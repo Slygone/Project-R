@@ -4,21 +4,28 @@ namespace Combat
 {
     public class EnemyFighter : Fighter
     {
-        protected override void Awake()
+        public void InitializeEnemy(EnemyData enemyData)
         {
-            base.Awake();
-            
-            // Initialize default enemy stats if not set
-            if (stats == null)
+            if(enemyData == null)
             {
-                stats = new BattleStats
-                {
-                    name = "Enemy",
-                    maxHealth = 50,
-                    currentHealth = 50,
-                    attackDamage = 5
-                };
+                Debug.LogError("EnemyData is null");
+                return;
+            }    
+
+            stats = new BattleStats
+            {
+                name = enemyData.enemyName,
+                maxHealth = enemyData.maxHealth,
+                currentHealth = enemyData.maxHealth,
+                attackDamage = enemyData.attackDamage
+            };
+
+            if(enemyData.enemySprite != null && spriteRenderer != null)
+            {
+                spriteRenderer.sprite = enemyData.enemySprite;
             }
-        }
+
+            UpdateHealthDisplay();
+        }        
     }
 }

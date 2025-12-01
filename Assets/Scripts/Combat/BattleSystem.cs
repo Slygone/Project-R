@@ -19,36 +19,42 @@ namespace Combat
 
         [Header("Fighters")]
         [SerializeField] private PlayerFighter player;
-        [SerializeField] private EnemyFighter enemy;
 
-        public void StartBattle()
+        [Header("Spawning")]
+        [SerializeField] private GameObject enemyPrefab;
+        [SerializeField] private Transform enemySpawnPoint;
+
+
+        private EnemyFighter currentEnemy;
+
+        public void StartBattle(EnemyData enemyData)
         {
             State = BattleState.Start;
-            StartCoroutine(SetupBattle());
+            StartCoroutine(SetupBattle(enemyData));
         }
 
-        private IEnumerator SetupBattle()
+        private IEnumerator SetupBattle(EnemyData enemyData)
         {
             Debug.Log("Setting up battle...");
             
-            if (player == null || enemy == null)
+            if (enemyPrefab != null && enemySpawnPoint != null)
             {
-                Debug.LogError("Player or Enemy fighter not assigned!");
+                GameObject go = Instantiate(enemyPrefab, enemySpawnPoint.position, Quaternion.identity);
+                currentEnemy = go.GetComponent<EnemyFighter>();
+
+                currentEnemy.InitializeEnemy(enemyData);
+                currentEnemy.Show();
+            }
+            else
+            {
+                Debug.LogError("Enemy Prefab or Spawn Point is missing");
                 yield break;
             }
 
-            // Reset health for new battle
-            // Player health carries over - only update display
             player.UpdateHealthDisplay();
-            // Enemy health resets each battle
-            enemy.ResetForBattle();
-
-            // Show enemy sprite and health
-            enemy.Show();
             
+            Debug.Log($"Spawning {currentEnemy.Stats.name} with {currentEnemy.Stats.maxHealth} HP");
             Debug.Log($"{player.Stats.name}: {player.Stats.currentHealth}/{player.Stats.maxHealth} HP");
-            Debug.Log($"{enemy.Stats.name}: {enemy.Stats.currentHealth}/{enemy.Stats.maxHealth} HP");
-            
             yield return new WaitForSeconds(1f);
 
             State = BattleState.PlayerTurn;
@@ -70,21 +76,21 @@ namespace Combat
         private IEnumerator PlayerAttack()
         {
             Debug.Log($"Player attacks for {player.Stats.attackDamage} damage!");
-            enemy.Stats.TakeDamage(player.Stats.attackDamage);
-            enemy.UpdateHealthDisplay();
-            Debug.Log($"Enemy HP: {enemy.Stats.currentHealth}/{enemy.Stats.maxHealth}");
+            currentEnemy.Stats.TakeDamage(player.Stats.attackDamage);
+            currentEnemy.UpdateHealthDisplay();
+            Debug.Log($"Enemy HP: {currentEnemy.Stats.currentHealth}/{currentEnemy.Stats.maxHealth}");
             
             yield return new WaitForSeconds(1f);
 
             // Check if enemy is defeated
-            if (!enemy.Stats.IsAlive())
+            if (!currentEnemy.Stats.IsAlive())
             {
                 Debug.Log("Enemy defeated! You won!");
                 State = BattleState.Won;
                 yield return new WaitForSeconds(1f);
                 
-                // Hide only enemy
-                enemy.Hide();
+                // Destroy the spawned enemy
+                Destroy(currentEnemy.gameObject);
                 
                 Core.GameManager.Instance.EndBattle();
                 yield break;
@@ -97,8 +103,8 @@ namespace Combat
 
         private IEnumerator EnemyTurn()
         {
-            Debug.Log($"Enemy attacks for {enemy.Stats.attackDamage} damage!");
-            player.Stats.TakeDamage(enemy.Stats.attackDamage);
+            Debug.Log($"Enemy attacks for {currentEnemy.Stats.attackDamage} damage!");
+            player.Stats.TakeDamage(currentEnemy.Stats.attackDamage);
             player.UpdateHealthDisplay();
             Debug.Log($"Player HP: {player.Stats.currentHealth}/{player.Stats.maxHealth}");
             
@@ -107,12 +113,8 @@ namespace Combat
             // Check if player is defeated
             if (!player.Stats.IsAlive())
             {
-                Debug.Log("You were defeated! Game Over!");
                 State = BattleState.Lost;
-                yield return new WaitForSeconds(1f);
-                
-                // Hide only enemy
-                enemy.Hide();
+                Debug.Log("You were defeated! Game Over!");   
                 
                 Core.GameManager.Instance.EndBattle();
                 yield break;

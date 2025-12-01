@@ -7,14 +7,14 @@ namespace Interaction
     {
         [SerializeField] private GameObject choiceMenu;
         [SerializeField] private GameObject restChoiceMenu;
-
-        private bool playerNearby = false;
+        
+        [Header("Combat Settings")]
+        [SerializeField] private System.Collections.Generic.List<Combat.EnemyData> possibleEnemies;
 
         private void OnTriggerEnter2D(Collider2D other)
         {
             if (other.CompareTag("Player"))
             {
-                playerNearby = true;
                 ShowChoiceMenu();
             }
         }
@@ -23,7 +23,6 @@ namespace Interaction
         {
             if (other.CompareTag("Player"))
             {
-                playerNearby = false;
                 HideChoiceMenu();
                 HideRestChoiceMenu();
             }
@@ -69,7 +68,20 @@ namespace Interaction
         {
             Debug.Log("Fight chosen!");
             HideChoiceMenu();
-            GameManager.Instance.StartBattle();
+            
+            if (possibleEnemies != null && possibleEnemies.Count > 0)
+            {
+                // Pick a random enemy from the list
+                int randomIndex = Random.Range(0, possibleEnemies.Count);
+                Combat.EnemyData selectedEnemy = possibleEnemies[randomIndex];
+                
+                Debug.Log($"Encounter started! Fighting: {selectedEnemy.enemyName}");
+                GameManager.Instance.StartBattle(selectedEnemy);
+            }
+            else
+            {
+                Debug.LogError("No enemies assigned to this InteractionTrigger!");
+            }
         }
 
         public void OnShopChoice()
@@ -87,7 +99,7 @@ namespace Interaction
 
         public void OnHealChoice()
         {
-            var playerFighter = FindObjectOfType<Combat.PlayerFighter>();
+            var playerFighter = FindFirstObjectByType<Combat.PlayerFighter>();
             if (playerFighter != null)
             {
                 // Heal +30 HP (can't exceed max)
@@ -105,7 +117,7 @@ namespace Interaction
 
         public void OnBoostAttackChoice()
         {
-            var playerFighter = FindObjectOfType<Combat.PlayerFighter>();
+            var playerFighter = FindFirstObjectByType<Combat.PlayerFighter>();
             if (playerFighter != null)
             {
                 // Increase attack damage by 10

@@ -47,18 +47,21 @@ namespace Core
                     if (battleSystem != null) battleSystem.gameObject.SetActive(false);
                     break;
                 case GameState.Battle:
-                    if (battleSystem != null)
-                    {
-                        battleSystem.gameObject.SetActive(true);
-                        battleSystem.StartBattle();
-                    }
+                    // Wait for StartBattle(EnemyData) to be called explicitly
                     break;
             }
         }
 
-        public void StartBattle()
+        public void StartBattle(Combat.EnemyData enemyData)
         {
             Debug.Log($"StartBattle called! BattleSystem is {(battleSystem == null ? "NULL" : "set")}");
+            
+            if (battleSystem != null)
+            {
+                battleSystem.gameObject.SetActive(true);
+                battleSystem.StartBattle(enemyData);
+            }
+            
             SetState(GameState.Battle);
         }
 
