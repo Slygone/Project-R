@@ -1,6 +1,7 @@
 using System.Text;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.EventSystems;
 using TMPro;
 
 public class PlayerStatsUI : MonoBehaviour
@@ -8,6 +9,9 @@ public class PlayerStatsUI : MonoBehaviour
     private GameObject statsPanel;
     private TextMeshProUGUI statsText;
     private TextMeshProUGUI relicsText;
+    private GameObject resistInfoIcon;
+    private GameObject resistTooltipPanel;
+    private TextMeshProUGUI resistTooltipText;
     private bool isOpen = false;
     private Referencer refs;
 
@@ -64,6 +68,69 @@ public class PlayerStatsUI : MonoBehaviour
         titleText.alignment = TextAlignmentOptions.Center;
         titleText.fontSize = 28;
         titleText.color = new Color(1f, 0.85f, 0.2f);
+
+        var infoObj = new GameObject("ResistInfo");
+        infoObj.transform.SetParent(panel.transform, false);
+        var infoRect = infoObj.AddComponent<RectTransform>();
+        infoRect.anchorMin = new Vector2(0.92f, 0.90f);
+        infoRect.anchorMax = new Vector2(0.98f, 0.98f);
+        infoRect.offsetMin = Vector2.zero;
+        infoRect.offsetMax = Vector2.zero;
+
+        var infoBg = infoObj.AddComponent<Image>();
+        infoBg.color = new Color(0.2f, 0.2f, 0.25f, 0.9f);
+
+        var infoTextObj = new GameObject("Text");
+        infoTextObj.transform.SetParent(infoObj.transform, false);
+        var infoTextRect = infoTextObj.AddComponent<RectTransform>();
+        infoTextRect.anchorMin = Vector2.zero;
+        infoTextRect.anchorMax = Vector2.one;
+        infoTextRect.offsetMin = Vector2.zero;
+        infoTextRect.offsetMax = Vector2.zero;
+
+        var infoText = infoTextObj.AddComponent<TextMeshProUGUI>();
+        infoText.text = "?";
+        infoText.alignment = TextAlignmentOptions.Center;
+        infoText.fontSize = 20;
+        infoText.color = new Color(0.8f, 0.9f, 1f);
+
+        resistInfoIcon = infoObj;
+
+        var tooltipObj = new GameObject("ResistTooltip");
+        tooltipObj.transform.SetParent(panel.transform, false);
+        var tooltipRect = tooltipObj.AddComponent<RectTransform>();
+        tooltipRect.anchorMin = new Vector2(0.45f, 0.78f);
+        tooltipRect.anchorMax = new Vector2(0.98f, 0.90f);
+        tooltipRect.offsetMin = Vector2.zero;
+        tooltipRect.offsetMax = Vector2.zero;
+
+        var tooltipBg = tooltipObj.AddComponent<Image>();
+        tooltipBg.color = new Color(0.1f, 0.1f, 0.15f, 0.95f);
+
+        var tooltipTextObj = new GameObject("TooltipText");
+        tooltipTextObj.transform.SetParent(tooltipObj.transform, false);
+        var tooltipTextRect = tooltipTextObj.AddComponent<RectTransform>();
+        tooltipTextRect.anchorMin = Vector2.zero;
+        tooltipTextRect.anchorMax = Vector2.one;
+        tooltipTextRect.offsetMin = new Vector2(8, 6);
+        tooltipTextRect.offsetMax = new Vector2(-8, -6);
+
+        resistTooltipText = tooltipTextObj.AddComponent<TextMeshProUGUI>();
+        resistTooltipText.fontSize = 12;
+        resistTooltipText.color = Color.white;
+        resistTooltipText.alignment = TextAlignmentOptions.TopLeft;
+        resistTooltipText.text = "Elemental resistance reduces incoming damage of that element.\nAll elements use Base Resistance.\nYour Affinity element also gets Bonus Resistance.";
+
+        resistTooltipPanel = tooltipObj;
+        resistTooltipPanel.SetActive(false);
+
+        var infoTrigger = infoObj.AddComponent<EventTrigger>();
+        var enter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+        enter.callback.AddListener((data) => { if (resistTooltipPanel != null) resistTooltipPanel.SetActive(true); });
+        infoTrigger.triggers.Add(enter);
+        var exit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
+        exit.callback.AddListener((data) => { if (resistTooltipPanel != null) resistTooltipPanel.SetActive(false); });
+        infoTrigger.triggers.Add(exit);
 
         var statsObj = new GameObject("Stats");
         statsObj.transform.SetParent(panel.transform, false);
@@ -173,6 +240,16 @@ public class PlayerStatsUI : MonoBehaviour
         sb.AppendLine($"  {FormatElementBonus(Element.Water, player, affinity)}");
         sb.AppendLine($"  {FormatElementBonus(Element.Wind, player, affinity)}");
         sb.AppendLine($"  {FormatElementBonus(Element.Rock, player, affinity)}");
+        sb.AppendLine();
+        
+        sb.AppendLine("<color=#55ffaa>Elemental Resistances:</color>");
+        int baseRes = player.GetBaseResistance();
+        int bonusRes = player.GetBonusResistance();
+        sb.AppendLine($"  {FormatElementResistance(Element.Fire, affinity, baseRes, bonusRes)}");
+        sb.AppendLine($"  {FormatElementResistance(Element.Ice, affinity, baseRes, bonusRes)}");
+        sb.AppendLine($"  {FormatElementResistance(Element.Water, affinity, baseRes, bonusRes)}");
+        sb.AppendLine($"  {FormatElementResistance(Element.Wind, affinity, baseRes, bonusRes)}");
+        sb.AppendLine($"  {FormatElementResistance(Element.Rock, affinity, baseRes, bonusRes)}");
 
         statsText.text = sb.ToString();
 
@@ -213,6 +290,14 @@ public class PlayerStatsUI : MonoBehaviour
         string color = GetElementColor(element);
         string activeMarker = element == affinity ? " <-" : "";
         return $"<color={color}>{element}:</color> +{bonus}{activeMarker}";
+    }
+
+    private string FormatElementResistance(Element element, Element affinity, int baseRes, int bonusRes)
+    {
+        int total = baseRes + (element == affinity ? bonusRes : 0);
+        string color = GetElementColor(element);
+        string bonusMarker = element == affinity && affinity != Element.None ? $" (+{bonusRes}%)" : "";
+        return $"<color={color}>{element}:</color> {total}%{bonusMarker}";
     }
 
     public static string GetSkillDescription(string skillName)
