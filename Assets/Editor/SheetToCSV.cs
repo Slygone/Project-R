@@ -27,6 +27,9 @@ public static class SheetToCSV
     private const string PlayerGid = "1551601093";
     private static readonly string DefaultPlayerCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={PlayerGid}";
 
+    private const string ElementalInterractionsGid = "990517346";
+    private static readonly string DefaultElementalInterractionsCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={ElementalInterractionsGid}";
+
     private const string ResourcesDir = "Assets/Resources/Data";
     private const string EnemyCsvPath = ResourcesDir + "/enemy.csv";
     private const string RestCsvPath = ResourcesDir + "/rest.csv";
@@ -34,6 +37,7 @@ public static class SheetToCSV
     private const string PotionCsvPath = ResourcesDir + "/potion.csv";
     private const string RelicCsvPath = ResourcesDir + "/relic.csv";
     private const string PlayerCsvPath = ResourcesDir + "/player.csv";
+    private const string ElementalInterractionsCsvPath = ResourcesDir + "/elementalInterractions.csv";
 
     [MenuItem("Tools/Data/Update All CSVs")]
     public static void UpdateAllCsvs()
@@ -46,6 +50,7 @@ public static class SheetToCSV
             (PotionCsvPath, DefaultPotionCsvUrl),
             (RelicCsvPath, DefaultRelicCsvUrl),
             (PlayerCsvPath, DefaultPlayerCsvUrl),
+            (ElementalInterractionsCsvPath, DefaultElementalInterractionsCsvUrl),
         };
         int total = jobs.Count;
         bool anyError = false;

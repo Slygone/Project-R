@@ -1,0 +1,4 @@
+Mark,FireDet,IceDet,WaterDet,WindDet,RockDet
+Fire,50% of damage delt over 2 turns,total damage * 1.75,total damage * 1.25 times,Deal 25% of the original damage to all enemies and shread resistance fire by 40%,Gives shield to the player equal to the 25% of the damage delt for fire element
+Ice,total damage * 1.25 times,Increased crit chance by 25%,Freeze enemy and increased crit chance and crit damage by 25%,Deal 25% of the original damage to all enemies and shread resistance by ice 40%,Gives shield to the player equal to the 25% of the damage delt for ice element
+Water,total damage * 1.25 times,Freeze enemy and increased crit chance and crit damage by 25%,deal damage to the next enemy 50% of the original,Deal 25% of the original damage to all enemies and shread resistance by water 40%,Gives shield to the player equal to the 25% of the damage delt for water element
