@@ -16,6 +16,7 @@ public class Referencer : MonoBehaviour
     public WeaponSelectionUI weaponSelectionUI;
     public TooltipUI tooltipUI;
     public ShopUI shopUI;
+    public PotionUI potionUI;
     
     public GameObject nodePopupPanel;
     public GameObject victoryPanel;
@@ -84,6 +85,29 @@ public class Referencer : MonoBehaviour
         {
             var shopObj = new GameObject("ShopUI");
             shopUI = shopObj.AddComponent<ShopUI>();
+        }
+        
+        potionUI = FindFirstObjectByType<PotionUI>();
+        if (potionUI == null)
+        {
+            var potionObj = new GameObject("PotionUI");
+            potionUI = potionObj.AddComponent<PotionUI>();
+        }
+
+        var mainCam = Camera.main;
+        if (mainCam != null)
+        {
+            var follow = mainCam.GetComponent<CameraFollow>();
+            if (follow == null)
+            {
+                follow = mainCam.gameObject.AddComponent<CameraFollow>();
+            }
+
+            if (follow.target == null)
+            {
+                if (playerController != null) follow.target = playerController.transform;
+                else if (player != null) follow.target = player.transform;
+            }
         }
         
         var canvas = GameObject.Find("Canvas");

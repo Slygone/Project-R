@@ -1,3 +1,3 @@
-Element,ElementID,Stat Affected,Amount,Status
+DisplayName,ElementID,Stat Affected,Amount,Status
 Heal,1,Health,20,Done
 Upgrade,2,Damage,5,Done

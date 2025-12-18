@@ -100,24 +100,35 @@ public class CombatManager : MonoBehaviour
 
     public void OnPlayerAttack()
     {
-        if (!combatActive || !isPlayerTurn) return;
-
         var target = GetFirstAliveEnemy();
-        if (target == null) return;
+        if (target != null)
+        {
+            OnPlayerAttackTarget(target);
+        }
+    }
+
+    public void OnPlayerAttackTarget(CombatEnemy target)
+    {
+        if (!combatActive || !isPlayerTurn) return;
+        if (target == null || !target.IsAlive()) return;
 
         Element attackElement = player.GetAffinity();
-        int damage = player.GetTotalDamage();
+        int baseDamage = player.GetTotalDamage();
         bool isCrit = false;
         
         if (Random.Range(0, 100) < player.GetCritChance())
         {
-            damage = Mathf.RoundToInt(damage * player.GetCritDamage());
+            baseDamage = Mathf.RoundToInt(baseDamage * player.GetCritDamage());
             isCrit = true;
         }
 
+        int damage = target.ApplyResistance(baseDamage, attackElement);
+        int resistPercent = target.CalculateResistance(attackElement);
+        
         target.TakeDamage(damage);
         string critText = isCrit ? " (CRIT!)" : "";
-        Debug.Log($"[CombatManager] Player dealt {damage} {attackElement} damage to {target.Name}{critText}. Enemy HP: {target.Health}/{target.MaxHealth}");
+        string resistText = resistPercent > 0 ? $" ({resistPercent}% resisted)" : "";
+        Debug.Log($"[CombatManager] Player dealt {damage} {attackElement} damage to {target.Name}{critText}{resistText}. Enemy HP: {target.Health}/{target.MaxHealth}");
 
         if (combatUI != null)
         {
@@ -142,7 +153,17 @@ public class CombatManager : MonoBehaviour
 
     public void OnPlayerSkill(int skillNumber)
     {
+        var target = GetFirstAliveEnemy();
+        if (target != null)
+        {
+            OnPlayerSkillTarget(skillNumber, target);
+        }
+    }
+
+    public void OnPlayerSkillTarget(int skillNumber, CombatEnemy target)
+    {
         if (!combatActive || !isPlayerTurn) return;
+        if (target == null || !target.IsAlive()) return;
 
         var weapon = player.GetWeapon();
         if (weapon == null)
@@ -158,9 +179,6 @@ public class CombatManager : MonoBehaviour
             3 => weapon.Skill3,
             _ => "Unknown"
         };
-
-        var target = GetFirstAliveEnemy();
-        if (target == null) return;
 
         int damage = player.GetTotalDamage();
         string effectText = "";
@@ -235,8 +253,13 @@ public class CombatManager : MonoBehaviour
                 break;
         }
 
-        target.TakeDamage(damage);
-        Debug.Log($"[CombatManager] Player {effectText} {target.Name} for {damage} damage! ({skillName})");
+        Element attackElement = player.GetAffinity();
+        int finalDamage = target.ApplyResistance(damage, attackElement);
+        int resistPercent = target.CalculateResistance(attackElement);
+        
+        target.TakeDamage(finalDamage);
+        string resistText = resistPercent > 0 ? $" ({resistPercent}% resisted)" : "";
+        Debug.Log($"[CombatManager] Player {effectText} {target.Name} for {finalDamage} damage! ({skillName}){resistText}");
 
         if (combatUI != null)
         {
@@ -261,11 +284,13 @@ public class CombatManager : MonoBehaviour
 
     private void DamageAllEnemies(int damage)
     {
+        Element attackElement = player.GetAffinity();
         foreach (var enemy in enemies)
         {
             if (enemy.IsAlive())
             {
-                enemy.TakeDamage(damage);
+                int finalDamage = enemy.ApplyResistance(damage, attackElement);
+                enemy.TakeDamage(finalDamage);
                 if (combatUI != null)
                 {
                     combatUI.UpdateEnemyHealth(enemy);
@@ -282,8 +307,12 @@ public class CombatManager : MonoBehaviour
         {
             if (enemy.IsAlive())
             {
-                totalDamage += enemy.Damage;
-                Debug.Log($"[CombatManager] {enemy.Name} attacks for {enemy.Damage} damage");
+                int baseDamage = enemy.Damage;
+                int finalDamage = player.ApplyResistance(baseDamage, enemy.Affinity);
+                totalDamage += finalDamage;
+                
+                string elementText = enemy.Affinity != Element.None ? $" ({enemy.Affinity})" : "";
+                Debug.Log($"[CombatManager] {enemy.Name}{elementText} attacks for {finalDamage} damage (base: {baseDamage})");
             }
         }
 
@@ -390,6 +419,7 @@ public class CombatManager : MonoBehaviour
     }
 
     public bool IsCombatActive() => combatActive;
+    public bool IsInCombat() => combatActive;
     public bool IsPlayerTurn() => isPlayerTurn;
     public List<CombatEnemy> GetEnemies() => enemies;
 }

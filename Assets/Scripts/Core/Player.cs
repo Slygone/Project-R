@@ -11,7 +11,13 @@ public class Player : MonoBehaviour
     private int maxEnergy;
     private int critChance;
     private float critDamage;
+    private int baseResistance;
+    private int bonusResistance;
+    private int tempCritChanceBonus = 0;
+    private int tempCritDamageBonus = 0;
     private List<RelicData> relics = new List<RelicData>();
+    private List<PotionData> potionInventory = new List<PotionData>();
+    private const int MAX_POTIONS = 4;
     private ElementalDamage elementalDamage = new ElementalDamage();
     private Element affinity = Element.None;
     private WeaponData equippedWeapon = null;
@@ -27,8 +33,10 @@ public class Player : MonoBehaviour
         energy = maxEnergy;
         critChance = stats.CritChance;
         critDamage = stats.CritDamage;
+        baseResistance = stats.BaseResistance;
+        bonusResistance = stats.BonusResistance;
 
-        Debug.Log($"[Player] Initialized - HP: {health}/{maxHealth}, Base Damage: {baseDamage}, Gold: {gold}, Energy: {energy}/{maxEnergy}, Crit: {critChance}% x{critDamage}");
+        Debug.Log($"[Player] Initialized - HP: {health}/{maxHealth}, Base Damage: {baseDamage}, Gold: {gold}, Energy: {energy}/{maxEnergy}, Crit: {critChance}% x{critDamage}, Resist: {baseResistance}+{bonusResistance}");
     }
 
     public int GetHealth() => health;
@@ -46,8 +54,30 @@ public class Player : MonoBehaviour
     public int GetGold() => gold;
     public int GetEnergy() => energy;
     public int GetMaxEnergy() => maxEnergy;
-    public int GetCritChance() => critChance;
-    public float GetCritDamage() => critDamage;
+    public int GetCritChance() => critChance + tempCritChanceBonus;
+    public float GetCritDamage() => critDamage + (tempCritDamageBonus / 100f);
+    public int GetBaseResistance() => baseResistance;
+    public int GetBonusResistance() => bonusResistance;
+
+    public int CalculateResistance(Element attackerAffinity)
+    {
+        int totalResistance = baseResistance;
+        
+        if (affinity != Element.None && attackerAffinity == affinity)
+        {
+            totalResistance += bonusResistance;
+        }
+        
+        return totalResistance;
+    }
+
+    public int ApplyResistance(int damage, Element attackerAffinity)
+    {
+        int resistance = CalculateResistance(attackerAffinity);
+        float multiplier = 1f - (resistance / 100f);
+        if (multiplier < 0f) multiplier = 0f;
+        return Mathf.RoundToInt(damage * multiplier);
+    }
 
     public void TakeDamage(int amount)
     {
@@ -156,4 +186,95 @@ public class Player : MonoBehaviour
     public List<RelicData> GetRelics() => relics;
 
     public bool IsAlive() => health > 0;
+
+    public bool CanAddPotion() => potionInventory.Count < MAX_POTIONS;
+    public int GetPotionCount() => potionInventory.Count;
+    public int GetMaxPotions() => MAX_POTIONS;
+    public List<PotionData> GetPotions() => potionInventory;
+
+    public void AddPotionToInventory(PotionData potion)
+    {
+        if (potionInventory.Count >= MAX_POTIONS)
+        {
+            Debug.Log($"[Player] Potion inventory full, cannot add {potion.DisplayName}");
+            return;
+        }
+        potionInventory.Add(potion);
+        Debug.Log($"[Player] Added {potion.DisplayName} to inventory ({potionInventory.Count}/{MAX_POTIONS})");
+    }
+
+    public bool UsePotion(int index, CombatEnemy target = null, Element elementOverride = Element.None)
+    {
+        if (index < 0 || index >= potionInventory.Count)
+        {
+            Debug.Log($"[Player] Invalid potion index: {index}");
+            return false;
+        }
+
+        var potion = potionInventory[index];
+        potionInventory.RemoveAt(index);
+
+        var stat = potion.StatAffected.ToLower().Trim();
+        switch (stat)
+        {
+            case "health":
+                Heal(potion.Amount);
+                Debug.Log($"[Player] Used {potion.DisplayName}: Healed {potion.Amount} HP");
+                break;
+            case "elemental afinity direct damage":
+                if (target != null && target.IsAlive())
+                {
+                    Element element = elementOverride != Element.None ? elementOverride : GetRandomElement();
+                    int damage = target.ApplyResistance(potion.Amount, element);
+                    target.TakeDamage(damage);
+                    Debug.Log($"[Player] Used {potion.DisplayName} ({element}): Dealt {damage} damage to {target.Name}");
+                }
+                else
+                {
+                    Debug.Log($"[Player] Used {potion.DisplayName}: No valid target for damage potion");
+                    potionInventory.Insert(index, potion);
+                    return false;
+                }
+                break;
+            case "crit rate":
+                tempCritChanceBonus += potion.Amount;
+                Debug.Log($"[Player] Used {potion.DisplayName}: +{potion.Amount}% crit chance (now {GetCritChance()}%)");
+                break;
+            case "crit damage":
+                tempCritDamageBonus += potion.Amount;
+                Debug.Log($"[Player] Used {potion.DisplayName}: +{potion.Amount}% crit damage (now {GetCritDamage():F2}x)");
+                break;
+            default:
+                Debug.LogWarning($"[Player] Unknown potion stat: {potion.StatAffected}");
+                return false;
+        }
+
+        return true;
+    }
+
+    public bool IsElementalPotion(int index)
+    {
+        if (index < 0 || index >= potionInventory.Count) return false;
+        var stat = potionInventory[index].StatAffected.ToLower().Trim();
+        return stat.Contains("elemental");
+    }
+
+    public PotionData GetPotion(int index)
+    {
+        if (index < 0 || index >= potionInventory.Count) return null;
+        return potionInventory[index];
+    }
+
+    private Element GetRandomElement()
+    {
+        var elements = new Element[] { Element.Fire, Element.Ice, Element.Water, Element.Wind, Element.Rock };
+        return elements[Random.Range(0, elements.Length)];
+    }
+
+    public void ResetWorldBonuses()
+    {
+        tempCritChanceBonus = 0;
+        tempCritDamageBonus = 0;
+        Debug.Log("[Player] World bonuses reset");
+    }
 }

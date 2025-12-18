@@ -130,7 +130,7 @@ public class PlayerStatsUI : MonoBehaviour
         statsPanel.SetActive(isOpen);
     }
 
-    private void UpdateStats()
+    public void UpdateStats()
     {
         if (refs == null || refs.player == null) return;
 

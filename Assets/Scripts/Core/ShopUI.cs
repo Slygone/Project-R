@@ -15,7 +15,9 @@ public class ShopUI : MonoBehaviour
     private GameObject relicContainer;
     private TextMeshProUGUI goldText;
     private List<RelicData> currentRelicChoices = new List<RelicData>();
+    private List<PotionData> currentPotionChoices = new List<PotionData>();
     private List<GameObject> relicButtons = new List<GameObject>();
+    private List<GameObject> potionButtons = new List<GameObject>();
     private Action onShopClosed;
     private bool isActive = false;
     private Player player;
@@ -258,22 +260,40 @@ public class ShopUI : MonoBehaviour
 
     private void PopulatePotions()
     {
-        foreach (Transform child in potionContainer.transform)
+        foreach (var btn in potionButtons)
         {
-            Destroy(child.gameObject);
+            if (btn != null) Destroy(btn);
         }
+        potionButtons.Clear();
 
-        var potions = DataCache.Potions;
-        if (potions == null || potions.Count == 0)
-        {
-            Debug.LogWarning("[ShopUI] No potions loaded in DataCache");
-            return;
-        }
+        currentPotionChoices = GetRandomPotions(3);
 
-        foreach (var potion in potions)
+        foreach (var potion in currentPotionChoices)
         {
             CreatePotionButton(potion);
         }
+    }
+
+    private List<PotionData> GetRandomPotions(int count)
+    {
+        var allPotions = DataCache.Potions;
+        if (allPotions == null || allPotions.Count == 0)
+        {
+            Debug.LogWarning("[ShopUI] No potions loaded in DataCache");
+            return new List<PotionData>();
+        }
+
+        var available = new List<PotionData>(allPotions);
+        var result = new List<PotionData>();
+
+        while (result.Count < count && available.Count > 0)
+        {
+            int index = UnityEngine.Random.Range(0, available.Count);
+            result.Add(available[index]);
+            available.RemoveAt(index);
+        }
+
+        return result;
     }
 
     private void CreatePotionButton(PotionData potion)
@@ -286,9 +306,11 @@ public class ShopUI : MonoBehaviour
 
         var btn = btnObj.AddComponent<Button>();
         btn.targetGraphic = btnImage;
+        potionButtons.Add(btnObj);
 
         PotionData capturedPotion = potion;
-        btn.onClick.AddListener(() => OnPotionClicked(capturedPotion, btnObj));
+        GameObject capturedBtn = btnObj;
+        btn.onClick.AddListener(() => OnPotionClicked(capturedPotion, capturedBtn));
 
         var layout = btnObj.AddComponent<VerticalLayoutGroup>();
         layout.spacing = 5;
@@ -447,28 +469,23 @@ public class ShopUI : MonoBehaviour
             return;
         }
 
+        if (!player.CanAddPotion())
+        {
+            Debug.Log($"[ShopUI] Potion inventory full (max 4)");
+            return;
+        }
+
         player.AddGold(-POTION_PRICE);
-        ApplyPotion(potion);
+        player.AddPotionToInventory(potion);
         RefreshGoldDisplay();
 
-        Debug.Log($"[ShopUI] Purchased {potion.DisplayName} for {POTION_PRICE} gold");
-    }
-
-    private void ApplyPotion(PotionData potion)
-    {
-        var stat = potion.StatAffected.ToLower().Trim();
-        switch (stat)
+        if (btnObj != null)
         {
-            case "health":
-                player.Heal(potion.Amount);
-                break;
-            case "damage":
-                player.AddBaseDamage(potion.Amount);
-                break;
-            default:
-                Debug.LogWarning($"[ShopUI] Unknown potion stat: {potion.StatAffected}");
-                break;
+            potionButtons.Remove(btnObj);
+            Destroy(btnObj);
         }
+
+        Debug.Log($"[ShopUI] Purchased {potion.DisplayName} for {POTION_PRICE} gold");
     }
 
     private void OnRelicClicked(RelicData relic, GameObject btnObj)

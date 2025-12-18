@@ -1,9 +1,9 @@
-Type,Element,ElementID,Health,Skill1,Skill2,Damage,BaseRessistance,BonusRessistance,Initiative,Status
-Enemy,Grunt,1,50,Attack1,Attack2,8,25,5,1,Done
-Enemy,Wizard,2,40,Attack1,Attack2,8,10,20,1,Done
-Enemy,Archer,3,35,Attack1,Attack2,10,15,10,1,Done
-Enemy,Rogue,4,30,Attack1,Attack2,9,5,15,1,Done
-Elite Enemy,Juggernaut,5,110,Attack1,Attack2,18,20,10,1,Done
-Elite Enemy,Spellbreaker,6,85,Attack1,Attack2,20,10,10,1,Done
-Boss Enemy,SlimeBoss,7,300,Attack1,Attack2,10,40,10,1,Done
-Boss Enemy,RainbowBoss,8,200,Attack1,Attack2,20,20,20,1,Done
+Type,Element,ElementID,Health,Skill1,Skill2,Damage,BaseRessistance,BonusRessistance,Status
+Enemy,Grunt,1,50,Attack1,Attack2,8,25,5,Done
+Enemy,Wizard,2,40,Attack1,Attack2,8,10,20,Done
+Enemy,Archer,3,35,Attack1,Attack2,10,15,10,Done
+Enemy,Rogue,4,30,Attack1,Attack2,9,5,15,Done
+Elite Enemy,Juggernaut,5,110,Attack1,Attack2,18,20,10,Done
+Elite Enemy,Spellbreaker,6,85,Attack1,Attack2,20,10,10,Done
+Boss Enemy,SlimeBoss,7,300,Attack1,Attack2,10,40,10,Done
+Boss Enemy,RainbowBoss,8,200,Attack1,Attack2,20,20,20,Done

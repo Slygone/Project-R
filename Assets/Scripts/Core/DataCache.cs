@@ -46,7 +46,9 @@ public static class DataCache
                 Element = CSVParser.ParseString(row, "Element"),
                 ElementID = CSVParser.ParseInt(row, "ElementID"),
                 Health = CSVParser.ParseInt(row, "Health"),
-                Damage = CSVParser.ParseInt(row, "Damage")
+                Damage = CSVParser.ParseInt(row, "Damage"),
+                BaseResistance = CSVParser.ParseInt(row, "BaseRessistance"),
+                BonusResistance = CSVParser.ParseInt(row, "BonusRessistance")
             };
             
             list.Add(enemy);
@@ -69,7 +71,7 @@ public static class DataCache
         {
             list.Add(new RestData
             {
-                Element = CSVParser.ParseString(row, "Element"),
+                Element = CSVParser.ParseString(row, "DisplayName"),
                 ElementID = CSVParser.ParseInt(row, "ElementID"),
                 StatAffected = CSVParser.ParseString(row, "Stat Affected"),
                 Amount = CSVParser.ParseInt(row, "Amount")
@@ -165,7 +167,9 @@ public static class DataCache
             Gold = CSVParser.ParseInt(row, "Gold"),
             MaxEnergy = CSVParser.ParseInt(row, "MaxEnergy"),
             CritChance = CSVParser.ParseInt(row, "CritChance"),
-            CritDamage = CSVParser.ParseFloat(row, "CritDamage")
+            CritDamage = CSVParser.ParseFloat(row, "CritDamage"),
+            BaseResistance = CSVParser.ParseInt(row, "BaseRessistance"),
+            BonusResistance = CSVParser.ParseInt(row, "BonusRessistance")
         };
     }
 }
