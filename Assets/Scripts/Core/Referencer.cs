@@ -15,6 +15,7 @@ public class Referencer : MonoBehaviour
     public AffinitySelectionUI affinitySelectionUI;
     public WeaponSelectionUI weaponSelectionUI;
     public TooltipUI tooltipUI;
+    public ShopUI shopUI;
     
     public GameObject nodePopupPanel;
     public GameObject victoryPanel;
@@ -76,6 +77,13 @@ public class Referencer : MonoBehaviour
         {
             var ttObj = new GameObject("TooltipUI");
             tooltipUI = ttObj.AddComponent<TooltipUI>();
+        }
+        
+        shopUI = FindFirstObjectByType<ShopUI>();
+        if (shopUI == null)
+        {
+            var shopObj = new GameObject("ShopUI");
+            shopUI = shopObj.AddComponent<ShopUI>();
         }
         
         var canvas = GameObject.Find("Canvas");

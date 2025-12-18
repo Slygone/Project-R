@@ -1,2 +1,2 @@
-MaxHealth,Damage,Gold,MaxEnergy,CritChance,CritDamage
-150,5,0,10,10,1.7
+MaxHealth,Damage,Gold,MaxEnergy,CritChance,CritDamage,BaseRessistance,BonusRessistance
+150,5,0,10,10,1.7,10,5

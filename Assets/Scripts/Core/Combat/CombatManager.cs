@@ -1,6 +1,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+public enum CombatType { Normal, Elite, Boss }
+
 public class CombatManager : MonoBehaviour
 {
     private List<CombatEnemy> enemies = new List<CombatEnemy>();
@@ -8,9 +10,55 @@ public class CombatManager : MonoBehaviour
     private CombatUI combatUI;
     private bool isPlayerTurn = true;
     private bool combatActive = false;
-    private CombatNode currentNode;
+    private NodeBase currentNode;
+    private CombatType currentCombatType = CombatType.Normal;
 
     public void StartCombat(CombatNode node, Player playerRef)
+    {
+        currentCombatType = CombatType.Normal;
+        StartCombatInternal(node, playerRef, DataCache.RegularEnemies, Random.Range(1, 4));
+    }
+
+    public void StartEliteCombat(NodeBase node, Player playerRef)
+    {
+        currentCombatType = CombatType.Elite;
+        StartCombatInternal(node, playerRef, DataCache.EliteEnemies, 1);
+    }
+
+    public void StartBossCombat(Player playerRef, System.Action<bool> onBossComplete)
+    {
+        currentCombatType = CombatType.Boss;
+        onBossCombatComplete = onBossComplete;
+        currentNode = null;
+        
+        if (combatUI == null)
+        {
+            combatUI = FindFirstObjectByType<CombatUI>();
+        }
+
+        player = playerRef;
+        enemies.Clear();
+
+        if (DataCache.BossEnemies.Count > 0)
+        {
+            var bossData = DataCache.BossEnemies[Random.Range(0, DataCache.BossEnemies.Count)];
+            enemies.Add(new CombatEnemy(bossData));
+        }
+
+        combatActive = true;
+        isPlayerTurn = true;
+
+        Debug.Log($"[CombatManager] BOSS FIGHT started: {enemies[0].Name}");
+
+        if (combatUI != null)
+        {
+            combatUI.ShowCombat(enemies, player, "BOSS FIGHT!");
+        }
+    }
+
+    private System.Action<bool> onBossCombatComplete;
+
+    private void StartCombatInternal(NodeBase node, Player playerRef, List<EnemyData> enemyPool, int enemyCount)
     {
         if (combatUI == null)
         {
@@ -21,25 +69,28 @@ public class CombatManager : MonoBehaviour
         player = playerRef;
         enemies.Clear();
 
-        int enemyCount = Random.Range(1, 4);
-        var availableEnemies = DataCache.Enemies;
+        if (enemyPool == null || enemyPool.Count == 0)
+        {
+            enemyPool = DataCache.RegularEnemies;
+        }
 
         for (int i = 0; i < enemyCount; i++)
         {
-            int randomIndex = Random.Range(0, availableEnemies.Count);
-            var enemyData = availableEnemies[randomIndex];
+            int randomIndex = Random.Range(0, enemyPool.Count);
+            var enemyData = enemyPool[randomIndex];
             enemies.Add(new CombatEnemy(enemyData));
         }
 
         combatActive = true;
         isPlayerTurn = true;
 
-        Debug.Log($"[CombatManager] Combat started with {enemies.Count} enemies");
+        string combatTypeLabel = currentCombatType == CombatType.Elite ? "ELITE " : "";
+        Debug.Log($"[CombatManager] {combatTypeLabel}Combat started with {enemies.Count} enemies");
 
         if (combatUI != null)
         {
-            Debug.Log("[CombatManager] Showing combat UI");
-            combatUI.ShowCombat(enemies, player);
+            string title = currentCombatType == CombatType.Elite ? "ELITE ENCOUNTER!" : null;
+            combatUI.ShowCombat(enemies, player, title);
         }
         else
         {
@@ -282,17 +333,35 @@ public class CombatManager : MonoBehaviour
     private void EndCombat(bool victory)
     {
         combatActive = false;
-        Debug.Log($"[CombatManager] Combat ended. Victory: {victory}");
+        Debug.Log($"[CombatManager] Combat ended. Victory: {victory}, Type: {currentCombatType}");
+
+        if (currentCombatType == CombatType.Boss)
+        {
+            if (combatUI != null)
+            {
+                combatUI.HideCombat();
+            }
+            onBossCombatComplete?.Invoke(victory);
+            onBossCombatComplete = null;
+            return;
+        }
 
         if (victory)
         {
             int goldReward = Random.Range(1, 11);
+            
+            if (currentCombatType == CombatType.Elite)
+            {
+                goldReward *= 2;
+            }
+            
             var availableRelics = DataCache.Relics;
             RelicData relicReward = availableRelics[Random.Range(0, availableRelics.Count)];
 
             if (combatUI != null)
             {
-                combatUI.ShowLootPanel(goldReward, relicReward, player, currentNode);
+                string lootTitle = currentCombatType == CombatType.Elite ? "ELITE VICTORY!\n(Double Rewards)" : null;
+                combatUI.ShowLootPanel(goldReward, relicReward, player, currentNode, lootTitle);
             }
         }
         else

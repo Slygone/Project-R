@@ -96,7 +96,7 @@ public class GameManager : MonoBehaviour
 
         if (completedNodes >= TOTAL_NODES)
         {
-            ShowVictory();
+            StartBossFight();
         }
     }
 
@@ -105,6 +105,40 @@ public class GameManager : MonoBehaviour
         if (refs != null && refs.nodeCounterText != null)
         {
             refs.nodeCounterText.text = $"Nodes Completed: {completedNodes}/{TOTAL_NODES}";
+        }
+    }
+
+    private void StartBossFight()
+    {
+        Debug.Log("[GameManager] All nodes completed! Starting BOSS FIGHT!");
+        
+        if (refs != null && refs.playerController != null)
+        {
+            refs.playerController.SetCanMove(false);
+        }
+
+        if (refs != null && refs.combatManager != null && refs.player != null)
+        {
+            refs.combatManager.StartBossCombat(refs.player, OnBossFightComplete);
+        }
+        else
+        {
+            Debug.LogError("[GameManager] CombatManager or Player not found for boss fight");
+            ShowVictory();
+        }
+    }
+
+    private void OnBossFightComplete(bool victory)
+    {
+        if (victory)
+        {
+            Debug.Log("[GameManager] BOSS DEFEATED! Player wins the level!");
+            ShowVictory();
+        }
+        else
+        {
+            Debug.Log("[GameManager] Player defeated by boss. Game Over!");
+            ShowDefeat();
         }
     }
 
@@ -118,6 +152,45 @@ public class GameManager : MonoBehaviour
         if (refs != null && refs.playerController != null)
         {
             refs.playerController.SetCanMove(false);
+        }
+    }
+
+    private void ShowDefeat()
+    {
+        Debug.Log("[GameManager] Showing defeat screen");
+        
+        if (refs != null && refs.playerController != null)
+        {
+            refs.playerController.SetCanMove(false);
+        }
+        
+        var canvas = GameObject.Find("Canvas");
+        if (canvas != null)
+        {
+            var defeatPanel = new GameObject("DefeatPanel");
+            defeatPanel.transform.SetParent(canvas.transform, false);
+            
+            var rect = defeatPanel.AddComponent<UnityEngine.RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            
+            var bg = defeatPanel.AddComponent<UnityEngine.UI.Image>();
+            bg.color = new Color(0.1f, 0f, 0f, 0.95f);
+            
+            var textObj = new GameObject("DefeatText");
+            textObj.transform.SetParent(defeatPanel.transform, false);
+            var textRect = textObj.AddComponent<UnityEngine.RectTransform>();
+            textRect.anchorMin = new Vector2(0.2f, 0.4f);
+            textRect.anchorMax = new Vector2(0.8f, 0.6f);
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+            var text = textObj.AddComponent<TMPro.TextMeshProUGUI>();
+            text.text = "DEFEATED\nThe boss was too powerful...";
+            text.alignment = TMPro.TextAlignmentOptions.Center;
+            text.fontSize = 48;
+            text.color = Color.red;
         }
     }
 }

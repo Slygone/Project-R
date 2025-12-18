@@ -26,11 +26,13 @@ public class CombatUI : MonoBehaviour
     
     private TextMeshProUGUI lootGoldText;
     private TextMeshProUGUI lootRelicText;
+    private TextMeshProUGUI lootTitleText;
     private Button collectLootButton;
     private int pendingGold;
     private RelicData pendingRelic;
     private Player pendingPlayer;
-    private CombatNode pendingNode;
+    private NodeBase pendingNode;
+    private TextMeshProUGUI combatTitleText;
 
     void Awake()
     {
@@ -67,6 +69,19 @@ public class CombatUI : MonoBehaviour
 
         var bg = panel.AddComponent<Image>();
         bg.color = new Color(0, 0, 0, 0.85f);
+
+        var titleObj = new GameObject("CombatTitle");
+        titleObj.transform.SetParent(panel.transform, false);
+        var titleRect = titleObj.AddComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0.3f, 0.88f);
+        titleRect.anchorMax = new Vector2(0.7f, 0.95f);
+        titleRect.offsetMin = Vector2.zero;
+        titleRect.offsetMax = Vector2.zero;
+        combatTitleText = titleObj.AddComponent<TextMeshProUGUI>();
+        combatTitleText.text = "COMBAT";
+        combatTitleText.alignment = TextAlignmentOptions.Center;
+        combatTitleText.fontSize = 28;
+        combatTitleText.color = Color.white;
 
         CreatePlayerHealthBar(panel.transform);
         CreateEnemyContainer(panel.transform);
@@ -247,7 +262,7 @@ public class CombatUI : MonoBehaviour
         }
     }
 
-    public void ShowCombat(List<CombatEnemy> enemies, Player player)
+    public void ShowCombat(List<CombatEnemy> enemies, Player player, string title = null)
     {
         if (combatPanel == null)
         {
@@ -260,6 +275,12 @@ public class CombatUI : MonoBehaviour
         foreach (var enemy in enemies)
         {
             CreateEnemySlot(enemy);
+        }
+
+        if (combatTitleText != null)
+        {
+            combatTitleText.text = title ?? "COMBAT";
+            combatTitleText.color = string.IsNullOrEmpty(title) ? Color.white : new Color(1f, 0.5f, 0.2f);
         }
 
         UpdateSkillButtons(player);
@@ -296,6 +317,12 @@ public class CombatUI : MonoBehaviour
 
     public void HideCombat()
     {
+        var tooltipUI = FindFirstObjectByType<TooltipUI>();
+        if (tooltipUI != null)
+        {
+            tooltipUI.Hide();
+        }
+        
         combatPanel.SetActive(false);
         ClearEnemySlots();
     }
@@ -465,11 +492,11 @@ public class CombatUI : MonoBehaviour
         titleRect.anchorMax = new Vector2(1, 0.95f);
         titleRect.offsetMin = Vector2.zero;
         titleRect.offsetMax = Vector2.zero;
-        var titleText = titleObj.AddComponent<TextMeshProUGUI>();
-        titleText.text = "VICTORY!";
-        titleText.alignment = TextAlignmentOptions.Center;
-        titleText.fontSize = 32;
-        titleText.color = new Color(1f, 0.85f, 0.2f);
+        lootTitleText = titleObj.AddComponent<TextMeshProUGUI>();
+        lootTitleText.text = "VICTORY!";
+        lootTitleText.alignment = TextAlignmentOptions.Center;
+        lootTitleText.fontSize = 32;
+        lootTitleText.color = new Color(1f, 0.85f, 0.2f);
 
         var goldObj = new GameObject("GoldText");
         goldObj.transform.SetParent(panel.transform, false);
@@ -524,13 +551,17 @@ public class CombatUI : MonoBehaviour
         return panel;
     }
 
-    public void ShowLootPanel(int gold, RelicData relic, Player player, CombatNode node)
+    public void ShowLootPanel(int gold, RelicData relic, Player player, NodeBase node, string title = null)
     {
         pendingGold = gold;
         pendingRelic = relic;
         pendingPlayer = player;
         pendingNode = node;
 
+        if (lootTitleText != null)
+        {
+            lootTitleText.text = title ?? "VICTORY!";
+        }
         lootGoldText.text = $"Gold: +{gold}";
         lootRelicText.text = $"Relic: {relic.DisplayName}\n({relic.StatAffected} +{relic.Amount})";
 

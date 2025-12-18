@@ -4,6 +4,9 @@ using UnityEngine;
 public static class DataCache
 {
     public static List<EnemyData> Enemies { get; private set; }
+    public static List<EnemyData> RegularEnemies { get; private set; }
+    public static List<EnemyData> EliteEnemies { get; private set; }
+    public static List<EnemyData> BossEnemies { get; private set; }
     public static List<RestData> RestOptions { get; private set; }
     public static List<WeaponData> Weapons { get; private set; }
     public static List<PotionData> Potions { get; private set; }
@@ -31,15 +34,26 @@ public static class DataCache
         var rows = CSVParser.Parse(csv.text);
         var list = new List<EnemyData>();
 
+        RegularEnemies = new List<EnemyData>();
+        EliteEnemies = new List<EnemyData>();
+        BossEnemies = new List<EnemyData>();
+
         foreach (var row in rows)
         {
-            list.Add(new EnemyData
+            var enemy = new EnemyData
             {
+                Type = CSVParser.ParseString(row, "Type"),
                 Element = CSVParser.ParseString(row, "Element"),
                 ElementID = CSVParser.ParseInt(row, "ElementID"),
                 Health = CSVParser.ParseInt(row, "Health"),
                 Damage = CSVParser.ParseInt(row, "Damage")
-            });
+            };
+            
+            list.Add(enemy);
+            
+            if (enemy.IsRegular) RegularEnemies.Add(enemy);
+            else if (enemy.IsElite) EliteEnemies.Add(enemy);
+            else if (enemy.IsBoss) BossEnemies.Add(enemy);
         }
 
         return list;
