@@ -6,8 +6,15 @@ using UnityEngine.UI;
 public class Referencer : MonoBehaviour
 {
     public GameManager gm;
-    public PlayerController player;
+    public PlayerController playerController;
+    public Player player;
     public UIManager ui;
+    public CombatManager combatManager;
+    public CombatUI combatUI;
+    public PlayerStatsUI playerStatsUI;
+    public AffinitySelectionUI affinitySelectionUI;
+    public WeaponSelectionUI weaponSelectionUI;
+    public TooltipUI tooltipUI;
     
     public GameObject nodePopupPanel;
     public GameObject victoryPanel;
@@ -25,8 +32,51 @@ public class Referencer : MonoBehaviour
         }
 
 
-        player = FindFirstObjectByType<PlayerController>();
+        playerController = FindFirstObjectByType<PlayerController>();
+        player = FindFirstObjectByType<Player>();
         ui = FindFirstObjectByType<UIManager>();
+        
+        combatManager = FindFirstObjectByType<CombatManager>();
+        if (combatManager == null)
+        {
+            var cmObj = new GameObject("CombatManager");
+            combatManager = cmObj.AddComponent<CombatManager>();
+        }
+        
+        combatUI = FindFirstObjectByType<CombatUI>();
+        if (combatUI == null)
+        {
+            var cuiObj = new GameObject("CombatUI");
+            combatUI = cuiObj.AddComponent<CombatUI>();
+        }
+        
+        playerStatsUI = FindFirstObjectByType<PlayerStatsUI>();
+        if (playerStatsUI == null)
+        {
+            var psuiObj = new GameObject("PlayerStatsUI");
+            playerStatsUI = psuiObj.AddComponent<PlayerStatsUI>();
+        }
+        
+        affinitySelectionUI = FindFirstObjectByType<AffinitySelectionUI>();
+        if (affinitySelectionUI == null)
+        {
+            var asuiObj = new GameObject("AffinitySelectionUI");
+            affinitySelectionUI = asuiObj.AddComponent<AffinitySelectionUI>();
+        }
+        
+        weaponSelectionUI = FindFirstObjectByType<WeaponSelectionUI>();
+        if (weaponSelectionUI == null)
+        {
+            var wsuiObj = new GameObject("WeaponSelectionUI");
+            weaponSelectionUI = wsuiObj.AddComponent<WeaponSelectionUI>();
+        }
+        
+        tooltipUI = FindFirstObjectByType<TooltipUI>();
+        if (tooltipUI == null)
+        {
+            var ttObj = new GameObject("TooltipUI");
+            tooltipUI = ttObj.AddComponent<TooltipUI>();
+        }
         
         var canvas = GameObject.Find("Canvas");
         if (canvas == null)

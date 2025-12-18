@@ -1,0 +1,5 @@
+Element,ElementID,Health,Damage,Status
+Grunt,1,50,10,Done
+Wizard,2,40,15,Done
+Archer,3,35,15,Done
+Rogue,4,30,25,Done

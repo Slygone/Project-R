@@ -930,6 +930,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Referencer
   gm: {fileID: 0}
+  playerController: {fileID: 0}
   player: {fileID: 0}
   ui: {fileID: 0}
   nodePopupPanel: {fileID: 0}
@@ -1179,6 +1180,7 @@ GameObject:
   - component: {fileID: 1147541733}
   - component: {fileID: 1147541732}
   - component: {fileID: 1147541731}
+  - component: {fileID: 1147541737}
   m_Layer: 0
   m_Name: Player
   m_TagString: Player
@@ -1318,6 +1320,18 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1147541737
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1147541730}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ff516cfbf51d72445bcedc89ef1f93c1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Player
 --- !u!1 &1222731534
 GameObject:
   m_ObjectHideFlags: 0

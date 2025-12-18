@@ -1,2 +1,3 @@
-Elements,Heal From Max HP,Upgrade Dmage,Status
-Heal,30,null,Done
+Element,ElementID,Stat Affected,Amount,Status
+Heal,1,Health,20,Done
+Upgrade,2,Damage,5,Done

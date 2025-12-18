@@ -31,9 +31,9 @@ public class UIManager : MonoBehaviour
             refs.nodePopupPanel.SetActive(true);
         }
         
-        if (refs.player != null)
+        if (refs.playerController != null)
         {
-            refs.player.SetCanMove(false);
+            refs.playerController.SetCanMove(false);
         }
     }
 
@@ -46,9 +46,9 @@ public class UIManager : MonoBehaviour
             refs.nodePopupPanel.SetActive(false);
         }
         
-        if (refs.player != null)
+        if (refs.playerController != null)
         {
-            refs.player.SetCanMove(true);
+            refs.playerController.SetCanMove(true);
         }
         
         if (currentNode != null)
