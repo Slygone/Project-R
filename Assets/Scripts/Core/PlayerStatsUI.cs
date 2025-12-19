@@ -135,20 +135,20 @@ public class PlayerStatsUI : MonoBehaviour
         var statsObj = new GameObject("Stats");
         statsObj.transform.SetParent(panel.transform, false);
         var statsRect = statsObj.AddComponent<RectTransform>();
-        statsRect.anchorMin = new Vector2(0, 0.35f);
+        statsRect.anchorMin = new Vector2(0, 0.37f);
         statsRect.anchorMax = new Vector2(1, 0.88f);
         statsRect.offsetMin = new Vector2(15, 0);
         statsRect.offsetMax = new Vector2(-15, 0);
         statsText = statsObj.AddComponent<TextMeshProUGUI>();
         statsText.alignment = TextAlignmentOptions.TopLeft;
-        statsText.fontSize = 16;
+        statsText.fontSize = 15;
         statsText.color = Color.white;
 
         var relicsTitleObj = new GameObject("RelicsTitle");
         relicsTitleObj.transform.SetParent(panel.transform, false);
         var relicsTitleRect = relicsTitleObj.AddComponent<RectTransform>();
-        relicsTitleRect.anchorMin = new Vector2(0, 0.28f);
-        relicsTitleRect.anchorMax = new Vector2(1, 0.35f);
+        relicsTitleRect.anchorMin = new Vector2(0, 0.29f);
+        relicsTitleRect.anchorMax = new Vector2(1, 0.36f);
         relicsTitleRect.offsetMin = new Vector2(15, 0);
         relicsTitleRect.offsetMax = new Vector2(-15, 0);
         var relicsTitleText = relicsTitleObj.AddComponent<TextMeshProUGUI>();
@@ -161,12 +161,12 @@ public class PlayerStatsUI : MonoBehaviour
         relicsObj.transform.SetParent(panel.transform, false);
         var relicsRect = relicsObj.AddComponent<RectTransform>();
         relicsRect.anchorMin = new Vector2(0, 0.05f);
-        relicsRect.anchorMax = new Vector2(1, 0.28f);
+        relicsRect.anchorMax = new Vector2(1, 0.29f);
         relicsRect.offsetMin = new Vector2(15, 0);
         relicsRect.offsetMax = new Vector2(-15, 0);
         relicsText = relicsObj.AddComponent<TextMeshProUGUI>();
         relicsText.alignment = TextAlignmentOptions.TopLeft;
-        relicsText.fontSize = 16;
+        relicsText.fontSize = 15;
         relicsText.color = new Color(0.8f, 0.8f, 0.8f);
 
         var hintObj = new GameObject("Hint");
@@ -204,45 +204,39 @@ public class PlayerStatsUI : MonoBehaviour
         var player = refs.player;
         var sb = new StringBuilder();
 
-        sb.AppendLine($"<color=#ff5555>Health:</color> {player.GetHealth()} / {player.GetMaxHealth()}");
-        sb.AppendLine($"<color=#ffdd55>Gold:</color> {player.GetGold()}");
-        sb.AppendLine($"<color=#55aaff>Energy:</color> {player.GetEnergy()} / {player.GetMaxEnergy()}");
-        sb.AppendLine($"<color=#ff55ff>Crit Chance:</color> {player.GetCritChance()}%");
-        sb.AppendLine($"<color=#ff55ff>Crit Damage:</color> x{player.GetCritDamage():F1}");
-        sb.AppendLine();
-        
+        const string divider = "<color=#444444>------------------------------</color>";
+
+        sb.AppendLine("<color=#ffffff><b>PLAYER STATS</b></color>");
+        sb.AppendLine($"Health: {player.GetHealth()} / {player.GetMaxHealth()}");
+        sb.AppendLine($"Gold: {player.GetGold()}");
+        sb.AppendLine($"Energy: {player.GetEnergy()} / {player.GetMaxEnergy()}");
+        sb.AppendLine($"Crit Rate: {player.GetCritChance()}%");
+        sb.AppendLine($"Crit Damage: x{player.GetCritDamage():F1}");
+        sb.AppendLine(divider);
+
         var weapon = player.GetWeapon();
         string weaponName = weapon != null ? weapon.DisplayName : "None";
         int weaponDmg = player.GetWeaponDamage();
-        sb.AppendLine($"<color=#ffaa22>Weapon:</color> {weaponName} (+{weaponDmg})");
+        sb.AppendLine("<color=#ffffff><b>LOADOUT</b></color>");
+        sb.AppendLine($"Weapon: {weaponName} (+{weaponDmg})");
         
         var affinity = player.GetAffinity();
         string affinityColor = GetElementColor(affinity);
         string affinityName = affinity != Element.None ? affinity.ToString() : "None";
-        sb.AppendLine($"<color=#aaaaaa>Affinity:</color> <color={affinityColor}>{affinityName}</color>");
-        sb.AppendLine();
-        sb.AppendLine($"<color=#aaaaaa>Total Damage:</color> {player.GetTotalDamage()}");
-        sb.AppendLine($"  Base: {player.GetBaseDamage()} + Weapon: {weaponDmg} + Affinity: {player.GetAffinityBonus()}");
-        sb.AppendLine();
-        
-        if (weapon != null)
-        {
-            sb.AppendLine("<color=#7799ff>Skills:</color>");
-            sb.AppendLine($"  • {weapon.Skill1}: {GetSkillDescription(weapon.Skill1)}");
-            sb.AppendLine($"  • {weapon.Skill2}: {GetSkillDescription(weapon.Skill2)}");
-            sb.AppendLine($"  • {weapon.Skill3}: {GetSkillDescription(weapon.Skill3)}");
-            sb.AppendLine();
-        }
-        
-        sb.AppendLine("<color=#aaaaaa>Elemental Bonuses:</color>");
+        sb.AppendLine($"Affinity: <color={affinityColor}>{affinityName}</color>");
+        sb.AppendLine($"Damage: {player.GetTotalDamage()} (Base {player.GetBaseDamage()} + Weapon {weaponDmg} + Affinity {player.GetAffinityBonus()})");
+        sb.AppendLine(divider);
+
+        sb.AppendLine("<color=#ffffff><b>ELEMENTS</b></color>");
+        sb.AppendLine("Bonuses:");
         sb.AppendLine($"  {FormatElementBonus(Element.Fire, player, affinity)}");
         sb.AppendLine($"  {FormatElementBonus(Element.Ice, player, affinity)}");
         sb.AppendLine($"  {FormatElementBonus(Element.Water, player, affinity)}");
         sb.AppendLine($"  {FormatElementBonus(Element.Wind, player, affinity)}");
         sb.AppendLine($"  {FormatElementBonus(Element.Rock, player, affinity)}");
         sb.AppendLine();
-        
-        sb.AppendLine("<color=#55ffaa>Elemental Resistances:</color>");
+
+        sb.AppendLine("Resistances:");
         int baseRes = player.GetBaseResistance();
         int bonusRes = player.GetBonusResistance();
         sb.AppendLine($"  {FormatElementResistance(Element.Fire, affinity, baseRes, bonusRes)}");
