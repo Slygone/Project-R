@@ -4,11 +4,11 @@ using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
-public class WeaponSelectionUI : MonoBehaviour
+public class CharacterSelectionUI : MonoBehaviour
 {
     private GameObject selectionPanel;
-    private List<WeaponData> choices = new List<WeaponData>();
-    private Action<WeaponData> onWeaponSelected;
+    private List<CharacterData> choices = new List<CharacterData>();
+    private Action<CharacterData> onCharacterSelected;
     private bool isActive = false;
 
     void Awake()
@@ -21,7 +21,7 @@ public class WeaponSelectionUI : MonoBehaviour
         var canvas = GameObject.Find("Canvas");
         if (canvas == null)
         {
-            Debug.LogError("[WeaponSelectionUI] Canvas not found");
+            Debug.LogError("[CharacterSelectionUI] Canvas not found");
             return;
         }
 
@@ -31,7 +31,7 @@ public class WeaponSelectionUI : MonoBehaviour
 
     private GameObject CreateSelectionPanel(Transform parent)
     {
-        var panel = new GameObject("WeaponSelectionPanel");
+        var panel = new GameObject("CharacterSelectionPanel");
         panel.transform.SetParent(parent, false);
 
         var rect = panel.AddComponent<RectTransform>();
@@ -51,7 +51,7 @@ public class WeaponSelectionUI : MonoBehaviour
         titleRect.offsetMin = Vector2.zero;
         titleRect.offsetMax = Vector2.zero;
         var titleText = titleObj.AddComponent<TextMeshProUGUI>();
-        titleText.text = "CHOOSE YOUR WEAPON";
+        titleText.text = "CHOOSE YOUR CHARACTER";
         titleText.alignment = TextAlignmentOptions.Center;
         titleText.fontSize = 42;
         titleText.color = new Color(0.9f, 0.9f, 0.9f);
@@ -64,7 +64,7 @@ public class WeaponSelectionUI : MonoBehaviour
         subtitleRect.offsetMin = Vector2.zero;
         subtitleRect.offsetMax = Vector2.zero;
         var subtitleText = subtitleObj.AddComponent<TextMeshProUGUI>();
-        subtitleText.text = "Your weapon determines your skills and adds to your base damage";
+        subtitleText.text = "Your character determines your skills and combat style";
         subtitleText.alignment = TextAlignmentOptions.Center;
         subtitleText.fontSize = 20;
         subtitleText.color = new Color(0.7f, 0.7f, 0.7f);
@@ -72,28 +72,34 @@ public class WeaponSelectionUI : MonoBehaviour
         return panel;
     }
 
-    public void Show(Action<WeaponData> callback)
+    public void Show(Action<CharacterData> callback)
     {
-        onWeaponSelected = callback;
-        choices = GetRandomWeapons(3);
+        onCharacterSelected = callback;
+        choices = GetRandomCharacters(3);
         
         ClearChoiceButtons();
         CreateChoiceButtons();
         
         selectionPanel.SetActive(true);
         isActive = true;
+
+        var refs = FindFirstObjectByType<Referencer>();
+        if (refs != null && refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
+        {
+            refs.playerStatsUI.UpdateStats();
+        }
     }
 
-    private List<WeaponData> GetRandomWeapons(int count)
+    private List<CharacterData> GetRandomCharacters(int count)
     {
-        var allWeapons = new List<WeaponData>(DataCache.Weapons);
-        var result = new List<WeaponData>();
+        var allCharacters = new List<CharacterData>(DataCache.Characters);
+        var result = new List<CharacterData>();
 
-        while (result.Count < count && allWeapons.Count > 0)
+        while (result.Count < count && allCharacters.Count > 0)
         {
-            int index = UnityEngine.Random.Range(0, allWeapons.Count);
-            result.Add(allWeapons[index]);
-            allWeapons.RemoveAt(index);
+            int index = UnityEngine.Random.Range(0, allCharacters.Count);
+            result.Add(allCharacters[index]);
+            allCharacters.RemoveAt(index);
         }
 
         return result;
@@ -129,13 +135,13 @@ public class WeaponSelectionUI : MonoBehaviour
 
         for (int i = 0; i < choices.Count; i++)
         {
-            CreateWeaponButton(container.transform, choices[i]);
+            CreateCharacterButton(container.transform, choices[i]);
         }
     }
 
-    private void CreateWeaponButton(Transform parent, WeaponData weapon)
+    private void CreateCharacterButton(Transform parent, CharacterData character)
     {
-        var btnObj = new GameObject($"Btn_{weapon.DisplayName}");
+        var btnObj = new GameObject($"Btn_{character.DisplayName}");
         btnObj.transform.SetParent(parent, false);
 
         var btnImage = btnObj.AddComponent<Image>();
@@ -144,8 +150,8 @@ public class WeaponSelectionUI : MonoBehaviour
         var btn = btnObj.AddComponent<Button>();
         btn.targetGraphic = btnImage;
         
-        WeaponData capturedWeapon = weapon;
-        btn.onClick.AddListener(() => OnChoiceClicked(capturedWeapon));
+        CharacterData capturedCharacter = character;
+        btn.onClick.AddListener(() => OnChoiceClicked(capturedCharacter));
 
         var layout = btnObj.AddComponent<VerticalLayoutGroup>();
         layout.spacing = 8;
@@ -157,27 +163,27 @@ public class WeaponSelectionUI : MonoBehaviour
         var nameObj = new GameObject("Name");
         nameObj.transform.SetParent(btnObj.transform, false);
         var nameText = nameObj.AddComponent<TextMeshProUGUI>();
-        nameText.text = weapon.DisplayName.ToUpper();
+        nameText.text = character.DisplayName.ToUpper();
         nameText.alignment = TextAlignmentOptions.Center;
         nameText.fontSize = 28;
         nameText.color = new Color(1f, 0.85f, 0.2f);
         var nameLayout = nameObj.AddComponent<LayoutElement>();
         nameLayout.preferredHeight = 40;
 
-        var typeObj = new GameObject("Type");
-        typeObj.transform.SetParent(btnObj.transform, false);
-        var typeText = typeObj.AddComponent<TextMeshProUGUI>();
-        typeText.text = weapon.WeaponType;
-        typeText.alignment = TextAlignmentOptions.Center;
-        typeText.fontSize = 16;
-        typeText.color = new Color(0.6f, 0.6f, 0.6f);
-        var typeLayout = typeObj.AddComponent<LayoutElement>();
-        typeLayout.preferredHeight = 25;
+        var classObj = new GameObject("Class");
+        classObj.transform.SetParent(btnObj.transform, false);
+        var classText = classObj.AddComponent<TextMeshProUGUI>();
+        classText.text = character.CharacterClass ?? "";
+        classText.alignment = TextAlignmentOptions.Center;
+        classText.fontSize = 16;
+        classText.color = new Color(0.6f, 0.6f, 0.6f);
+        var classLayout = classObj.AddComponent<LayoutElement>();
+        classLayout.preferredHeight = 25;
 
         var damageObj = new GameObject("Damage");
         damageObj.transform.SetParent(btnObj.transform, false);
         var damageText = damageObj.AddComponent<TextMeshProUGUI>();
-        damageText.text = $"+{weapon.Damage} Damage";
+        damageText.text = $"+{character.Damage} Damage";
         damageText.alignment = TextAlignmentOptions.Center;
         damageText.fontSize = 20;
         damageText.color = new Color(1f, 0.4f, 0.4f);
@@ -197,7 +203,7 @@ public class WeaponSelectionUI : MonoBehaviour
         var skillsObj = new GameObject("Skills");
         skillsObj.transform.SetParent(btnObj.transform, false);
         var skillsText = skillsObj.AddComponent<TextMeshProUGUI>();
-        skillsText.text = $"{weapon.Skill1}\n{weapon.Skill2}\n{weapon.Skill3}";
+        skillsText.text = $"{character.Skill1}\n{character.Skill2}\n{character.Skill3}";
         skillsText.alignment = TextAlignmentOptions.Center;
         skillsText.fontSize = 16;
         skillsText.color = new Color(0.7f, 0.85f, 1f);
@@ -205,13 +211,19 @@ public class WeaponSelectionUI : MonoBehaviour
         skillsLayout.preferredHeight = 70;
     }
 
-    private void OnChoiceClicked(WeaponData weapon)
+    private void OnChoiceClicked(CharacterData character)
     {
         selectionPanel.SetActive(false);
         isActive = false;
 
-        Debug.Log($"[WeaponSelectionUI] Player chose {weapon.DisplayName}");
-        onWeaponSelected?.Invoke(weapon);
+        Debug.Log($"[CharacterSelectionUI] Player chose {character.DisplayName}");
+        onCharacterSelected?.Invoke(character);
+
+        var refs = FindFirstObjectByType<Referencer>();
+        if (refs != null && refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
+        {
+            refs.playerStatsUI.UpdateStats();
+        }
     }
 
     public bool IsActive() => isActive;

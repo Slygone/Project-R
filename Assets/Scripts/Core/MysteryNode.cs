@@ -40,6 +40,10 @@ public class MysteryNode : NodeBase
             var relic = DataCache.Relics[Random.Range(0, DataCache.Relics.Count)];
             refs.player.AddRelic(relic);
             Debug.Log($"[MysteryNode] Player found a relic: {relic.DisplayName}");
+            if (refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
+            {
+                refs.playerStatsUI.UpdateStats();
+            }
             
             if (refs.ui != null)
             {
@@ -72,6 +76,11 @@ public class MysteryNode : NodeBase
             default:
                 Debug.LogWarning($"[MysteryNode] Unknown potion stat: {potion.StatAffected}");
                 break;
+        }
+
+        if (refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
+        {
+            refs.playerStatsUI.UpdateStats();
         }
     }
 

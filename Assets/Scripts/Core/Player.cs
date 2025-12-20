@@ -20,7 +20,7 @@ public class Player : MonoBehaviour
     private const int MAX_POTIONS = 4;
     private ElementalDamage elementalDamage = new ElementalDamage();
     private Element affinity = Element.None;
-    private WeaponData equippedWeapon = null;
+    private CharacterData selectedCharacter = null;
 
     void Awake()
     {
@@ -36,21 +36,35 @@ public class Player : MonoBehaviour
         baseResistance = stats.BaseResistance;
         bonusResistance = stats.BonusResistance;
 
-        Debug.Log($"[Player] Initialized - HP: {health}/{maxHealth}, Base Damage: {baseDamage}, Gold: {gold}, Energy: {energy}/{maxEnergy}, Crit: {critChance}% x{critDamage}, Resist: {baseResistance}+{bonusResistance}");
+        Debug.Log($"[Player] Initialized - HP: {health}/{maxHealth}, Gold: {gold}, Energy: {energy}/{maxEnergy}, Crit: {critChance}% x{critDamage}, Resist: {baseResistance}+{bonusResistance}");
     }
 
     public int GetHealth() => health;
     public int GetMaxHealth() => maxHealth;
-    public int GetBaseDamage() => baseDamage;
-    public int GetWeaponDamage() => equippedWeapon != null ? equippedWeapon.Damage : 0;
-    public int GetTotalDamage() => baseDamage + GetWeaponDamage() + GetAffinityBonus();
+    public int GetCharacterDamage() => selectedCharacter != null ? selectedCharacter.Damage : 0;
+    public int GetTotalDamage() => GetCharacterDamage() + GetAffinityBonus();
     public int GetAffinityBonus() => affinity != Element.None ? elementalDamage.Get(affinity) : 0;
+    
+    public (int damage, bool isCrit) CalculateDamageWithCrit(int baseDamage)
+    {
+        int totalCritChance = GetCritChance();
+        bool isCrit = Random.Range(0, 100) < totalCritChance;
+        
+        if (isCrit)
+        {
+            float critMultiplier = GetCritDamage();
+            int critDamage = Mathf.RoundToInt(baseDamage * critMultiplier);
+            return (critDamage, true);
+        }
+        
+        return (baseDamage, false);
+    }
     public int GetElementalBonus(Element element) => elementalDamage.Get(element);
     public ElementalDamage GetElementalDamage() => elementalDamage;
     public Element GetAffinity() => affinity;
     public bool HasAffinity() => affinity != Element.None;
-    public WeaponData GetWeapon() => equippedWeapon;
-    public bool HasWeapon() => equippedWeapon != null;
+    public CharacterData GetCharacter() => selectedCharacter;
+    public bool HasCharacter() => selectedCharacter != null;
     public int GetGold() => gold;
     public int GetEnergy() => energy;
     public int GetMaxEnergy() => maxEnergy;
@@ -93,6 +107,26 @@ public class Player : MonoBehaviour
         Debug.Log($"[Player] Healed {amount}. Health: {health}/{maxHealth}");
     }
 
+    public void IncreaseMaxHealth(int amount)
+    {
+        maxHealth += amount;
+        health += amount;
+        Debug.Log($"[Player] Max health increased by {amount}. Now {health}/{maxHealth}");
+    }
+
+    public void IncreaseCharacterDamage(int amount)
+    {
+        if (selectedCharacter != null)
+        {
+            selectedCharacter.Damage += amount;
+            Debug.Log($"[Player] Character damage increased by {amount}. Now {selectedCharacter.Damage}");
+        }
+        else
+        {
+            Debug.LogWarning("[Player] No character selected, cannot increase damage");
+        }
+    }
+
     public void AddBaseDamage(int amount)
     {
         baseDamage += amount;
@@ -111,10 +145,10 @@ public class Player : MonoBehaviour
         Debug.Log($"[Player] Affinity set to {element}");
     }
 
-    public void EquipWeapon(WeaponData weapon)
+    public void SelectCharacter(CharacterData character)
     {
-        equippedWeapon = weapon;
-        Debug.Log($"[Player] Equipped {weapon.DisplayName} (+{weapon.Damage} damage)");
+        selectedCharacter = character;
+        Debug.Log($"[Player] Selected {character.DisplayName} (+{character.Damage} damage)");
     }
 
     public void AddGold(int amount)
@@ -146,6 +180,17 @@ public class Player : MonoBehaviour
     {
         var stat = relic.StatAffected.ToLower().Trim();
         
+        if (stat == "all elements")
+        {
+            elementalDamage.Add(Element.Fire, relic.Amount);
+            elementalDamage.Add(Element.Ice, relic.Amount);
+            elementalDamage.Add(Element.Water, relic.Amount);
+            elementalDamage.Add(Element.Wind, relic.Amount);
+            elementalDamage.Add(Element.Rock, relic.Amount);
+            Debug.Log($"[Player] All Elements relic applied: +{relic.Amount} to each element");
+            return;
+        }
+        
         Element element = ElementalDamage.ParseElement(stat);
         if (element != Element.None)
         {
@@ -167,18 +212,24 @@ public class Player : MonoBehaviour
             case "maxhealth":
                 maxHealth += relic.Amount;
                 health += relic.Amount;
+                Debug.Log($"[Player] Health relic applied: +{relic.Amount} max health");
                 break;
-            case "damage":
-            case "basedamage":
-                baseDamage += relic.Amount;
-                break;
+            case "crit rate":
+            case "critrate":
             case "critchance":
                 critChance += relic.Amount;
+                Debug.Log($"[Player] Crit Rate relic applied: +{relic.Amount}% crit chance (now {critChance}%)");
+                break;
+            case "crit damage":
+            case "critdamage":
+                critDamage += relic.Amount / 100f;
+                Debug.Log($"[Player] Crit Damage relic applied: +{relic.Amount}% crit damage (now x{critDamage:F2})");
                 break;
             case "energy":
             case "maxenergy":
                 maxEnergy += relic.Amount;
                 energy += relic.Amount;
+                Debug.Log($"[Player] Energy relic applied: +{relic.Amount} max energy");
                 break;
         }
     }

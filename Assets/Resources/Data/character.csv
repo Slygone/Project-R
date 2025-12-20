@@ -1,0 +1,6 @@
+DisplayName,ElementID,Damage,Skill1,Skill2,Skill3,Perk1a,Perk1b,Perk2a,Perk2b,Perk3a,Perk3b,Perk4a,Perk4b,Status
+Fighter,1,15,Slash,Riposte,Bladestorm,Fighter_option_1_a,Fighter_option_b,Fighter_option_a,Fighter_option_b,Fighter_option_a,Fighter_option_b,Fighter_option_a,Fighter_option_b,Done
+Mage,2,10,Bolt,Ray,Meteor,Mage_option_1_a,Mage_option_b,Mage_option_a,Mage_option_b,Mage_option_a,Mage_option_b,Mage_option_a,Mage_option_b,Done
+Archer,3,20,AimedShot,TripleShot,DoubleUp,Archer_option_1_a,Archer_option_b,Archer_option_a,Archer_option_b,Archer_option_a,Archer_option_b,Archer_option_a,Archer_option_b,Done
+Rogue,4,10,DirtyStab,CheapShot,Ambush,Rogue_option_1_a,Rogue_option_b,Rogue_option_a,Rogue_option_b,Rogue_option_a,Rogue_option_b,Rogue_option_a,Rogue_option_b,Done
+Cleric,5,8,Shock,Judgement,HolyNova,Cleric_option_1_a,Cleric_option_b,Cleric_option_a,Cleric_option_b,Cleric_option_a,Cleric_option_b,Cleric_option_a,Cleric_option_b,Done

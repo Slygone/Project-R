@@ -13,10 +13,11 @@ public class Referencer : MonoBehaviour
     public CombatUI combatUI;
     public PlayerStatsUI playerStatsUI;
     public AffinitySelectionUI affinitySelectionUI;
-    public WeaponSelectionUI weaponSelectionUI;
+    public CharacterSelectionUI characterSelectionUI;
     public TooltipUI tooltipUI;
     public ShopUI shopUI;
     public PotionUI potionUI;
+    public RestUI restUI;
     
     public GameObject nodePopupPanel;
     public GameObject victoryPanel;
@@ -66,11 +67,11 @@ public class Referencer : MonoBehaviour
             affinitySelectionUI = asuiObj.AddComponent<AffinitySelectionUI>();
         }
         
-        weaponSelectionUI = FindFirstObjectByType<WeaponSelectionUI>();
-        if (weaponSelectionUI == null)
+        characterSelectionUI = FindFirstObjectByType<CharacterSelectionUI>();
+        if (characterSelectionUI == null)
         {
-            var wsuiObj = new GameObject("WeaponSelectionUI");
-            weaponSelectionUI = wsuiObj.AddComponent<WeaponSelectionUI>();
+            var csuiObj = new GameObject("CharacterSelectionUI");
+            characterSelectionUI = csuiObj.AddComponent<CharacterSelectionUI>();
         }
         
         tooltipUI = FindFirstObjectByType<TooltipUI>();
@@ -92,6 +93,13 @@ public class Referencer : MonoBehaviour
         {
             var potionObj = new GameObject("PotionUI");
             potionUI = potionObj.AddComponent<PotionUI>();
+        }
+        
+        restUI = FindFirstObjectByType<RestUI>();
+        if (restUI == null)
+        {
+            var restObj = new GameObject("RestUI");
+            restUI = restObj.AddComponent<RestUI>();
         }
 
         var mainCam = Camera.main;

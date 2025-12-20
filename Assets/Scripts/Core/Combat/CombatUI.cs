@@ -604,14 +604,14 @@ public class CombatUI : MonoBehaviour
         var refs = FindFirstObjectByType<Referencer>();
         if (refs == null || refs.player == null) return false;
         
-        var weapon = refs.player.GetWeapon();
-        if (weapon == null) return false;
+        var character = refs.player.GetCharacter();
+        if (character == null) return false;
         
         string skillName = skillNumber switch
         {
-            1 => weapon.Skill1,
-            2 => weapon.Skill2,
-            3 => weapon.Skill3,
+            1 => character.Skill1,
+            2 => character.Skill2,
+            3 => character.Skill3,
             _ => ""
         };
         
@@ -862,16 +862,16 @@ public class CombatUI : MonoBehaviour
 
     private void UpdateSkillButtons(Player player)
     {
-        var weapon = player.GetWeapon();
-        if (weapon != null)
+        var character = player.GetCharacter();
+        if (character != null)
         {
-            if (skill1Text != null) skill1Text.text = weapon.Skill1;
-            if (skill2Text != null) skill2Text.text = weapon.Skill2;
-            if (skill3Text != null) skill3Text.text = weapon.Skill3;
+            if (skill1Text != null) skill1Text.text = character.Skill1;
+            if (skill2Text != null) skill2Text.text = character.Skill2;
+            if (skill3Text != null) skill3Text.text = character.Skill3;
             
-            if (skill1Tooltip != null) skill1Tooltip.SetTooltip($"<b>{weapon.Skill1}</b>\n{PlayerStatsUI.GetSkillDescription(weapon.Skill1)}");
-            if (skill2Tooltip != null) skill2Tooltip.SetTooltip($"<b>{weapon.Skill2}</b>\n{PlayerStatsUI.GetSkillDescription(weapon.Skill2)}");
-            if (skill3Tooltip != null) skill3Tooltip.SetTooltip($"<b>{weapon.Skill3}</b>\n{PlayerStatsUI.GetSkillDescription(weapon.Skill3)}");
+            if (skill1Tooltip != null) skill1Tooltip.SetTooltip($"<b>{character.Skill1}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill1)}");
+            if (skill2Tooltip != null) skill2Tooltip.SetTooltip($"<b>{character.Skill2}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill2)}");
+            if (skill3Tooltip != null) skill3Tooltip.SetTooltip($"<b>{character.Skill3}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill3)}");
         }
         else
         {
@@ -1055,9 +1055,10 @@ public class CombatUI : MonoBehaviour
             playerHealthFill.color = Color.red;
     }
 
-    public void ShowDamageToEnemy(CombatEnemy enemy, int damage)
+    public void ShowDamageToEnemy(CombatEnemy enemy, int damage, bool isCrit = false)
     {
-        Debug.Log($"[CombatUI] Enemy {enemy.Name} took {damage} damage");
+        string critText = isCrit ? " CRIT!" : "";
+        Debug.Log($"[CombatUI] Enemy {enemy.Name} took {damage} damage{critText}");
     }
 
     public void ShowDamageToPlayer(int damage)

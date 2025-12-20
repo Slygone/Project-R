@@ -165,18 +165,18 @@ public class CombatManager : MonoBehaviour
         if (!combatActive || !isPlayerTurn) return;
         if (target == null || !target.IsAlive()) return;
 
-        var weapon = player.GetWeapon();
-        if (weapon == null)
+        var character = player.GetCharacter();
+        if (character == null)
         {
-            Debug.Log("[CombatManager] No weapon equipped");
+            Debug.Log("[CombatManager] No character selected");
             return;
         }
 
         string skillName = skillNumber switch
         {
-            1 => weapon.Skill1,
-            2 => weapon.Skill2,
-            3 => weapon.Skill3,
+            1 => character.Skill1,
+            2 => character.Skill2,
+            3 => character.Skill3,
             _ => "Unknown"
         };
 
@@ -254,16 +254,21 @@ public class CombatManager : MonoBehaviour
         }
 
         Element attackElement = player.GetAffinity();
-        int finalDamage = target.ApplyResistance(damage, attackElement);
+        
+        var (critDamage, isCrit) = player.CalculateDamageWithCrit(damage);
+        int damageAfterCrit = critDamage;
+        
+        int finalDamage = target.ApplyResistance(damageAfterCrit, attackElement);
         int resistPercent = target.CalculateResistance(attackElement);
         
         target.TakeDamage(finalDamage);
+        string critText = isCrit ? " <color=yellow>CRIT!</color>" : "";
         string resistText = resistPercent > 0 ? $" ({resistPercent}% resisted)" : "";
-        Debug.Log($"[CombatManager] Player {effectText} {target.Name} for {finalDamage} damage! ({skillName}){resistText}");
+        Debug.Log($"[CombatManager] Player {effectText} {target.Name} for {finalDamage} damage! ({skillName}){critText}{resistText}");
 
         if (combatUI != null)
         {
-            combatUI.ShowDamageToEnemy(target, damage);
+            combatUI.ShowDamageToEnemy(target, finalDamage, isCrit);
             combatUI.UpdateEnemyHealth(target);
         }
 

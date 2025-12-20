@@ -502,6 +502,12 @@ public class ShopUI : MonoBehaviour
         player.AddRelic(relic);
         RefreshGoldDisplay();
 
+        var refs = FindFirstObjectByType<Referencer>();
+        if (refs != null && refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
+        {
+            refs.playerStatsUI.UpdateStats();
+        }
+
         if (btnObj != null)
         {
             relicButtons.Remove(btnObj);

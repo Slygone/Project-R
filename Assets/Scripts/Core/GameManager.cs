@@ -6,14 +6,14 @@ public class GameManager : MonoBehaviour
     private int completedNodes = 0;
     private const int TOTAL_NODES = 10;
     private bool affinityChosen = false;
-    private bool weaponChosen = false;
+    private bool characterChosen = false;
 
     void Start()
     {
         refs = FindFirstObjectByType<Referencer>();
         UpdateNodeCounter();
         
-        StartAffinitySelection();
+        StartCharacterSelection();
     }
 
     private void StartAffinitySelection()
@@ -38,6 +38,34 @@ public class GameManager : MonoBehaviour
         }
     }
 
+    private void StartCharacterSelection()
+    {
+        if (refs != null && refs.characterSelectionUI != null)
+        {
+            refs.characterSelectionUI.Show(OnCharacterChosen);
+        }
+        else
+        {
+            Debug.LogError("[GameManager] CharacterSelectionUI not found");
+            characterChosen = true;
+            StartAffinitySelection();
+        }
+    }
+
+    private void OnCharacterChosen(CharacterData character)
+    {
+        characterChosen = true;
+
+        if (refs != null && refs.player != null)
+        {
+            refs.player.SelectCharacter(character);
+        }
+
+        Debug.Log($"[GameManager] Character chosen: {character.DisplayName}");
+        
+        StartAffinitySelection();
+    }
+
     private void OnAffinityChosen(Element element)
     {
         affinityChosen = true;
@@ -47,47 +75,21 @@ public class GameManager : MonoBehaviour
             refs.player.SetAffinity(element);
         }
 
-        Debug.Log($"[GameManager] Affinity chosen: {element}");
-        
-        StartWeaponSelection();
-    }
-
-    private void StartWeaponSelection()
-    {
-        if (refs != null && refs.weaponSelectionUI != null)
-        {
-            refs.weaponSelectionUI.Show(OnWeaponChosen);
-        }
-        else
-        {
-            Debug.LogError("[GameManager] WeaponSelectionUI not found");
-            weaponChosen = true;
-            if (refs != null && refs.playerController != null)
-            {
-                refs.playerController.SetCanMove(true);
-            }
-        }
-    }
-
-    private void OnWeaponChosen(WeaponData weapon)
-    {
-        weaponChosen = true;
-
-        if (refs != null && refs.player != null)
-        {
-            refs.player.EquipWeapon(weapon);
-        }
-
         if (refs != null && refs.playerController != null)
         {
             refs.playerController.SetCanMove(true);
         }
 
-        Debug.Log($"[GameManager] Run started with {refs.player.GetAffinity()} affinity and {weapon.DisplayName}");
+        if (refs != null && refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
+        {
+            refs.playerStatsUI.UpdateStats();
+        }
+
+        Debug.Log($"[GameManager] Run started with {refs.player.GetCharacter().DisplayName} and {element} affinity");
     }
 
     public bool HasAffinityBeenChosen() => affinityChosen;
-    public bool HasWeaponBeenChosen() => weaponChosen;
+    public bool HasCharacterBeenChosen() => characterChosen;
 
     public void OnNodeCompleted()
     {

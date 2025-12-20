@@ -214,17 +214,18 @@ public class PlayerStatsUI : MonoBehaviour
         sb.AppendLine($"Crit Damage: x{player.GetCritDamage():F1}");
         sb.AppendLine(divider);
 
-        var weapon = player.GetWeapon();
-        string weaponName = weapon != null ? weapon.DisplayName : "None";
-        int weaponDmg = player.GetWeaponDamage();
+        var character = player.GetCharacter();
+        string characterName = character != null ? character.DisplayName : "None";
+        int characterDmg = player.GetCharacterDamage();
         sb.AppendLine("<color=#ffffff><b>LOADOUT</b></color>");
-        sb.AppendLine($"Weapon: {weaponName} (+{weaponDmg})");
+        sb.AppendLine($"Character: {characterName} (+{characterDmg})");
         
         var affinity = player.GetAffinity();
         string affinityColor = GetElementColor(affinity);
         string affinityName = affinity != Element.None ? affinity.ToString() : "None";
         sb.AppendLine($"Affinity: <color={affinityColor}>{affinityName}</color>");
-        sb.AppendLine($"Damage: {player.GetTotalDamage()} (Base {player.GetBaseDamage()} + Weapon {weaponDmg} + Affinity {player.GetAffinityBonus()})");
+        int affinityBonus = player.GetAffinityBonus();
+        sb.AppendLine($"Damage: {player.GetTotalDamage()} (Character {characterDmg} + Elemental {affinityBonus})");
         sb.AppendLine(divider);
 
         sb.AppendLine("<color=#ffffff><b>ELEMENTS</b></color>");

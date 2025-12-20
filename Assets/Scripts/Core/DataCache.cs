@@ -8,7 +8,7 @@ public static class DataCache
     public static List<EnemyData> EliteEnemies { get; private set; }
     public static List<EnemyData> BossEnemies { get; private set; }
     public static List<RestData> RestOptions { get; private set; }
-    public static List<WeaponData> Weapons { get; private set; }
+    public static List<CharacterData> Characters { get; private set; }
     public static List<PotionData> Potions { get; private set; }
     public static List<RelicData> Relics { get; private set; }
     public static PlayerData PlayerStats { get; private set; }
@@ -19,13 +19,13 @@ public static class DataCache
     {
         Enemies = LoadEnemies();
         RestOptions = LoadRestOptions();
-        Weapons = LoadWeapons();
+        Characters = LoadCharacters();
         Potions = LoadPotions();
         Relics = LoadRelics();
         PlayerStats = LoadPlayerStats();
 
         IsLoaded = true;
-        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Weapons.Count} weapons, {Potions.Count} potions, {Relics.Count} relics, player stats");
+        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, player stats");
     }
 
     private static List<EnemyData> LoadEnemies()
@@ -81,19 +81,19 @@ public static class DataCache
         return list;
     }
 
-    private static List<WeaponData> LoadWeapons()
+    private static List<CharacterData> LoadCharacters()
     {
-        var csv = Resources.Load<TextAsset>("Data/weapon");
+        var csv = Resources.Load<TextAsset>("Data/character");
         var rows = CSVParser.Parse(csv.text);
-        var list = new List<WeaponData>();
+        var list = new List<CharacterData>();
 
         foreach (var row in rows)
         {
-            list.Add(new WeaponData
+            list.Add(new CharacterData
             {
                 DisplayName = CSVParser.ParseString(row, "DisplayName"),
                 ElementID = CSVParser.ParseInt(row, "ElementID"),
-                WeaponType = CSVParser.ParseString(row, "Weapon Type"),
+                CharacterClass = "",
                 Damage = CSVParser.ParseInt(row, "Damage"),
                 Skill1 = CSVParser.ParseString(row, "Skill1"),
                 Skill2 = CSVParser.ParseString(row, "Skill2"),

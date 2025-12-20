@@ -1,6 +1,0 @@
-DisplayName,ElementID,Weapon Type,Damage,Skill1,Skill2,Skill3,Status
-Sword,1,Sword,15,Slash,Riposte,Bladestorm,Done
-Staff,2,Staff,10,Bolt,Ray,Meteor,Done
-Bow,3,Bow,20,AimedShot,TripleShot,DoubleUp,Done
-Dagger,4,Dagger,10,DirtyStab,CheapShot,Ambush,Done
-Scepter,5,Scepter,8,Shock,Judgement,HolyNova,Done

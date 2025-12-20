@@ -1,8 +1,8 @@
-public class WeaponData
+public class CharacterData
 {
     public string DisplayName;
     public int ElementID;
-    public string WeaponType;
+    public string CharacterClass;
     public int Damage;
     public string Skill1;
     public string Skill2;
