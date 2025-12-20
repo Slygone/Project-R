@@ -221,11 +221,49 @@ public class PlayerStatsUI : MonoBehaviour
         sb.AppendLine($"Character: {characterName} (+{characterDmg})");
         
         var affinity = player.GetAffinity();
-        string affinityColor = GetElementColor(affinity);
-        string affinityName = affinity != Element.None ? affinity.ToString() : "None";
-        sb.AppendLine($"Affinity: <color={affinityColor}>{affinityName}</color>");
+        
+        if (player.HasElementPair())
+        {
+            var orbA = player.GetOrbAElement();
+            var orbB = player.GetOrbBElement();
+            string orbAColor = GetElementColor(orbA);
+            string orbBColor = GetElementColor(orbB);
+            sb.AppendLine($"Orb A: <color={orbAColor}>{orbA}</color>");
+            sb.AppendLine($"Orb B: <color={orbBColor}>{orbB}</color>");
+            
+            var orbSystem = player.GetOrbSystem();
+            if (orbSystem.IsOrbAActive || orbSystem.IsOrbBActive)
+            {
+                string markStatus = "";
+                if (orbSystem.IsOrbAActive) markStatus += $"A:{orbSystem.OrbAMark} ";
+                if (orbSystem.IsOrbBActive) markStatus += $"B:{orbSystem.OrbBMark}";
+                sb.AppendLine($"<color=#ffaa55>Marks: {markStatus.Trim()}</color>");
+            }
+        }
+        else
+        {
+            string affinityColor = GetElementColor(affinity);
+            string affinityName = affinity != Element.None ? affinity.ToString() : "None";
+            sb.AppendLine($"Affinity: <color={affinityColor}>{affinityName}</color>");
+        }
+        
         int affinityBonus = player.GetAffinityBonus();
-        sb.AppendLine($"Damage: {player.GetTotalDamage()} (Character {characterDmg} + Elemental {affinityBonus})");
+        if (player.HasElementPair())
+        {
+            var aElem = player.GetOrbAElement();
+            var bElem = player.GetOrbBElement();
+            int aBonus = player.GetElementalBonus(aElem);
+            int bBonus = player.GetElementalBonus(bElem);
+            int totalElem = aBonus + bBonus;
+            sb.AppendLine($"Damage: {player.GetTotalDamage()} (Character {characterDmg} + Elemental {totalElem})");
+            string aColor = GetElementColor(aElem);
+            string bColor = GetElementColor(bElem);
+            sb.AppendLine($"Elemental Sources: <color={aColor}>{aElem}</color> (+{aBonus}) -> <color={bColor}>{bElem}</color> (+{bBonus})");
+        }
+        else
+        {
+            sb.AppendLine($"Damage: {player.GetTotalDamage()} (Character {characterDmg} + Elemental {affinityBonus})");
+        }
         sb.AppendLine(divider);
 
         sb.AppendLine("<color=#ffffff><b>ELEMENTS</b></color>");
@@ -240,11 +278,11 @@ public class PlayerStatsUI : MonoBehaviour
         sb.AppendLine("Resistances:");
         int baseRes = player.GetBaseResistance();
         int bonusRes = player.GetBonusResistance();
-        sb.AppendLine($"  {FormatElementResistance(Element.Fire, affinity, baseRes, bonusRes)}");
-        sb.AppendLine($"  {FormatElementResistance(Element.Ice, affinity, baseRes, bonusRes)}");
-        sb.AppendLine($"  {FormatElementResistance(Element.Water, affinity, baseRes, bonusRes)}");
-        sb.AppendLine($"  {FormatElementResistance(Element.Wind, affinity, baseRes, bonusRes)}");
-        sb.AppendLine($"  {FormatElementResistance(Element.Rock, affinity, baseRes, bonusRes)}");
+        sb.AppendLine($"  {FormatElementResistance(Element.Fire, player, affinity, baseRes, bonusRes)}");
+        sb.AppendLine($"  {FormatElementResistance(Element.Ice, player, affinity, baseRes, bonusRes)}");
+        sb.AppendLine($"  {FormatElementResistance(Element.Water, player, affinity, baseRes, bonusRes)}");
+        sb.AppendLine($"  {FormatElementResistance(Element.Wind, player, affinity, baseRes, bonusRes)}");
+        sb.AppendLine($"  {FormatElementResistance(Element.Rock, player, affinity, baseRes, bonusRes)}");
 
         statsText.text = sb.ToString();
 
@@ -283,16 +321,63 @@ public class PlayerStatsUI : MonoBehaviour
     {
         int bonus = player.GetElementalBonus(element);
         string color = GetElementColor(element);
-        string activeMarker = element == affinity ? " <-" : "";
-        return $"<color={color}>{element}:</color> +{bonus}{activeMarker}";
+        string marker = "";
+        
+        if (player.HasElementPair())
+        {
+            bool isA = element == player.GetOrbAElement();
+            bool isB = element == player.GetOrbBElement();
+            if (isA && isB)
+            {
+                marker = " <-A,B"; // edge case if both are same (shouldn't happen with distinct pairs)
+            }
+            else if (isA)
+            {
+                marker = " <-A";
+            }
+            else if (isB)
+            {
+                marker = " <-B";
+            }
+        }
+        else
+        {
+            // Legacy single-affinity indication
+            if (element == affinity)
+            {
+                marker = " <-";
+            }
+        }
+        
+        return $"<color={color}>{element}:</color> +{bonus}{marker}";
     }
 
-    private string FormatElementResistance(Element element, Element affinity, int baseRes, int bonusRes)
+    private string FormatElementResistance(Element element, Player player, Element affinity, int baseRes, int bonusRes)
     {
-        int total = baseRes + (element == affinity ? bonusRes : 0);
+        bool getsBonus;
+        string marker = "";
+        if (player.HasElementPair())
+        {
+            bool isA = element == player.GetOrbAElement();
+            bool isB = element == player.GetOrbBElement();
+            getsBonus = isA || isB;
+            if (isA && isB)
+                marker = " <-A,B";
+            else if (isA)
+                marker = " <-A";
+            else if (isB)
+                marker = " <-B";
+        }
+        else
+        {
+            getsBonus = (element == affinity && affinity != Element.None);
+            if (getsBonus) marker = " <-";
+        }
+
+        int total = baseRes + (getsBonus ? bonusRes : 0);
         string color = GetElementColor(element);
-        string bonusMarker = element == affinity && affinity != Element.None ? $" (+{bonusRes}%)" : "";
-        return $"<color={color}>{element}:</color> {total}%{bonusMarker}";
+        string bonusMarker = getsBonus ? $" (+{bonusRes}%)" : "";
+        return $"<color={color}>{element}:</color> {total}%{bonusMarker}{marker}";
     }
 
     public static string GetSkillDescription(string skillName)

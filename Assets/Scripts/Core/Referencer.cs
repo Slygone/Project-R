@@ -18,6 +18,7 @@ public class Referencer : MonoBehaviour
     public ShopUI shopUI;
     public PotionUI potionUI;
     public RestUI restUI;
+    public InfusionUI infusionUI;
     
     public GameObject nodePopupPanel;
     public GameObject victoryPanel;
@@ -100,6 +101,13 @@ public class Referencer : MonoBehaviour
         {
             var restObj = new GameObject("RestUI");
             restUI = restObj.AddComponent<RestUI>();
+        }
+        
+        infusionUI = FindFirstObjectByType<InfusionUI>();
+        if (infusionUI == null)
+        {
+            var infusionObj = new GameObject("InfusionUI");
+            infusionUI = infusionObj.AddComponent<InfusionUI>();
         }
 
         var mainCam = Camera.main;

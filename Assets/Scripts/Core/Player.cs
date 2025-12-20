@@ -21,6 +21,9 @@ public class Player : MonoBehaviour
     private ElementalDamage elementalDamage = new ElementalDamage();
     private Element affinity = Element.None;
     private CharacterData selectedCharacter = null;
+    
+    private ElementalOrbSystem orbSystem = new ElementalOrbSystem();
+    private bool hasElementPair = false;
 
     void Awake()
     {
@@ -42,7 +45,18 @@ public class Player : MonoBehaviour
     public int GetHealth() => health;
     public int GetMaxHealth() => maxHealth;
     public int GetCharacterDamage() => selectedCharacter != null ? selectedCharacter.Damage : 0;
-    public int GetTotalDamage() => GetCharacterDamage() + GetAffinityBonus();
+    public int GetTotalDamage()
+    {
+        // If player has an orb pair selected, apply dual elemental bonuses
+        if (hasElementPair && orbSystem != null)
+        {
+            int a = elementalDamage.Get(orbSystem.OrbAElement);
+            int b = elementalDamage.Get(orbSystem.OrbBElement);
+            return GetCharacterDamage() + a + b;
+        }
+        // Legacy single-affinity bonus
+        return GetCharacterDamage() + GetAffinityBonus();
+    }
     public int GetAffinityBonus() => affinity != Element.None ? elementalDamage.Get(affinity) : 0;
     
     public (int damage, bool isCrit) CalculateDamageWithCrit(int baseDamage)
@@ -77,7 +91,14 @@ public class Player : MonoBehaviour
     {
         int totalResistance = baseResistance;
         
-        if (affinity != Element.None && attackerAffinity == affinity)
+        if (hasElementPair && orbSystem != null)
+        {
+            if (attackerAffinity == orbSystem.OrbAElement || attackerAffinity == orbSystem.OrbBElement)
+            {
+                totalResistance += bonusResistance;
+            }
+        }
+        else if (affinity != Element.None && attackerAffinity == affinity)
         {
             totalResistance += bonusResistance;
         }
@@ -143,6 +164,41 @@ public class Player : MonoBehaviour
     {
         affinity = element;
         Debug.Log($"[Player] Affinity set to {element}");
+    }
+    
+    public void SetElementPair(ElementPair pair)
+    {
+        orbSystem.SetElementPair(pair.OrbA, pair.OrbB);
+        affinity = pair.OrbA;
+        hasElementPair = true;
+        Debug.Log($"[Player] Element pair set: {pair.DisplayName} ({pair.OrbA} + {pair.OrbB})");
+    }
+    
+    public ElementalOrbSystem GetOrbSystem() => orbSystem;
+    public bool HasElementPair() => hasElementPair;
+    public Element GetOrbAElement() => orbSystem.OrbAElement;
+    public Element GetOrbBElement() => orbSystem.OrbBElement;
+    
+    public void InfuseOrb(bool useOrbA)
+    {
+        orbSystem.InfuseOrb(useOrbA);
+        affinity = orbSystem.GetInfusedElement(useOrbA);
+    }
+    
+    public Element GetInfusedElement(bool useOrbA)
+    {
+        return orbSystem.GetInfusedElement(useOrbA);
+    }
+    
+    public bool HasReactionReady() => orbSystem.HasReactionReady();
+    
+    public float TriggerReactionAndGetMultiplier()
+    {
+        if (!orbSystem.HasReactionReady()) return 1f;
+        
+        float multiplier = orbSystem.GetReactionDamageMultiplier();
+        orbSystem.TriggerReaction();
+        return multiplier;
     }
 
     public void SelectCharacter(CharacterData character)

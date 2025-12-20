@@ -6,6 +6,7 @@ public class GameManager : MonoBehaviour
     private int completedNodes = 0;
     private const int TOTAL_NODES = 10;
     private bool affinityChosen = false;
+    private bool elementPairChosen = false;
     private bool characterChosen = false;
 
     void Start()
@@ -25,17 +26,40 @@ public class GameManager : MonoBehaviour
 
         if (refs != null && refs.affinitySelectionUI != null)
         {
-            refs.affinitySelectionUI.Show(OnAffinityChosen);
+            refs.affinitySelectionUI.ShowPairSelection(OnElementPairChosen);
         }
         else
         {
             Debug.LogError("[GameManager] AffinitySelectionUI not found");
-            affinityChosen = true;
+            elementPairChosen = true;
             if (refs != null && refs.playerController != null)
             {
                 refs.playerController.SetCanMove(true);
             }
         }
+    }
+    
+    private void OnElementPairChosen(ElementPair pair)
+    {
+        elementPairChosen = true;
+        affinityChosen = true;
+
+        if (refs != null && refs.player != null)
+        {
+            refs.player.SetElementPair(pair);
+        }
+
+        if (refs != null && refs.playerController != null)
+        {
+            refs.playerController.SetCanMove(true);
+        }
+
+        if (refs != null && refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
+        {
+            refs.playerStatsUI.UpdateStats();
+        }
+
+        Debug.Log($"[GameManager] Run started with {refs.player.GetCharacter().DisplayName} and {pair.DisplayName} orb pair");
     }
 
     private void StartCharacterSelection()
@@ -89,6 +113,7 @@ public class GameManager : MonoBehaviour
     }
 
     public bool HasAffinityBeenChosen() => affinityChosen;
+    public bool HasElementPairBeenChosen() => elementPairChosen;
     public bool HasCharacterBeenChosen() => characterChosen;
 
     public void OnNodeCompleted()

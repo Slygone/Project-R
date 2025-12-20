@@ -8,8 +8,11 @@ public class AffinitySelectionUI : MonoBehaviour
 {
     private GameObject selectionPanel;
     private List<Element> choices = new List<Element>();
+    private List<ElementPair> pairChoices = new List<ElementPair>();
     private Action<Element> onAffinitySelected;
+    private Action<ElementPair> onPairSelected;
     private bool isActive = false;
+    private bool isPairMode = false;
 
     void Awake()
     {
@@ -51,7 +54,7 @@ public class AffinitySelectionUI : MonoBehaviour
         titleRect.offsetMin = Vector2.zero;
         titleRect.offsetMax = Vector2.zero;
         var titleText = titleObj.AddComponent<TextMeshProUGUI>();
-        titleText.text = "CHOOSE YOUR AFFINITY";
+        titleText.text = "CHOOSE YOUR ELEMENTAL ORBS";
         titleText.alignment = TextAlignmentOptions.Center;
         titleText.fontSize = 42;
         titleText.color = new Color(1f, 0.85f, 0.2f);
@@ -64,7 +67,7 @@ public class AffinitySelectionUI : MonoBehaviour
         subtitleRect.offsetMin = Vector2.zero;
         subtitleRect.offsetMax = Vector2.zero;
         var subtitleText = subtitleObj.AddComponent<TextMeshProUGUI>();
-        subtitleText.text = "Your affinity determines your elemental damage type for this run";
+        subtitleText.text = "Choose your elemental orb pair for this run. Infuse attacks with either element!";
         subtitleText.alignment = TextAlignmentOptions.Center;
         subtitleText.fontSize = 20;
         subtitleText.color = new Color(0.7f, 0.7f, 0.7f);
@@ -74,6 +77,7 @@ public class AffinitySelectionUI : MonoBehaviour
 
     public void Show(Action<Element> callback)
     {
+        isPairMode = false;
         onAffinitySelected = callback;
         choices = GetRandomElements(3);
         
@@ -82,6 +86,151 @@ public class AffinitySelectionUI : MonoBehaviour
         
         selectionPanel.SetActive(true);
         isActive = true;
+    }
+    
+    public void ShowPairSelection(Action<ElementPair> callback)
+    {
+        isPairMode = true;
+        onPairSelected = callback;
+        pairChoices = GetRandomPairs(3);
+        
+        ClearChoiceButtons();
+        CreatePairButtons();
+        
+        selectionPanel.SetActive(true);
+        isActive = true;
+    }
+    
+    private List<ElementPair> GetRandomPairs(int count)
+    {
+        var allPairs = new List<ElementPair>(ElementPair.GetPredefinedPairs());
+        var result = new List<ElementPair>();
+        
+        while (result.Count < count && allPairs.Count > 0)
+        {
+            int index = UnityEngine.Random.Range(0, allPairs.Count);
+            result.Add(allPairs[index]);
+            allPairs.RemoveAt(index);
+        }
+        
+        return result;
+    }
+    
+    private void CreatePairButtons()
+    {
+        var container = new GameObject("ChoiceContainer");
+        container.transform.SetParent(selectionPanel.transform, false);
+
+        var containerRect = container.AddComponent<RectTransform>();
+        containerRect.anchorMin = new Vector2(0.1f, 0.15f);
+        containerRect.anchorMax = new Vector2(0.9f, 0.6f);
+        containerRect.offsetMin = Vector2.zero;
+        containerRect.offsetMax = Vector2.zero;
+
+        var layout = container.AddComponent<HorizontalLayoutGroup>();
+        layout.spacing = 30;
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = true;
+
+        foreach (var pair in pairChoices)
+        {
+            CreatePairButton(container.transform, pair);
+        }
+    }
+    
+    private void CreatePairButton(Transform parent, ElementPair pair)
+    {
+        var btnObj = new GameObject($"Btn_{pair.DisplayName}");
+        btnObj.transform.SetParent(parent, false);
+
+        var btnImage = btnObj.AddComponent<Image>();
+        btnImage.color = new Color(0.15f, 0.15f, 0.2f, 1f);
+
+        var btn = btnObj.AddComponent<Button>();
+        btn.targetGraphic = btnImage;
+        
+        ElementPair capturedPair = pair;
+        btn.onClick.AddListener(() => OnPairClicked(capturedPair));
+
+        var layout = btnObj.AddComponent<VerticalLayoutGroup>();
+        layout.spacing = 8;
+        layout.padding = new RectOffset(15, 15, 20, 20);
+        layout.childAlignment = TextAnchor.MiddleCenter;
+        layout.childControlWidth = true;
+        layout.childControlHeight = false;
+
+        var nameObj = new GameObject("Name");
+        nameObj.transform.SetParent(btnObj.transform, false);
+        var nameText = nameObj.AddComponent<TextMeshProUGUI>();
+        nameText.text = pair.DisplayName.ToUpper();
+        nameText.alignment = TextAlignmentOptions.Center;
+        nameText.fontSize = 26;
+        nameText.fontStyle = FontStyles.Bold;
+        nameText.color = Color.white;
+        var nameLayout = nameObj.AddComponent<LayoutElement>();
+        nameLayout.preferredHeight = 40;
+
+        var orbContainer = new GameObject("OrbContainer");
+        orbContainer.transform.SetParent(btnObj.transform, false);
+        var orbLayout = orbContainer.AddComponent<HorizontalLayoutGroup>();
+        orbLayout.spacing = 20;
+        orbLayout.childAlignment = TextAnchor.MiddleCenter;
+        orbLayout.childControlWidth = false;
+        orbLayout.childControlHeight = false;
+        var orbLayoutElement = orbContainer.AddComponent<LayoutElement>();
+        orbLayoutElement.preferredHeight = 80;
+
+        CreateOrbIcon(orbContainer.transform, pair.OrbA, "A");
+        CreateOrbIcon(orbContainer.transform, pair.OrbB, "B");
+
+        var descObj = new GameObject("Description");
+        descObj.transform.SetParent(btnObj.transform, false);
+        var descText = descObj.AddComponent<TextMeshProUGUI>();
+        descText.text = $"Orb A: {pair.OrbA}\nOrb B: {pair.OrbB}";
+        descText.alignment = TextAlignmentOptions.Center;
+        descText.fontSize = 14;
+        descText.color = new Color(0.8f, 0.8f, 0.8f);
+        var descLayout = descObj.AddComponent<LayoutElement>();
+        descLayout.preferredHeight = 40;
+    }
+    
+    private void CreateOrbIcon(Transform parent, Element element, string label)
+    {
+        var orbObj = new GameObject($"Orb_{label}");
+        orbObj.transform.SetParent(parent, false);
+        
+        var orbRect = orbObj.AddComponent<RectTransform>();
+        orbRect.sizeDelta = new Vector2(60, 60);
+        
+        var orbImage = orbObj.AddComponent<Image>();
+        orbImage.color = GetElementBackgroundColor(element);
+        
+        var textObj = new GameObject("Text");
+        textObj.transform.SetParent(orbObj.transform, false);
+        var textRect = textObj.AddComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        
+        var text = textObj.AddComponent<TextMeshProUGUI>();
+        text.text = element.ToString().Substring(0, 1);
+        text.alignment = TextAlignmentOptions.Center;
+        text.fontSize = 28;
+        text.fontStyle = FontStyles.Bold;
+        text.color = Color.white;
+    }
+    
+    private void OnPairClicked(ElementPair pair)
+    {
+        selectionPanel.SetActive(false);
+        isActive = false;
+
+        Debug.Log($"[AffinitySelectionUI] Player chose {pair.DisplayName} orb pair");
+        onPairSelected?.Invoke(pair);
     }
 
     private List<Element> GetRandomElements(int count)
@@ -218,4 +367,5 @@ public class AffinitySelectionUI : MonoBehaviour
     }
 
     public bool IsActive() => isActive;
+    public bool IsPairMode() => isPairMode;
 }
