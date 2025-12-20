@@ -1076,6 +1076,137 @@ public class CombatUI : MonoBehaviour
             skill2Button.interactable = isPlayerTurn;
         if (skill3Button != null)
             skill3Button.interactable = isPlayerTurn;
+            
+        if (isPlayerTurn)
+        {
+            UpdateReactionIndicator();
+        }
+    }
+    
+    public void UpdateReactionIndicator()
+    {
+        var refs = FindFirstObjectByType<Referencer>();
+        if (refs == null || refs.player == null) return;
+        
+        var player = refs.player;
+        bool reactionReady = player.HasReactionReady();
+        
+        Color normalColor = new Color(0.2f, 0.5f, 0.7f, 1f);
+        Color attackNormalColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+        
+        if (reactionReady)
+        {
+            var orbSystem = player.GetOrbSystem();
+            Color colorA = GetElementColor(orbSystem.OrbAMark);
+            Color colorB = GetElementColor(orbSystem.OrbBMark);
+            
+            SetButtonDiagonalSplit(attackButton, colorA, colorB);
+            SetButtonDiagonalSplit(skill1Button, colorA, colorB);
+            SetButtonDiagonalSplit(skill2Button, colorA, colorB);
+            SetButtonDiagonalSplit(skill3Button, colorA, colorB);
+        }
+        else
+        {
+            ClearButtonDiagonalSplit(attackButton, attackNormalColor);
+            ClearButtonDiagonalSplit(skill1Button, normalColor);
+            ClearButtonDiagonalSplit(skill2Button, normalColor);
+            ClearButtonDiagonalSplit(skill3Button, normalColor);
+        }
+    }
+    
+    private void SetButtonDiagonalSplit(Button button, Color topColor, Color bottomColor)
+    {
+        if (button == null) return;
+        
+        var buttonImage = button.GetComponent<Image>();
+        if (buttonImage != null)
+        {
+            buttonImage.color = Color.clear;
+        }
+        
+        var diagonalOverlay = button.transform.Find("DiagonalOverlay");
+        RawImage rawImage;
+        
+        if (diagonalOverlay == null)
+        {
+            var obj = new GameObject("DiagonalOverlay");
+            obj.transform.SetParent(button.transform, false);
+            obj.transform.SetAsFirstSibling();
+            
+            var rect = obj.AddComponent<RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            
+            rawImage = obj.AddComponent<RawImage>();
+            rawImage.raycastTarget = false;
+            diagonalOverlay = obj.transform;
+        }
+        else
+        {
+            rawImage = diagonalOverlay.GetComponent<RawImage>();
+            diagonalOverlay.gameObject.SetActive(true);
+        }
+        
+        rawImage.texture = CreateDiagonalTexture(topColor, bottomColor);
+        
+        var outline = button.GetComponent<Outline>();
+        if (outline == null)
+        {
+            outline = button.gameObject.AddComponent<Outline>();
+        }
+        outline.effectColor = Color.white;
+        outline.effectDistance = new Vector2(2, 2);
+        outline.enabled = true;
+    }
+    
+    private Texture2D CreateDiagonalTexture(Color topColor, Color bottomColor)
+    {
+        int size = 64;
+        var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        tex.filterMode = FilterMode.Bilinear;
+        
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                if (x + y < size)
+                {
+                    tex.SetPixel(x, y, topColor);
+                }
+                else
+                {
+                    tex.SetPixel(x, y, bottomColor);
+                }
+            }
+        }
+        
+        tex.Apply();
+        return tex;
+    }
+    
+    private void ClearButtonDiagonalSplit(Button button, Color normalColor)
+    {
+        if (button == null) return;
+        
+        var buttonImage = button.GetComponent<Image>();
+        if (buttonImage != null)
+        {
+            buttonImage.color = normalColor;
+        }
+        
+        var diagonalOverlay = button.transform.Find("DiagonalOverlay");
+        if (diagonalOverlay != null)
+        {
+            diagonalOverlay.gameObject.SetActive(false);
+        }
+        
+        var outline = button.GetComponent<Outline>();
+        if (outline != null)
+        {
+            outline.enabled = false;
+        }
     }
 
     private Color GetElementColor(Element element)

@@ -8,6 +8,8 @@ public class ElementalOrbSystem
     private Element orbBMark = Element.None;
     private bool orbAActive = false;
     private bool orbBActive = false;
+    private Element detonatorElement = Element.None;
+    private int infusionOrder = 0;
     
     public Element OrbAElement => orbAElement;
     public Element OrbBElement => orbBElement;
@@ -15,6 +17,7 @@ public class ElementalOrbSystem
     public Element OrbBMark => orbBMark;
     public bool IsOrbAActive => orbAActive;
     public bool IsOrbBActive => orbBActive;
+    public Element DetonatorElement => detonatorElement;
     
     public void SetElementPair(Element a, Element b)
     {
@@ -26,20 +29,28 @@ public class ElementalOrbSystem
     
     public void InfuseOrb(bool useOrbA)
     {
+        infusionOrder++;
+        Element infusedElement;
+        
         if (useOrbA)
         {
             orbAMark = orbAElement;
             orbAActive = true;
+            infusedElement = orbAElement;
             ApplyElementBuff(orbAElement);
-            Debug.Log($"[ElementalOrbSystem] Orb A infused with {orbAElement} - mark applied");
+            Debug.Log($"[ElementalOrbSystem] Orb A infused with {orbAElement} - mark applied (order: {infusionOrder})");
         }
         else
         {
             orbBMark = orbBElement;
             orbBActive = true;
+            infusedElement = orbBElement;
             ApplyElementBuff(orbBElement);
-            Debug.Log($"[ElementalOrbSystem] Orb B infused with {orbBElement} - mark applied");
+            Debug.Log($"[ElementalOrbSystem] Orb B infused with {orbBElement} - mark applied (order: {infusionOrder})");
         }
+        
+        detonatorElement = infusedElement;
+        Debug.Log($"[ElementalOrbSystem] Detonator set to {detonatorElement}");
     }
     
     public Element GetInfusedElement(bool useOrbA)
@@ -76,6 +87,8 @@ public class ElementalOrbSystem
         orbBMark = Element.None;
         orbAActive = false;
         orbBActive = false;
+        detonatorElement = Element.None;
+        infusionOrder = 0;
         Debug.Log("[ElementalOrbSystem] Marks cleared");
     }
     

@@ -9,6 +9,7 @@ public class CombatManager : MonoBehaviour
     private Player player;
     private CombatUI combatUI;
     private InfusionUI infusionUI;
+    private ReactionQTEPanel qtePanel;
     private bool isPlayerTurn = true;
     private bool combatActive = false;
     private NodeBase currentNode;
@@ -18,6 +19,10 @@ public class CombatManager : MonoBehaviour
     private int pendingSkillNumber;
     private bool pendingIsAttack;
     private Element pendingInfusedElement = Element.None;
+    private float pendingReactionMultiplier = 1f;
+    private string pendingReactionName = "";
+    private Element pendingReactionElementA = Element.None;
+    private Element pendingReactionElementB = Element.None;
 
     public void StartCombat(CombatNode node, Player playerRef)
     {
@@ -120,7 +125,14 @@ public class CombatManager : MonoBehaviour
 
         if (player.HasElementPair())
         {
-            RequestInfusion(target, 0, true);
+            if (player.HasReactionReady())
+            {
+                TriggerReactionAction(target, 0, true);
+            }
+            else
+            {
+                RequestInfusion(target, 0, true);
+            }
         }
         else
         {
@@ -170,29 +182,87 @@ public class CombatManager : MonoBehaviour
     
     private void OnInfusionSelected(bool useOrbA)
     {
-        player.InfuseOrb(useOrbA);
         pendingInfusedElement = player.GetInfusedElement(useOrbA);
+        player.InfuseOrb(useOrbA);
         
-        float reactionMultiplier = 1f;
-        if (player.HasReactionReady())
-        {
-            reactionMultiplier = player.TriggerReactionAndGetMultiplier();
-            Debug.Log($"[CombatManager] Reaction triggered! Damage multiplier: {reactionMultiplier}x");
-        }
+        ExecuteActionWithoutReaction();
+    }
+    
+    private void OnQTEComplete(QTEResult result)
+    {
+        float qteMultiplier = ReactionQTE.GetQteMultiplier(result);
+        
+        Debug.Log($"[CombatLog_rest] QTEComplete | Result={result} | QTEMultiplier={qteMultiplier:F1}x");
         
         if (pendingIsAttack)
         {
-            ExecuteAttack(pendingTarget, reactionMultiplier, pendingInfusedElement);
+            ExecuteAttackWithReaction(pendingTarget, pendingReactionMultiplier, qteMultiplier, pendingInfusedElement, result);
         }
         else
         {
-            ExecuteSkill(pendingSkillNumber, pendingTarget, reactionMultiplier, pendingInfusedElement);
+            ExecuteSkillWithReaction(pendingSkillNumber, pendingTarget, pendingReactionMultiplier, qteMultiplier, pendingInfusedElement, result);
         }
         
+        ClearPendingAction();
+    }
+    
+    private void ExecuteActionWithoutReaction()
+    {
+        if (pendingIsAttack)
+        {
+            ExecuteAttack(pendingTarget, 1f, pendingInfusedElement);
+        }
+        else
+        {
+            ExecuteSkill(pendingSkillNumber, pendingTarget, 1f, pendingInfusedElement);
+        }
+        
+        ClearPendingAction();
+    }
+    
+    private void ClearPendingAction()
+    {
         pendingTarget = null;
         pendingSkillNumber = 0;
         pendingIsAttack = false;
         pendingInfusedElement = Element.None;
+        pendingReactionMultiplier = 1f;
+        pendingReactionName = "";
+        pendingReactionElementA = Element.None;
+        pendingReactionElementB = Element.None;
+    }
+    
+    private void TriggerReactionAction(CombatEnemy target, int skillNumber, bool isAttack)
+    {
+        pendingTarget = target;
+        pendingSkillNumber = skillNumber;
+        pendingIsAttack = isAttack;
+        
+        var orbSystem = player.GetOrbSystem();
+        pendingReactionElementA = orbSystem.OrbAMark;
+        pendingReactionElementB = orbSystem.OrbBMark;
+        pendingInfusedElement = orbSystem.DetonatorElement;
+        pendingReactionName = ReactionQTE.GetReactionName(pendingReactionElementA, pendingReactionElementB);
+        pendingReactionMultiplier = ReactionQTE.GetReactionMultiplier(pendingReactionElementA, pendingReactionElementB);
+        
+        orbSystem.ClearMarks();
+        
+        Debug.Log($"[CombatLog_rest] ReactionTriggered | Type={pendingReactionName} | Elements={pendingReactionElementA}+{pendingReactionElementB} | Detonator={pendingInfusedElement} | Multiplier={pendingReactionMultiplier:F2}x");
+        
+        if (qtePanel == null)
+        {
+            qtePanel = FindFirstObjectByType<ReactionQTEPanel>();
+        }
+        
+        if (qtePanel != null)
+        {
+            qtePanel.Show(pendingReactionName, OnQTEComplete);
+        }
+        else
+        {
+            Debug.LogWarning("[CombatManager] ReactionQTEPanel not found, executing with Good QTE result");
+            OnQTEComplete(QTEResult.Good);
+        }
     }
     
     private void ExecuteAttack(CombatEnemy target, float reactionMultiplier = 1f, Element? forcedElement = null)
@@ -246,6 +316,59 @@ public class CombatManager : MonoBehaviour
         isPlayerTurn = false;
         EnemyTurn();
     }
+    
+    private void ExecuteAttackWithReaction(CombatEnemy target, float reactionMultiplier, float qteMultiplier, Element? forcedElement, QTEResult qteResult)
+    {
+        Element attackElement = forcedElement ?? player.GetAffinity();
+        int characterDamage = player.GetCharacterDamage();
+        int elementalBonus = player.HasElementPair() 
+            ? player.GetElementalBonus(player.GetOrbAElement()) + player.GetElementalBonus(player.GetOrbBElement())
+            : player.GetAffinityBonus();
+        
+        float damageAfterReaction = (characterDamage + elementalBonus) * reactionMultiplier;
+        
+        bool isCrit = Random.Range(0, 100) < player.GetCritChance();
+        float critMultiplier = isCrit ? player.GetCritDamage() : 1f;
+        float damageAfterCrit = damageAfterReaction * critMultiplier;
+        
+        float damageAfterQTE = damageAfterCrit * qteMultiplier;
+        int baseDamageBeforeResist = Mathf.RoundToInt(damageAfterQTE);
+        
+        int damage = target.ApplyResistance(baseDamageBeforeResist, attackElement);
+        int resistPercent = target.CalculateResistance(attackElement);
+        
+        target.TakeDamage(damage);
+        
+        string infusedSrc = "";
+        if (player.HasElementPair())
+        {
+            if (attackElement == player.GetOrbAElement()) infusedSrc = "A";
+            else if (attackElement == player.GetOrbBElement()) infusedSrc = "B";
+        }
+        
+        Debug.Log($"[CombatLog_rest] PlayerAttackReaction | Reaction={pendingReactionName} | ReactionMult={reactionMultiplier:F2}x | Crit={isCrit} | CritMult={critMultiplier:F1}x | QTE={qteResult} | QTEMult={qteMultiplier:F1}x | FinalDamage={damage} | Element={attackElement} | InfusedFrom={infusedSrc} | Resist={resistPercent}% | Target={target.Name}");
+        Debug.Log($"[CombatManager] REACTION ATTACK! {pendingReactionName} ({pendingReactionElementA}+{pendingReactionElementB}) -> {damage} damage to {target.Name} [QTE: {qteResult}]");
+
+        if (combatUI != null)
+        {
+            combatUI.ShowDamageToEnemy(target, damage, isCrit);
+            combatUI.UpdateEnemyHealth(target);
+        }
+
+        if (!target.IsAlive())
+        {
+            Debug.Log($"[CombatManager] {target.Name} defeated!");
+        }
+
+        if (AllEnemiesDead())
+        {
+            EndCombat(true);
+            return;
+        }
+
+        isPlayerTurn = false;
+        EnemyTurn();
+    }
 
     public void OnPlayerSkill(int skillNumber)
     {
@@ -270,7 +393,14 @@ public class CombatManager : MonoBehaviour
 
         if (player.HasElementPair())
         {
-            RequestInfusion(target, skillNumber, false);
+            if (player.HasReactionReady())
+            {
+                TriggerReactionAction(target, skillNumber, false);
+            }
+            else
+            {
+                RequestInfusion(target, skillNumber, false);
+            }
         }
         else
         {
@@ -405,6 +535,96 @@ public class CombatManager : MonoBehaviour
 
         isPlayerTurn = false;
         EnemyTurn();
+    }
+    
+    private void ExecuteSkillWithReaction(int skillNumber, CombatEnemy target, float reactionMultiplier, float qteMultiplier, Element? forcedElement, QTEResult qteResult)
+    {
+        var character = player.GetCharacter();
+        if (character == null) return;
+
+        string skillName = skillNumber switch
+        {
+            1 => character.Skill1,
+            2 => character.Skill2,
+            3 => character.Skill3,
+            _ => "Unknown"
+        };
+
+        float skillMultiplier = GetSkillMultiplier(skillName);
+        
+        Element attackElement = forcedElement ?? player.GetAffinity();
+        int characterDamage = player.GetCharacterDamage();
+        int elementalBonus = player.HasElementPair() 
+            ? player.GetElementalBonus(player.GetOrbAElement()) + player.GetElementalBonus(player.GetOrbBElement())
+            : player.GetAffinityBonus();
+        
+        float baseDamage = (characterDamage + elementalBonus) * skillMultiplier;
+        float damageAfterReaction = baseDamage * reactionMultiplier;
+        
+        bool isCrit = Random.Range(0, 100) < player.GetCritChance();
+        float critMultiplier = isCrit ? player.GetCritDamage() : 1f;
+        float damageAfterCrit = damageAfterReaction * critMultiplier;
+        
+        float damageAfterQTE = damageAfterCrit * qteMultiplier;
+        int baseDamageBeforeResist = Mathf.RoundToInt(damageAfterQTE);
+        
+        int finalDamage = target.ApplyResistance(baseDamageBeforeResist, attackElement);
+        int resistPercent = target.CalculateResistance(attackElement);
+        
+        target.TakeDamage(finalDamage);
+        
+        string infusedSrc = "";
+        if (player.HasElementPair())
+        {
+            if (attackElement == player.GetOrbAElement()) infusedSrc = "A";
+            else if (attackElement == player.GetOrbBElement()) infusedSrc = "B";
+        }
+        
+        Debug.Log($"[CombatLog_rest] PlayerSkillReaction | Skill={skillName} | Reaction={pendingReactionName} | ReactionMult={reactionMultiplier:F2}x | Crit={isCrit} | CritMult={critMultiplier:F1}x | QTE={qteResult} | QTEMult={qteMultiplier:F1}x | FinalDamage={finalDamage} | Element={attackElement} | InfusedFrom={infusedSrc} | Resist={resistPercent}% | Target={target.Name}");
+        Debug.Log($"[CombatManager] REACTION SKILL! {skillName} + {pendingReactionName} ({pendingReactionElementA}+{pendingReactionElementB}) -> {finalDamage} damage to {target.Name} [QTE: {qteResult}]");
+
+        if (combatUI != null)
+        {
+            combatUI.ShowDamageToEnemy(target, finalDamage, isCrit);
+            combatUI.UpdateEnemyHealth(target);
+        }
+
+        if (!target.IsAlive())
+        {
+            Debug.Log($"[CombatManager] {target.Name} defeated!");
+        }
+
+        if (AllEnemiesDead())
+        {
+            EndCombat(true);
+            return;
+        }
+
+        isPlayerTurn = false;
+        EnemyTurn();
+    }
+    
+    private float GetSkillMultiplier(string skillName)
+    {
+        return skillName.ToLower() switch
+        {
+            "slash" => 1.0f,
+            "riposte" => 0.8f,
+            "bladestorm" => 1.5f,
+            "bolt" => 0.9f,
+            "ray" => 1.2f,
+            "meteor" => 2.0f,
+            "aimedshot" => 1.3f,
+            "tripleshot" => 0.5f,
+            "doubleup" => 2.0f,
+            "dirtystab" => 1.1f,
+            "cheapshot" => 0.7f,
+            "ambush" => 1.8f,
+            "shock" => 0.9f,
+            "judgement" => 1.4f,
+            "holynova" => 1.2f,
+            _ => 1.0f
+        };
     }
 
     private void DamageAllEnemies(int damage, Element? forcedElement = null)

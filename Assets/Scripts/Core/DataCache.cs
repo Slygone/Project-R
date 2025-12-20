@@ -12,6 +12,8 @@ public static class DataCache
     public static List<PotionData> Potions { get; private set; }
     public static List<RelicData> Relics { get; private set; }
     public static PlayerData PlayerStats { get; private set; }
+    public static Dictionary<string, float> QTEMultipliers { get; private set; }
+    public static List<ReactionData> Reactions { get; private set; }
 
     public static bool IsLoaded { get; private set; }
 
@@ -23,9 +25,11 @@ public static class DataCache
         Potions = LoadPotions();
         Relics = LoadRelics();
         PlayerStats = LoadPlayerStats();
+        QTEMultipliers = LoadQTEMultipliers();
+        Reactions = LoadReactions();
 
         IsLoaded = true;
-        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, player stats");
+        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEMultipliers.Count} QTE results, {Reactions.Count} reactions, player stats");
     }
 
     private static List<EnemyData> LoadEnemies()
@@ -171,5 +175,88 @@ public static class DataCache
             BaseResistance = CSVParser.ParseInt(row, "BaseRessistance"),
             BonusResistance = CSVParser.ParseInt(row, "BonusRessistance")
         };
+    }
+
+    private static Dictionary<string, float> LoadQTEMultipliers()
+    {
+        var csv = Resources.Load<TextAsset>("Data/qte");
+        var dict = new Dictionary<string, float>();
+        
+        if (csv == null)
+        {
+            Debug.LogWarning("[DataCache] qte.csv not found, using defaults");
+            dict["Bad"] = 0.9f;
+            dict["Good"] = 1.0f;
+            dict["Perfect"] = 1.1f;
+            return dict;
+        }
+
+        var rows = CSVParser.Parse(csv.text);
+        foreach (var row in rows)
+        {
+            string result = CSVParser.ParseString(row, "Result");
+            float multiplier = CSVParser.ParseFloat(row, "Multiplier");
+            dict[result] = multiplier;
+        }
+
+        return dict;
+    }
+
+    private static List<ReactionData> LoadReactions()
+    {
+        var csv = Resources.Load<TextAsset>("Data/reaction");
+        var list = new List<ReactionData>();
+        
+        if (csv == null)
+        {
+            Debug.LogWarning("[DataCache] reaction.csv not found");
+            return list;
+        }
+
+        var rows = CSVParser.Parse(csv.text);
+        foreach (var row in rows)
+        {
+            list.Add(new ReactionData
+            {
+                ElementA = CSVParser.ParseString(row, "ElementA"),
+                ElementB = CSVParser.ParseString(row, "ElementB"),
+                ReactionName = CSVParser.ParseString(row, "ReactionName"),
+                Multiplier = CSVParser.ParseFloat(row, "Multiplier")
+            });
+        }
+
+        return list;
+    }
+
+    public static float GetQTEMultiplier(QTEResult result)
+    {
+        string key = result.ToString();
+        if (QTEMultipliers != null && QTEMultipliers.TryGetValue(key, out float mult))
+        {
+            return mult;
+        }
+        return 1.0f;
+    }
+
+    public static (string name, float multiplier) GetReaction(Element a, Element b)
+    {
+        if (a == b) return ("None", 1.0f);
+        
+        string aStr = a.ToString();
+        string bStr = b.ToString();
+        
+        if (Reactions != null)
+        {
+            foreach (var r in Reactions)
+            {
+                if ((r.ElementA == aStr && r.ElementB == bStr) ||
+                    (r.ElementA == bStr && r.ElementB == aStr))
+                {
+                    return (r.ReactionName, r.Multiplier);
+                }
+            }
+        }
+        
+        return ("Reaction", 1.25f);
     }
 }

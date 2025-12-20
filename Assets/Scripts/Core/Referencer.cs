@@ -19,6 +19,7 @@ public class Referencer : MonoBehaviour
     public PotionUI potionUI;
     public RestUI restUI;
     public InfusionUI infusionUI;
+    public ReactionQTEPanel reactionQTEPanel;
     
     public GameObject nodePopupPanel;
     public GameObject victoryPanel;
@@ -108,6 +109,13 @@ public class Referencer : MonoBehaviour
         {
             var infusionObj = new GameObject("InfusionUI");
             infusionUI = infusionObj.AddComponent<InfusionUI>();
+        }
+        
+        reactionQTEPanel = FindFirstObjectByType<ReactionQTEPanel>();
+        if (reactionQTEPanel == null)
+        {
+            var qteObj = new GameObject("ReactionQTEPanel");
+            reactionQTEPanel = qteObj.AddComponent<ReactionQTEPanel>();
         }
 
         var mainCam = Camera.main;

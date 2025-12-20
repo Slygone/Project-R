@@ -1,0 +1,11 @@
+ElementA,ElementB,ReactionName,Multiplier
+Fire,Ice,Melt,1.75
+Fire,Water,Vaporize,2.0
+Ice,Water,Freeze,1.5
+Fire,Wind,Overload,1.75
+Ice,Wind,Swirl,1.3
+Water,Wind,Swirl,1.3
+Fire,Rock,Crystallize,1.5
+Ice,Rock,Crystallize,1.5
+Water,Rock,Crystallize,1.5
+Rock,Wind,Shatter,1.4
