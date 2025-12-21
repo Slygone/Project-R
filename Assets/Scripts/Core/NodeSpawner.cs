@@ -11,17 +11,31 @@ public class NodeSpawner : MonoBehaviour
 
     void Start()
     {
-        SpawnNodes();
+        SpawnNodesForWorld(1);
     }
 
-    private void SpawnNodes()
+    public void SpawnNodesForWorld(int world)
     {
         spawnedPositions.Clear();
         
-        int shopCount = 1;
-        int combatCount = 5;
-        int restCount = 2;
-        int mysteryCount = 3;
+        int shopCount, combatCount, restCount, mysteryCount;
+        
+        if (world == 1)
+        {
+            // World 1: 20 nodes total
+            shopCount = 2;
+            combatCount = 10;
+            restCount = 3;
+            mysteryCount = 5;
+        }
+        else
+        {
+            // World 2: 25 nodes total
+            shopCount = 2;
+            combatCount = 13;
+            restCount = 4;
+            mysteryCount = 6;
+        }
 
         for (int i = 0; i < shopCount; i++)
             SpawnNode<ShopNode>();
@@ -34,6 +48,8 @@ public class NodeSpawner : MonoBehaviour
         
         for (int i = 0; i < mysteryCount; i++)
             SpawnNode<MysteryNode>();
+            
+        Debug.Log($"[NodeSpawner] Spawned nodes for World {world}: {shopCount} shops, {combatCount} combats, {restCount} rests, {mysteryCount} mysteries");
     }
 
     private void SpawnNode<T>() where T : NodeBase

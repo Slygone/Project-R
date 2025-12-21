@@ -33,7 +33,9 @@ public class CombatManager : MonoBehaviour
     public void StartEliteCombat(NodeBase node, Player playerRef)
     {
         currentCombatType = CombatType.Elite;
-        StartCombatInternal(node, playerRef, DataCache.EliteEnemies, 1);
+        // World 2 spawns 2 elites instead of 1
+        int eliteCount = GameManager.CurrentWorld >= 2 ? 2 : 1;
+        StartCombatInternal(node, playerRef, DataCache.EliteEnemies, eliteCount);
     }
 
     public void StartBossCombat(Player playerRef, System.Action<bool> onBossComplete)
@@ -50,20 +52,28 @@ public class CombatManager : MonoBehaviour
         player = playerRef;
         enemies.Clear();
 
+        int world = GameManager.CurrentWorld;
+        int bossCount = world >= 2 ? 2 : 1;
+        
         if (DataCache.BossEnemies.Count > 0)
         {
-            var bossData = DataCache.BossEnemies[Random.Range(0, DataCache.BossEnemies.Count)];
-            enemies.Add(new CombatEnemy(bossData));
+            for (int i = 0; i < bossCount; i++)
+            {
+                var bossData = DataCache.BossEnemies[Random.Range(0, DataCache.BossEnemies.Count)];
+                enemies.Add(new CombatEnemy(bossData, world));
+            }
         }
 
         combatActive = true;
         isPlayerTurn = true;
 
-        Debug.Log($"[CombatManager] BOSS FIGHT started: {enemies[0].Name}");
+        string bossNames = string.Join(" & ", enemies.ConvertAll(e => e.Name));
+        Debug.Log($"[CombatManager] BOSS FIGHT started: {bossNames} (World {world})");
 
+        string title = world >= 2 ? "FINAL BOSS FIGHT!" : "BOSS FIGHT!";
         if (combatUI != null)
         {
-            combatUI.ShowCombat(enemies, player, "BOSS FIGHT!");
+            combatUI.ShowCombat(enemies, player, title);
         }
     }
 
@@ -85,11 +95,12 @@ public class CombatManager : MonoBehaviour
             enemyPool = DataCache.RegularEnemies;
         }
 
+        int world = GameManager.CurrentWorld;
         for (int i = 0; i < enemyCount; i++)
         {
             int randomIndex = Random.Range(0, enemyPool.Count);
             var enemyData = enemyPool[randomIndex];
-            enemies.Add(new CombatEnemy(enemyData));
+            enemies.Add(new CombatEnemy(enemyData, world));
         }
 
         combatActive = true;
@@ -192,7 +203,7 @@ public class CombatManager : MonoBehaviour
     {
         float qteMultiplier = ReactionQTE.GetQteMultiplier(result);
         
-        Debug.Log($"[CombatLog_rest] QTEComplete | Result={result} | QTEMultiplier={qteMultiplier:F1}x");
+        Debug.Log($"[CombatLog] QTEComplete | Result={result} | QTEMultiplier={qteMultiplier:F1}x");
         
         if (pendingIsAttack)
         {
@@ -247,7 +258,7 @@ public class CombatManager : MonoBehaviour
         
         orbSystem.ClearMarks();
         
-        Debug.Log($"[CombatLog_rest] ReactionTriggered | Type={pendingReactionName} | Elements={pendingReactionElementA}+{pendingReactionElementB} | Detonator={pendingInfusedElement} | Multiplier={pendingReactionMultiplier:F2}x");
+        Debug.Log($"[CombatLog] ReactionTriggered | Type={pendingReactionName} | Elements={pendingReactionElementA}+{pendingReactionElementB} | Detonator={pendingInfusedElement} | Multiplier={pendingReactionMultiplier:F2}x");
         
         if (qtePanel == null)
         {
@@ -294,7 +305,7 @@ public class CombatManager : MonoBehaviour
             if (attackElement == player.GetOrbAElement()) infusedSrc = "A";
             else if (attackElement == player.GetOrbBElement()) infusedSrc = "B";
         }
-        Debug.Log($"[CombatLog_rest] PlayerAttack | Element={attackElement} | InfusedFrom={infusedSrc} | Damage={damage} | Crit={isCrit} | Reaction={reactionMultiplier:F1}x | Resist={resistPercent}% | Target={target.Name}");
+        Debug.Log($"[CombatLog] PlayerAttack | Element={attackElement} | InfusedFrom={infusedSrc} | Damage={damage} | Crit={isCrit} | Reaction={reactionMultiplier:F1}x | Resist={resistPercent}% | Target={target.Name}");
 
         if (combatUI != null)
         {
@@ -346,7 +357,7 @@ public class CombatManager : MonoBehaviour
             else if (attackElement == player.GetOrbBElement()) infusedSrc = "B";
         }
         
-        Debug.Log($"[CombatLog_rest] PlayerAttackReaction | Reaction={pendingReactionName} | ReactionMult={reactionMultiplier:F2}x | Crit={isCrit} | CritMult={critMultiplier:F1}x | QTE={qteResult} | QTEMult={qteMultiplier:F1}x | FinalDamage={damage} | Element={attackElement} | InfusedFrom={infusedSrc} | Resist={resistPercent}% | Target={target.Name}");
+        Debug.Log($"[CombatLog] PlayerAttackReaction | Reaction={pendingReactionName} | ReactionMult={reactionMultiplier:F2}x | Crit={isCrit} | CritMult={critMultiplier:F1}x | QTE={qteResult} | QTEMult={qteMultiplier:F1}x | FinalDamage={damage} | Element={attackElement} | InfusedFrom={infusedSrc} | Resist={resistPercent}% | Target={target.Name}");
         Debug.Log($"[CombatManager] REACTION ATTACK! {pendingReactionName} ({pendingReactionElementA}+{pendingReactionElementB}) -> {damage} damage to {target.Name} [QTE: {qteResult}]");
 
         if (combatUI != null)
@@ -514,7 +525,7 @@ public class CombatManager : MonoBehaviour
             if (attackElement == player.GetOrbAElement()) infusedSrcSkill = "A";
             else if (attackElement == player.GetOrbBElement()) infusedSrcSkill = "B";
         }
-        Debug.Log($"[CombatLog_rest] PlayerSkill | Skill={skillName} | Element={attackElement} | InfusedFrom={infusedSrcSkill} | Damage={finalDamage} | Crit={isCrit} | Reaction={reactionMultiplier:F1}x | Resist={resistPercent}% | Target={target.Name}");
+        Debug.Log($"[CombatLog] PlayerSkill | Skill={skillName} | Element={attackElement} | InfusedFrom={infusedSrcSkill} | Damage={finalDamage} | Crit={isCrit} | Reaction={reactionMultiplier:F1}x | Resist={resistPercent}% | Target={target.Name}");
 
         if (combatUI != null)
         {
@@ -580,7 +591,7 @@ public class CombatManager : MonoBehaviour
             else if (attackElement == player.GetOrbBElement()) infusedSrc = "B";
         }
         
-        Debug.Log($"[CombatLog_rest] PlayerSkillReaction | Skill={skillName} | Reaction={pendingReactionName} | ReactionMult={reactionMultiplier:F2}x | Crit={isCrit} | CritMult={critMultiplier:F1}x | QTE={qteResult} | QTEMult={qteMultiplier:F1}x | FinalDamage={finalDamage} | Element={attackElement} | InfusedFrom={infusedSrc} | Resist={resistPercent}% | Target={target.Name}");
+        Debug.Log($"[CombatLog] PlayerSkillReaction | Skill={skillName} | Reaction={pendingReactionName} | ReactionMult={reactionMultiplier:F2}x | Crit={isCrit} | CritMult={critMultiplier:F1}x | QTE={qteResult} | QTEMult={qteMultiplier:F1}x | FinalDamage={finalDamage} | Element={attackElement} | InfusedFrom={infusedSrc} | Resist={resistPercent}% | Target={target.Name}");
         Debug.Log($"[CombatManager] REACTION SKILL! {skillName} + {pendingReactionName} ({pendingReactionElementA}+{pendingReactionElementB}) -> {finalDamage} damage to {target.Name} [QTE: {qteResult}]");
 
         if (combatUI != null)
@@ -642,7 +653,7 @@ public class CombatManager : MonoBehaviour
                     if (attackElement == player.GetOrbAElement()) infusedSrcAoE = "A";
                     else if (attackElement == player.GetOrbBElement()) infusedSrcAoE = "B";
                 }
-                Debug.Log($"[CombatLog_rest] PlayerAoE | Element={attackElement} | InfusedFrom={infusedSrcAoE} | Damage={finalDamage} | Target={enemy.Name}");
+                Debug.Log($"[CombatLog] PlayerAoE | Element={attackElement} | InfusedFrom={infusedSrcAoE} | Damage={finalDamage} | Target={enemy.Name}");
                 if (combatUI != null)
                 {
                     combatUI.UpdateEnemyHealth(enemy);
@@ -682,7 +693,7 @@ public class CombatManager : MonoBehaviour
                     resMarker = "Affinity";
                 }
 
-                Debug.Log($"[CombatLog_rest] EnemyAttack | Attacker={enemy.Name} | Element={enemy.Affinity} | Base={baseDamage} | ResistTotal={resistPercent}% | ResistBonusFrom={resMarker} | Final={finalDamage}");
+                Debug.Log($"[CombatLog] EnemyAttack | Attacker={enemy.Name} | Element={enemy.Affinity} | Base={baseDamage} | ResistTotal={resistPercent}% | ResistBonusFrom={resMarker} | Final={finalDamage}");
             }
         }
 
@@ -752,6 +763,24 @@ public class CombatManager : MonoBehaviour
             if (currentCombatType == CombatType.Elite)
             {
                 goldReward *= 2;
+                
+                var mysteryNode = currentNode as MysteryNode;
+                if (mysteryNode != null && mysteryNode.IsEliteFight())
+                {
+                    mysteryNode.GiveEliteRewards();
+                    
+                    if (combatUI != null)
+                    {
+                        combatUI.HideCombat();
+                    }
+                    
+                    if (currentNode != null)
+                    {
+                        currentNode.OnNodeCompleted();
+                    }
+                    currentNode = null;
+                    return;
+                }
             }
             
             var availableRelics = DataCache.Relics;

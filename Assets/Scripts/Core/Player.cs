@@ -384,4 +384,23 @@ public class Player : MonoBehaviour
         tempCritDamageBonus = 0;
         Debug.Log("[Player] World bonuses reset");
     }
+    
+    public void ResetForNewWorld()
+    {
+        // Reset temporary potion bonuses
+        tempCritChanceBonus = 0;
+        tempCritDamageBonus = 0;
+        
+        // Clear potion inventory
+        potionInventory.Clear();
+        
+        // Restore health to max (keep max health from relics/rests)
+        health = maxHealth;
+        
+        // Restore energy to max
+        energy = maxEnergy;
+        
+        Debug.Log($"[Player] Reset for new world - HP restored to {health}/{maxHealth}, potions cleared, temp bonuses reset");
+        Debug.Log($"[Player] Keeping: {relics.Count} relics, {GetCharacterDamage()} character damage, elemental bonuses");
+    }
 }

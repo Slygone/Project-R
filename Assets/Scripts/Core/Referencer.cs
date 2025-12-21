@@ -20,6 +20,7 @@ public class Referencer : MonoBehaviour
     public RestUI restUI;
     public InfusionUI infusionUI;
     public ReactionQTEPanel reactionQTEPanel;
+    public MysteryUI mysteryUI;
     
     public GameObject nodePopupPanel;
     public GameObject victoryPanel;
@@ -116,6 +117,13 @@ public class Referencer : MonoBehaviour
         {
             var qteObj = new GameObject("ReactionQTEPanel");
             reactionQTEPanel = qteObj.AddComponent<ReactionQTEPanel>();
+        }
+        
+        mysteryUI = FindFirstObjectByType<MysteryUI>();
+        if (mysteryUI == null)
+        {
+            var mysteryObj = new GameObject("MysteryUI");
+            mysteryUI = mysteryObj.AddComponent<MysteryUI>();
         }
 
         var mainCam = Camera.main;

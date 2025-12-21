@@ -15,29 +15,25 @@ public static class SheetToCSV
     private const string RestGid = "161878381";
     private static readonly string DefaultRestCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={RestGid}";
 
-    private const string WeaponGid = "2103587809";
-    private static readonly string DefaultWeaponCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={WeaponGid}";
-
     private const string PotionGid = "893018057";
     private static readonly string DefaultPotionCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={PotionGid}";
 
     private const string RelicGid = "809776826";
     private static readonly string DefaultRelicCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={RelicGid}";
 
-    private const string PlayerGid = "1551601093";
-    private static readonly string DefaultPlayerCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={PlayerGid}";
-
     private const string ElementalInterractionsGid = "990517346";
     private static readonly string DefaultElementalInterractionsCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={ElementalInterractionsGid}";
+
+    private const string CharacterGid = "2103587809";
+    private static readonly string DefaultCharacterCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={CharacterGid}";
 
     private const string ResourcesDir = "Assets/Resources/Data";
     private const string EnemyCsvPath = ResourcesDir + "/enemy.csv";
     private const string RestCsvPath = ResourcesDir + "/rest.csv";
-    private const string WeaponCsvPath = ResourcesDir + "/weapon.csv";
     private const string PotionCsvPath = ResourcesDir + "/potion.csv";
     private const string RelicCsvPath = ResourcesDir + "/relic.csv";
-    private const string PlayerCsvPath = ResourcesDir + "/player.csv";
     private const string ElementalInterractionsCsvPath = ResourcesDir + "/elementalInterractions.csv";
+    private const string CharacterCsvPath = ResourcesDir + "/character.csv";
 
     [MenuItem("Tools/Data/Update All CSVs")]
     public static void UpdateAllCsvs()
@@ -46,11 +42,10 @@ public static class SheetToCSV
         {
             (EnemyCsvPath, DefaultEnemyCsvUrl),
             (RestCsvPath, DefaultRestCsvUrl),
-            (WeaponCsvPath, DefaultWeaponCsvUrl),
             (PotionCsvPath, DefaultPotionCsvUrl),
             (RelicCsvPath, DefaultRelicCsvUrl),
-            (PlayerCsvPath, DefaultPlayerCsvUrl),
             (ElementalInterractionsCsvPath, DefaultElementalInterractionsCsvUrl),
+            (CharacterCsvPath, DefaultCharacterCsvUrl),
         };
         int total = jobs.Count;
         bool anyError = false;

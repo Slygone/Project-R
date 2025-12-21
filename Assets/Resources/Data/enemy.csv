@@ -1,9 +1,17 @@
-Type,Element,ElementID,Health,Skill1,Skill2,Damage,BaseRessistance,BonusRessistance,Status
-Enemy,Grunt,1,50,Attack1,Attack2,8,25,5,Done
-Enemy,Wizard,2,40,Attack1,Attack2,8,10,20,Done
-Enemy,Archer,3,35,Attack1,Attack2,10,15,10,Done
-Enemy,Rogue,4,30,Attack1,Attack2,9,5,15,Done
-Elite Enemy,Juggernaut,5,110,Attack1,Attack2,18,20,10,Done
-Elite Enemy,Spellbreaker,6,85,Attack1,Attack2,20,10,10,Done
-Boss Enemy,SlimeBoss,7,300,Attack1,Attack2,10,40,10,Done
-Boss Enemy,RainbowBoss,8,200,Attack1,Attack2,20,20,20,Done
+Type,DisplayName,EnemyID,Health,World2HealthModifer,Skill1,Skill2,Damage,World2DamageModifer,BaseRessistance,World2BaseResistanceModifier,BonusRessistance,Status
+Enemy,Grunt,1,70,Health *1.7,Attack1,Attack2,10,Damage * 1.5,30,Base Resistance + 10,10,Done
+Enemy,Wizard,2,60,Health *1.7,Attack1,Attack2,12,Damage * 1.5,20,Base Resistance + 10,25,Done
+Enemy,Archer,3,55,Health *1.7,Attack1,Attack2,13,Damage * 1.5,20,Base Resistance + 10,15,Done
+Enemy,Rogue,4,50,Health *1.7,Attack1,Attack2,14,Damage * 1.5,15,Base Resistance + 10,20,Done
+Elite Enemy,Juggernaut,5,160,Health * 2,Attack1,Attack2,18,Damage * 1.7,35,Base Resistance + 15,20,Done
+Elite Enemy,Spellbreaker,6,130,Health * 2,Attack1,Attack2,22,Damage * 1.7,25,Base Resistance + 15,30,Done
+Boss Enemy,SlimeBoss,7,420,Health * 2.2,Attack1,Attack2,14,Damage * 2,45,Base Resistance + 18,20,Done
+Boss Enemy,RainbowBoss,8,320,Health * 2.2,Attack1,Attack2,22,Damage * 2,30,Base Resistance + 18,30,Done
+Enemy,Shieldbearer,9,85,Health *1.7,Attack1,Attack2,9,Damage * 1.5,40,Base Resistance + 10,10,Done
+Enemy,Pyromaniac,10,55,Health *1.7,Attack1,Attack2,15,Damage * 1.5,15,Base Resistance + 10,25,Done
+Enemy,Frostcaller,11,60,Health *1.7,Attack1,Attack2,11,Damage * 1.5,20,Base Resistance + 10,30,Done
+Enemy,TideShaman,12,65,Health *1.7,Attack1,Attack2,11,Damage * 1.5,25,Base Resistance + 10,25,Done
+Elite Enemy,StormCaptain,13,145,Health * 2,Attack1,Attack2,20,Damage * 1.7,30,Base Resistance + 15,30,Done
+Elite Enemy,StoneColossus,14,190,Health * 2,Attack1,Attack2,16,Damage * 1.7,45,Base Resistance + 15,25,Done
+Boss Enemy,ElementalHydra,15,380,Health * 2.2,Attack1,Attack2,20,Damage * 2,35,Base Resistance + 18,35,Done
+Boss Enemy,FallenChampion,16,460,Health * 2.2,Attack1,Attack2,18,Damage * 2,40,Base Resistance + 18,25,Done

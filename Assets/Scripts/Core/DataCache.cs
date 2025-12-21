@@ -32,6 +32,58 @@ public static class DataCache
         Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEMultipliers.Count} QTE results, {Reactions.Count} reactions, player stats");
     }
 
+    // Parse multiplier from formula like "Health *1.7" or "Damage * 2"
+    private static float ParseMultiplier(string formula)
+    {
+        if (string.IsNullOrEmpty(formula)) return 1f;
+        
+        // Find the * character and extract the number after it
+        int starIndex = formula.IndexOf('*');
+        if (starIndex >= 0 && starIndex < formula.Length - 1)
+        {
+            string numPart = formula.Substring(starIndex + 1).Trim();
+            if (float.TryParse(numPart, System.Globalization.NumberStyles.Float, 
+                System.Globalization.CultureInfo.InvariantCulture, out float result))
+            {
+                return result;
+            }
+        }
+        
+        // Try parsing as plain number
+        if (float.TryParse(formula.Trim(), System.Globalization.NumberStyles.Float,
+            System.Globalization.CultureInfo.InvariantCulture, out float plain))
+        {
+            return plain;
+        }
+        
+        return 1f;
+    }
+    
+    // Parse addend from formula like "Base Resistance + 10"
+    private static int ParseAddend(string formula)
+    {
+        if (string.IsNullOrEmpty(formula)) return 0;
+        
+        // Find the + character and extract the number after it
+        int plusIndex = formula.IndexOf('+');
+        if (plusIndex >= 0 && plusIndex < formula.Length - 1)
+        {
+            string numPart = formula.Substring(plusIndex + 1).Trim();
+            if (int.TryParse(numPart, out int result))
+            {
+                return result;
+            }
+        }
+        
+        // Try parsing as plain number
+        if (int.TryParse(formula.Trim(), out int plain))
+        {
+            return plain;
+        }
+        
+        return 0;
+    }
+
     private static List<EnemyData> LoadEnemies()
     {
         var csv = Resources.Load<TextAsset>("Data/enemy");
@@ -47,12 +99,15 @@ public static class DataCache
             var enemy = new EnemyData
             {
                 Type = CSVParser.ParseString(row, "Type"),
-                Element = CSVParser.ParseString(row, "Element"),
-                ElementID = CSVParser.ParseInt(row, "ElementID"),
+                DisplayName = CSVParser.ParseString(row, "DisplayName"),
+                EnemyID = CSVParser.ParseInt(row, "EnemyID"),
                 Health = CSVParser.ParseInt(row, "Health"),
                 Damage = CSVParser.ParseInt(row, "Damage"),
                 BaseResistance = CSVParser.ParseInt(row, "BaseRessistance"),
-                BonusResistance = CSVParser.ParseInt(row, "BonusRessistance")
+                BonusResistance = CSVParser.ParseInt(row, "BonusRessistance"),
+                World2HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World2HealthModifer", "1")),
+                World2DamageMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World2DamageModifer", "1")),
+                World2BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World2BaseResistanceModifier", "0"))
             };
             
             list.Add(enemy);
@@ -75,8 +130,8 @@ public static class DataCache
         {
             list.Add(new RestData
             {
-                Element = CSVParser.ParseString(row, "DisplayName"),
-                ElementID = CSVParser.ParseInt(row, "ElementID"),
+                DisplayName = CSVParser.ParseString(row, "DisplayName"),
+                RestID = CSVParser.ParseInt(row, "RestID"),
                 StatAffected = CSVParser.ParseString(row, "Stat Affected"),
                 Amount = CSVParser.ParseInt(row, "Amount")
             });
@@ -96,9 +151,15 @@ public static class DataCache
             list.Add(new CharacterData
             {
                 DisplayName = CSVParser.ParseString(row, "DisplayName"),
-                ElementID = CSVParser.ParseInt(row, "ElementID"),
-                CharacterClass = "",
+                CharacterID = CSVParser.ParseInt(row, "CharacterID"),
+                MaxHealth = CSVParser.ParseInt(row, "MaxHealth"),
                 Damage = CSVParser.ParseInt(row, "Damage"),
+                Gold = CSVParser.ParseInt(row, "Gold"),
+                MaxEnergy = CSVParser.ParseInt(row, "MaxEnergy"),
+                CritChance = CSVParser.ParseFloat(row, "CritChance"),
+                CritDamage = CSVParser.ParseFloat(row, "CritDamage"),
+                BaseResistance = CSVParser.ParseInt(row, "BaseRessistance"),
+                BonusResistance = CSVParser.ParseInt(row, "BonusRessistance"),
                 Skill1 = CSVParser.ParseString(row, "Skill1"),
                 Skill2 = CSVParser.ParseString(row, "Skill2"),
                 Skill3 = CSVParser.ParseString(row, "Skill3")
@@ -119,7 +180,7 @@ public static class DataCache
             list.Add(new PotionData
             {
                 DisplayName = CSVParser.ParseString(row, "DisplayName"),
-                ElementID = CSVParser.ParseInt(row, "ElementID"),
+                PotionID = CSVParser.ParseInt(row, "PotionID"),
                 StatAffected = CSVParser.ParseString(row, "Stat Affected"),
                 Amount = CSVParser.ParseInt(row, "Amount")
             });
@@ -139,7 +200,7 @@ public static class DataCache
             list.Add(new RelicData
             {
                 DisplayName = CSVParser.ParseString(row, "DisplayName"),
-                ElementID = CSVParser.ParseInt(row, "ElementID"),
+                RelicID = CSVParser.ParseInt(row, "RelicID"),
                 StatAffected = CSVParser.ParseString(row, "Stat Affected"),
                 Amount = CSVParser.ParseInt(row, "Amount")
             });

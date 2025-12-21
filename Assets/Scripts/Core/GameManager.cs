@@ -4,18 +4,26 @@ public class GameManager : MonoBehaviour
 {
     private Referencer refs;
     private int completedNodes = 0;
-    private const int TOTAL_NODES = 10;
+    private const int WORLD1_NODES = 20;
+    private const int WORLD2_NODES = 25;
     private bool affinityChosen = false;
     private bool elementPairChosen = false;
     private bool characterChosen = false;
+    
+    private static int currentWorld = 1;
+    public static int CurrentWorld => currentWorld;
 
     void Start()
     {
         refs = FindFirstObjectByType<Referencer>();
+        currentWorld = 1;
+        completedNodes = 0;
         UpdateNodeCounter();
         
         StartCharacterSelection();
     }
+    
+    public int GetTotalNodesForCurrentWorld() => currentWorld == 1 ? WORLD1_NODES : WORLD2_NODES;
 
     private void StartAffinitySelection()
     {
@@ -121,7 +129,8 @@ public class GameManager : MonoBehaviour
         completedNodes++;
         UpdateNodeCounter();
 
-        if (completedNodes >= TOTAL_NODES)
+        int totalNodes = GetTotalNodesForCurrentWorld();
+        if (completedNodes >= totalNodes)
         {
             StartBossFight();
         }
@@ -129,9 +138,11 @@ public class GameManager : MonoBehaviour
 
     private void UpdateNodeCounter()
     {
+        int totalNodes = GetTotalNodesForCurrentWorld();
+        string worldText = currentWorld == 1 ? "World 1" : "World 2";
         if (refs != null && refs.nodeCounterText != null)
         {
-            refs.nodeCounterText.text = $"Nodes Completed: {completedNodes}/{TOTAL_NODES}";
+            refs.nodeCounterText.text = $"{worldText}: {completedNodes}/{totalNodes}";
         }
     }
 
@@ -159,13 +170,62 @@ public class GameManager : MonoBehaviour
     {
         if (victory)
         {
-            Debug.Log("[GameManager] BOSS DEFEATED! Player wins the level!");
-            ShowVictory();
+            if (currentWorld == 1)
+            {
+                Debug.Log("[GameManager] World 1 BOSS DEFEATED! Transitioning to World 2...");
+                TransitionToWorld2();
+            }
+            else
+            {
+                Debug.Log("[GameManager] World 2 BOSS DEFEATED! RUN COMPLETE!");
+                ShowRunComplete();
+            }
         }
         else
         {
             Debug.Log("[GameManager] Player defeated by boss. Game Over!");
             ShowDefeat();
+        }
+    }
+    
+    private void TransitionToWorld2()
+    {
+        currentWorld = 2;
+        completedNodes = 0;
+        
+        // Reset potion bonuses but keep relic/rest upgrades
+        if (refs != null && refs.player != null)
+        {
+            refs.player.ResetForNewWorld();
+        }
+        
+        // Clear existing nodes
+        ClearAllNodes();
+        
+        // Spawn new nodes for World 2
+        var nodeSpawner = FindFirstObjectByType<NodeSpawner>();
+        if (nodeSpawner != null)
+        {
+            nodeSpawner.SpawnNodesForWorld(2);
+        }
+        
+        // Reset player position
+        if (refs != null && refs.playerController != null)
+        {
+            refs.playerController.transform.position = Vector3.zero;
+            refs.playerController.SetCanMove(true);
+        }
+        
+        UpdateNodeCounter();
+        Debug.Log("[GameManager] World 2 started!");
+    }
+    
+    private void ClearAllNodes()
+    {
+        var nodes = FindObjectsByType<NodeBase>(FindObjectsSortMode.None);
+        foreach (var node in nodes)
+        {
+            Destroy(node.gameObject);
         }
     }
 
@@ -180,6 +240,78 @@ public class GameManager : MonoBehaviour
         {
             refs.playerController.SetCanMove(false);
         }
+    }
+    
+    private void ShowRunComplete()
+    {
+        if (refs != null && refs.playerController != null)
+        {
+            refs.playerController.SetCanMove(false);
+        }
+        
+        var canvas = GameObject.Find("Canvas");
+        if (canvas != null)
+        {
+            var victoryPanel = new GameObject("RunCompletePanel");
+            victoryPanel.transform.SetParent(canvas.transform, false);
+            
+            var rect = victoryPanel.AddComponent<UnityEngine.RectTransform>();
+            rect.anchorMin = Vector2.zero;
+            rect.anchorMax = Vector2.one;
+            rect.offsetMin = Vector2.zero;
+            rect.offsetMax = Vector2.zero;
+            
+            var bg = victoryPanel.AddComponent<UnityEngine.UI.Image>();
+            bg.color = new Color(0f, 0.1f, 0f, 0.95f);
+            
+            var textObj = new GameObject("VictoryText");
+            textObj.transform.SetParent(victoryPanel.transform, false);
+            var textRect = textObj.AddComponent<UnityEngine.RectTransform>();
+            textRect.anchorMin = new Vector2(0.2f, 0.5f);
+            textRect.anchorMax = new Vector2(0.8f, 0.7f);
+            textRect.offsetMin = Vector2.zero;
+            textRect.offsetMax = Vector2.zero;
+            var text = textObj.AddComponent<TMPro.TextMeshProUGUI>();
+            text.text = "CONGRATULATIONS!\nYou beat the run!";
+            text.alignment = TMPro.TextAlignmentOptions.Center;
+            text.fontSize = 48;
+            text.color = new Color(1f, 0.84f, 0f);
+            
+            // Restart button
+            var btnObj = new GameObject("RestartButton");
+            btnObj.transform.SetParent(victoryPanel.transform, false);
+            var btnRect = btnObj.AddComponent<UnityEngine.RectTransform>();
+            btnRect.anchorMin = new Vector2(0.35f, 0.25f);
+            btnRect.anchorMax = new Vector2(0.65f, 0.35f);
+            btnRect.offsetMin = Vector2.zero;
+            btnRect.offsetMax = Vector2.zero;
+            
+            var btnImage = btnObj.AddComponent<UnityEngine.UI.Image>();
+            btnImage.color = new Color(0.2f, 0.5f, 0.2f);
+            
+            var btn = btnObj.AddComponent<UnityEngine.UI.Button>();
+            btn.targetGraphic = btnImage;
+            btn.onClick.AddListener(RestartGame);
+            
+            var btnTextObj = new GameObject("ButtonText");
+            btnTextObj.transform.SetParent(btnObj.transform, false);
+            var btnTextRect = btnTextObj.AddComponent<UnityEngine.RectTransform>();
+            btnTextRect.anchorMin = Vector2.zero;
+            btnTextRect.anchorMax = Vector2.one;
+            btnTextRect.offsetMin = Vector2.zero;
+            btnTextRect.offsetMax = Vector2.zero;
+            var btnText = btnTextObj.AddComponent<TMPro.TextMeshProUGUI>();
+            btnText.text = "RESTART";
+            btnText.alignment = TMPro.TextAlignmentOptions.Center;
+            btnText.fontSize = 28;
+            btnText.color = Color.white;
+        }
+    }
+    
+    private void RestartGame()
+    {
+        UnityEngine.SceneManagement.SceneManager.LoadScene(
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
     }
 
     private void ShowDefeat()

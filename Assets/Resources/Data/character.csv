@@ -1,6 +1,6 @@
-DisplayName,ElementID,Damage,Skill1,Skill2,Skill3,Perk1a,Perk1b,Perk2a,Perk2b,Perk3a,Perk3b,Perk4a,Perk4b,Status
-Fighter,1,15,Slash,Riposte,Bladestorm,Fighter_option_1_a,Fighter_option_b,Fighter_option_a,Fighter_option_b,Fighter_option_a,Fighter_option_b,Fighter_option_a,Fighter_option_b,Done
-Mage,2,10,Bolt,Ray,Meteor,Mage_option_1_a,Mage_option_b,Mage_option_a,Mage_option_b,Mage_option_a,Mage_option_b,Mage_option_a,Mage_option_b,Done
-Archer,3,20,AimedShot,TripleShot,DoubleUp,Archer_option_1_a,Archer_option_b,Archer_option_a,Archer_option_b,Archer_option_a,Archer_option_b,Archer_option_a,Archer_option_b,Done
-Rogue,4,10,DirtyStab,CheapShot,Ambush,Rogue_option_1_a,Rogue_option_b,Rogue_option_a,Rogue_option_b,Rogue_option_a,Rogue_option_b,Rogue_option_a,Rogue_option_b,Done
-Cleric,5,8,Shock,Judgement,HolyNova,Cleric_option_1_a,Cleric_option_b,Cleric_option_a,Cleric_option_b,Cleric_option_a,Cleric_option_b,Cleric_option_a,Cleric_option_b,Done
+DisplayName,CharacterID,MaxHealth,Damage,Gold,MaxEnergy,CritChance,CritDamage,BaseRessistance,BonusRessistance,Skill1,Skill2,Skill3,Perk1a,Perk1b,Perk2a,Perk2b,Perk3a,Perk3b,Perk4a,Perk4b,Status
+Fighter,1,150,15,0,10,10,1.5,15,5,Slash,Riposte,Bladestorm,Fighter_option_1_a,Fighter_option_b,Fighter_option_a,Fighter_option_b,Fighter_option_a,Fighter_option_b,Fighter_option_a,Fighter_option_b,Done
+Mage,2,120,12,0,10,10,1.3,13,5,Bolt,Ray,Meteor,Mage_option_1_a,Mage_option_b,Mage_option_a,Mage_option_b,Mage_option_a,Mage_option_b,Mage_option_a,Mage_option_b,Done
+Archer,3,130,16,0,10,10,1.5,10,5,AimedShot,TripleShot,DoubleUp,Archer_option_1_a,Archer_option_b,Archer_option_a,Archer_option_b,Archer_option_a,Archer_option_b,Archer_option_a,Archer_option_b,Done
+Rogue,4,115,13,0,10,10,1.7,8,5,DirtyStab,CheapShot,Ambush,Rogue_option_1_a,Rogue_option_b,Rogue_option_a,Rogue_option_b,Rogue_option_a,Rogue_option_b,Rogue_option_a,Rogue_option_b,Done
+Cleric,5,130,10,0,10,10,1.2,12,5,Shock,Judgement,HolyNova,Cleric_option_1_a,Cleric_option_b,Cleric_option_a,Cleric_option_b,Cleric_option_a,Cleric_option_b,Cleric_option_a,Cleric_option_b,Done

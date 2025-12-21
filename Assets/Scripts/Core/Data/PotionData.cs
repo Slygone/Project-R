@@ -1,7 +1,7 @@
 public class PotionData
 {
     public string DisplayName;
-    public int ElementID;
+    public int PotionID;
     public string StatAffected;
     public int Amount;
 }

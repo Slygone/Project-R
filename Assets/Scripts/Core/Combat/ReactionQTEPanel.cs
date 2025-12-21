@@ -21,7 +21,7 @@ public class ReactionQTEPanel : MonoBehaviour
     private bool showingResult = false;
     
     private float markerPosition = 0f;
-    private float markerSpeed = 1.25f; // slowed by 50%
+    private float markerSpeed = 1.25f; // try 1.50f also think about different visual. expedition 33 style button mby ?
     private float markerDirection = 1f;
     
     private const float BAR_WIDTH = 600f;

@@ -123,18 +123,10 @@ public class ShopUI : MonoBehaviour
         potionContainer = new GameObject("PotionContainer");
         potionContainer.transform.SetParent(sectionObj.transform, false);
         var containerRect = potionContainer.AddComponent<RectTransform>();
-        containerRect.anchorMin = new Vector2(0.1f, 0f);
-        containerRect.anchorMax = new Vector2(0.9f, 0.75f);
+        containerRect.anchorMin = new Vector2(0f, 0f);
+        containerRect.anchorMax = new Vector2(1f, 0.75f);
         containerRect.offsetMin = Vector2.zero;
         containerRect.offsetMax = Vector2.zero;
-
-        var layout = potionContainer.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 40;
-        layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.childControlWidth = true;
-        layout.childControlHeight = true;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = true;
     }
 
     private void CreateRelicSection(Transform parent)
@@ -167,14 +159,6 @@ public class ShopUI : MonoBehaviour
         containerRect.anchorMax = new Vector2(0.95f, 0.82f);
         containerRect.offsetMin = Vector2.zero;
         containerRect.offsetMax = Vector2.zero;
-
-        var layout = relicContainer.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 30;
-        layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.childControlWidth = true;
-        layout.childControlHeight = true;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = true;
 
         var rerollObj = new GameObject("RerollButton");
         rerollObj.transform.SetParent(sectionObj.transform, false);
@@ -298,8 +282,21 @@ public class ShopUI : MonoBehaviour
 
     private void CreatePotionButton(PotionData potion)
     {
+        int index = potionButtons.Count;
+        float buttonWidth = 0.30f;
+        float gap = 0.05f;
+        float startX = (1f - (3 * buttonWidth + 2 * gap)) / 2f;
+        float xMin = startX + index * (buttonWidth + gap);
+        float xMax = xMin + buttonWidth;
+        
         var btnObj = new GameObject($"Potion_{potion.DisplayName}");
         btnObj.transform.SetParent(potionContainer.transform, false);
+        
+        var btnRect = btnObj.AddComponent<RectTransform>();
+        btnRect.anchorMin = new Vector2(xMin, 0.05f);
+        btnRect.anchorMax = new Vector2(xMax, 0.95f);
+        btnRect.offsetMin = Vector2.zero;
+        btnRect.offsetMax = Vector2.zero;
 
         var btnImage = btnObj.AddComponent<Image>();
         btnImage.color = new Color(0.2f, 0.35f, 0.2f);
@@ -312,43 +309,45 @@ public class ShopUI : MonoBehaviour
         GameObject capturedBtn = btnObj;
         btn.onClick.AddListener(() => OnPotionClicked(capturedPotion, capturedBtn));
 
-        var layout = btnObj.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 5;
-        layout.padding = new RectOffset(10, 10, 15, 15);
-        layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
-
         var nameObj = new GameObject("Name");
         nameObj.transform.SetParent(btnObj.transform, false);
+        var nameRect = nameObj.AddComponent<RectTransform>();
+        nameRect.anchorMin = new Vector2(0.05f, 0.65f);
+        nameRect.anchorMax = new Vector2(0.95f, 0.95f);
+        nameRect.offsetMin = Vector2.zero;
+        nameRect.offsetMax = Vector2.zero;
         var nameText = nameObj.AddComponent<TextMeshProUGUI>();
         nameText.text = potion.DisplayName;
         nameText.alignment = TextAlignmentOptions.Center;
         nameText.fontSize = 20;
         nameText.fontStyle = FontStyles.Bold;
         nameText.color = Color.white;
-        var nameLayout = nameObj.AddComponent<LayoutElement>();
-        nameLayout.preferredHeight = 30;
 
         var descObj = new GameObject("Description");
         descObj.transform.SetParent(btnObj.transform, false);
+        var descRect = descObj.AddComponent<RectTransform>();
+        descRect.anchorMin = new Vector2(0.05f, 0.35f);
+        descRect.anchorMax = new Vector2(0.95f, 0.65f);
+        descRect.offsetMin = Vector2.zero;
+        descRect.offsetMax = Vector2.zero;
         var descText = descObj.AddComponent<TextMeshProUGUI>();
         descText.text = $"+{potion.Amount} {potion.StatAffected}";
         descText.alignment = TextAlignmentOptions.Center;
         descText.fontSize = 16;
         descText.color = new Color(0.8f, 0.8f, 0.8f);
-        var descLayout = descObj.AddComponent<LayoutElement>();
-        descLayout.preferredHeight = 25;
 
         var priceObj = new GameObject("Price");
         priceObj.transform.SetParent(btnObj.transform, false);
+        var priceRect = priceObj.AddComponent<RectTransform>();
+        priceRect.anchorMin = new Vector2(0.05f, 0.05f);
+        priceRect.anchorMax = new Vector2(0.95f, 0.35f);
+        priceRect.offsetMin = Vector2.zero;
+        priceRect.offsetMax = Vector2.zero;
         var priceText = priceObj.AddComponent<TextMeshProUGUI>();
         priceText.text = $"{POTION_PRICE} Gold";
         priceText.alignment = TextAlignmentOptions.Center;
         priceText.fontSize = 16;
         priceText.color = new Color(1f, 0.84f, 0f);
-        var priceLayout = priceObj.AddComponent<LayoutElement>();
-        priceLayout.preferredHeight = 25;
     }
 
     private void PopulateRelics()
@@ -391,9 +390,22 @@ public class ShopUI : MonoBehaviour
 
     private void CreateRelicButton(RelicData relic)
     {
+        int index = relicButtons.Count;
+        float buttonWidth = 0.30f;
+        float gap = 0.05f;
+        float startX = (1f - (3 * buttonWidth + 2 * gap)) / 2f;
+        float xMin = startX + index * (buttonWidth + gap);
+        float xMax = xMin + buttonWidth;
+        
         var btnObj = new GameObject($"Relic_{relic.DisplayName}");
         btnObj.transform.SetParent(relicContainer.transform, false);
         relicButtons.Add(btnObj);
+        
+        var btnRect = btnObj.AddComponent<RectTransform>();
+        btnRect.anchorMin = new Vector2(xMin, 0.05f);
+        btnRect.anchorMax = new Vector2(xMax, 0.95f);
+        btnRect.offsetMin = Vector2.zero;
+        btnRect.offsetMax = Vector2.zero;
 
         var btnImage = btnObj.AddComponent<Image>();
         btnImage.color = GetRelicColor(relic);
@@ -405,43 +417,48 @@ public class ShopUI : MonoBehaviour
         GameObject capturedBtn = btnObj;
         btn.onClick.AddListener(() => OnRelicClicked(capturedRelic, capturedBtn));
 
-        var layout = btnObj.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 5;
-        layout.padding = new RectOffset(10, 10, 15, 15);
-        layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
-
         var nameObj = new GameObject("Name");
         nameObj.transform.SetParent(btnObj.transform, false);
+        var nameRect = nameObj.AddComponent<RectTransform>();
+        nameRect.anchorMin = new Vector2(0.05f, 0.65f);
+        nameRect.anchorMax = new Vector2(0.95f, 0.95f);
+        nameRect.offsetMin = Vector2.zero;
+        nameRect.offsetMax = Vector2.zero;
         var nameText = nameObj.AddComponent<TextMeshProUGUI>();
         nameText.text = relic.DisplayName;
         nameText.alignment = TextAlignmentOptions.Center;
         nameText.fontSize = 18;
         nameText.fontStyle = FontStyles.Bold;
         nameText.color = Color.white;
-        var nameLayout = nameObj.AddComponent<LayoutElement>();
-        nameLayout.preferredHeight = 28;
 
         var descObj = new GameObject("Description");
         descObj.transform.SetParent(btnObj.transform, false);
+        var descRect = descObj.AddComponent<RectTransform>();
+        descRect.anchorMin = new Vector2(0.05f, 0.35f);
+        descRect.anchorMax = new Vector2(0.95f, 0.65f);
+        descRect.offsetMin = Vector2.zero;
+        descRect.offsetMax = Vector2.zero;
         var descText = descObj.AddComponent<TextMeshProUGUI>();
         descText.text = $"+{relic.Amount} {relic.StatAffected}";
         descText.alignment = TextAlignmentOptions.Center;
         descText.fontSize = 14;
         descText.color = new Color(0.8f, 0.8f, 0.8f);
-        var descLayout = descObj.AddComponent<LayoutElement>();
-        descLayout.preferredHeight = 22;
 
         var priceObj = new GameObject("Price");
         priceObj.transform.SetParent(btnObj.transform, false);
+        var priceRect = priceObj.AddComponent<RectTransform>();
+        priceRect.anchorMin = new Vector2(0.10f, 0.08f);
+        priceRect.anchorMax = new Vector2(0.90f, 0.28f);
+        priceRect.offsetMin = Vector2.zero;
+        priceRect.offsetMax = Vector2.zero;
         var priceText = priceObj.AddComponent<TextMeshProUGUI>();
         priceText.text = $"{RELIC_PRICE} Gold";
         priceText.alignment = TextAlignmentOptions.Center;
+        priceText.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
+        priceText.overflowMode = TextOverflowModes.Truncate;
         priceText.fontSize = 14;
         priceText.color = new Color(1f, 0.84f, 0f);
-        var priceLayout = priceObj.AddComponent<LayoutElement>();
-        priceLayout.preferredHeight = 22;
+        priceObj.transform.SetAsLastSibling();
     }
 
     private Color GetRelicColor(RelicData relic)

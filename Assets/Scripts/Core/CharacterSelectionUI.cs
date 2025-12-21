@@ -170,15 +170,15 @@ public class CharacterSelectionUI : MonoBehaviour
         var nameLayout = nameObj.AddComponent<LayoutElement>();
         nameLayout.preferredHeight = 40;
 
-        var classObj = new GameObject("Class");
-        classObj.transform.SetParent(btnObj.transform, false);
-        var classText = classObj.AddComponent<TextMeshProUGUI>();
-        classText.text = character.CharacterClass ?? "";
-        classText.alignment = TextAlignmentOptions.Center;
-        classText.fontSize = 16;
-        classText.color = new Color(0.6f, 0.6f, 0.6f);
-        var classLayout = classObj.AddComponent<LayoutElement>();
-        classLayout.preferredHeight = 25;
+        var statsObj = new GameObject("Stats");
+        statsObj.transform.SetParent(btnObj.transform, false);
+        var statsText = statsObj.AddComponent<TextMeshProUGUI>();
+        statsText.text = $"HP: {character.MaxHealth} | Crit: {character.CritChance}%";
+        statsText.alignment = TextAlignmentOptions.Center;
+        statsText.fontSize = 16;
+        statsText.color = new Color(0.6f, 0.6f, 0.6f);
+        var statsLayout = statsObj.AddComponent<LayoutElement>();
+        statsLayout.preferredHeight = 25;
 
         var damageObj = new GameObject("Damage");
         damageObj.transform.SetParent(btnObj.transform, false);

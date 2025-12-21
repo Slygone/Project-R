@@ -81,10 +81,24 @@ public static class CSVParser
     {
         return int.Parse(row[key]);
     }
+    
+    public static int ParseInt(Dictionary<string, string> row, string key, int defaultValue)
+    {
+        if (row.TryGetValue(key, out var value) && int.TryParse(value, out var result))
+            return result;
+        return defaultValue;
+    }
 
     public static string ParseString(Dictionary<string, string> row, string key)
     {
         return row[key];
+    }
+    
+    public static string ParseString(Dictionary<string, string> row, string key, string defaultValue)
+    {
+        if (row.TryGetValue(key, out var value))
+            return value;
+        return defaultValue;
     }
 
     public static float ParseFloat(Dictionary<string, string> row, string key)

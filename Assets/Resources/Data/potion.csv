@@ -1,4 +1,4 @@
-DisplayName,ElementID,Stat Affected,Amount,Status
+DisplayName,PotionID,Stat Affected,Amount,Status
 Small Health Potion,1,Health,25,Done
 Medium Health Potion,2,Health,50,Done
 Large Health Potion,3,Health,75,Done

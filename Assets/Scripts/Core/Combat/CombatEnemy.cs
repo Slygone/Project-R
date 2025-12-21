@@ -4,20 +4,22 @@ public class CombatEnemy
     public int Health;
     public int MaxHealth;
     public int Damage;
-    public int ElementID;
+    public int EnemyID;
     public int BaseResistance;
     public int BonusResistance;
     public Element Affinity;
     public bool IsBoss;
 
-    public CombatEnemy(EnemyData data)
+    public CombatEnemy(EnemyData data) : this(data, 1) { }
+    
+    public CombatEnemy(EnemyData data, int world)
     {
-        Name = data.Element;
-        MaxHealth = data.Health;
+        Name = data.DisplayName;
+        MaxHealth = data.GetHealth(world);
         Health = MaxHealth;
-        Damage = data.Damage;
-        ElementID = data.ElementID;
-        BaseResistance = data.BaseResistance;
+        Damage = data.GetDamage(world);
+        EnemyID = data.EnemyID;
+        BaseResistance = data.GetBaseResistance(world);
         BonusResistance = data.BonusResistance;
         IsBoss = data.IsBoss;
         
