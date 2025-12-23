@@ -21,8 +21,9 @@ public class CombatManager : MonoBehaviour
     private Element pendingInfusedElement = Element.None;
     private float pendingReactionMultiplier = 1f;
     private string pendingReactionName = "";
-    private Element pendingReactionElementA = Element.None;
-    private Element pendingReactionElementB = Element.None;
+    private string pendingReactionId = null;
+    private Element pendingReactionFirstElement = Element.None;
+    private Element pendingReactionDetonator = Element.None;
 
     public void StartCombat(CombatNode node, Player playerRef)
     {
@@ -257,8 +258,9 @@ public class CombatManager : MonoBehaviour
         pendingInfusedElement = Element.None;
         pendingReactionMultiplier = 1f;
         pendingReactionName = "";
-        pendingReactionElementA = Element.None;
-        pendingReactionElementB = Element.None;
+        pendingReactionId = null;
+        pendingReactionFirstElement = Element.None;
+        pendingReactionDetonator = Element.None;
     }
     
     private void TriggerReactionAction(CombatEnemy target, int skillNumber, bool isAttack)
@@ -268,15 +270,21 @@ public class CombatManager : MonoBehaviour
         pendingIsAttack = isAttack;
         
         var orbSystem = player.GetOrbSystem();
-        pendingReactionElementA = orbSystem.OrbAMark;
-        pendingReactionElementB = orbSystem.OrbBMark;
+        pendingReactionFirstElement = orbSystem.GetFirstElement();
+        pendingReactionDetonator = orbSystem.DetonatorElement;
         pendingInfusedElement = orbSystem.DetonatorElement;
-        pendingReactionName = ReactionQTE.GetReactionName(pendingReactionElementA, pendingReactionElementB);
-        pendingReactionMultiplier = ReactionQTE.GetReactionMultiplier(pendingReactionElementA, pendingReactionElementB);
+        pendingReactionId = orbSystem.GetReactionId();
+        
+        // Get reaction data from CSV via directional ReactionId
+        var reactionDef = DataCache.GetReactionDef(pendingReactionId);
+        pendingReactionName = reactionDef.Name;
+        pendingReactionMultiplier = reactionDef.DamageMultiplier;
+        
+        var effects = DataCache.GetReactionEffects(pendingReactionId);
         
         orbSystem.ClearMarks();
         
-        Debug.Log($"[CombatLog] ReactionTriggered | Type={pendingReactionName} | Elements={pendingReactionElementA}+{pendingReactionElementB} | Detonator={pendingInfusedElement} | Multiplier={pendingReactionMultiplier:F2}x");
+        Debug.Log($"[Reaction] id={pendingReactionId} name={pendingReactionName} mult={pendingReactionMultiplier:F2} effects={effects.Count}");
         
         // Show reaction floating text on target
         if (combatUI != null && pendingTarget != null)
@@ -399,12 +407,16 @@ public class CombatManager : MonoBehaviour
         }
         
         Debug.Log($"[CombatLog] PlayerAttackReaction | Reaction={pendingReactionName} | Base={baseDamage} | Variance={afterVariance} | OQTE={afterOQTE:F0} | Crit={isCrit} | CritMult={critMultiplier:F1}x | ReactionBonus={reactionDamage:F0} | FinalDamage={damage} | Element={attackElement} | InfusedFrom={infusedSrc} | Resist={resistPercent}% | Target={target.Name}");
-        Debug.Log($"[CombatManager] REACTION ATTACK! {pendingReactionName} ({pendingReactionElementA}+{pendingReactionElementB}) -> {damage} damage to {target.Name} [QTE: {qteResult}]");
+        Debug.Log($"[CombatManager] REACTION ATTACK! {pendingReactionName} ({pendingReactionFirstElement}+{pendingReactionDetonator}) -> {damage} damage to {target.Name} [QTE: {qteResult}]");
+
+        // Apply reaction effects from CSV data
+        ReactionEffectEngine.ApplyPostHitEffects(pendingReactionId, player, target, damage, attackElement);
 
         if (combatUI != null)
         {
             combatUI.ShowDamageToEnemy(target, damage, isCrit);
             combatUI.UpdateEnemyHealth(target);
+            combatUI.UpdatePlayerHealth(player); // Update in case of shield effects
         }
 
         if (!target.IsAlive())
@@ -882,7 +894,15 @@ public class CombatManager : MonoBehaviour
         }
         
         Debug.Log($"[CombatLog] PlayerSkillReaction | Skill={skillName} | Reaction={pendingReactionName} | Base={baseDamage:F0} | Variance={afterVariance} | OQTE={afterOQTE:F0} | Crit={isCrit} | CritMult={critMultiplier:F1}x | ReactionBonus={reactionDamage:F0} | FinalDamage={finalDamage} | Element={attackElement} | InfusedFrom={infusedSrc} | Resist={resistPercent}% | Target={target.Name}");
-        Debug.Log($"[CombatManager] REACTION SKILL! {skillName} + {pendingReactionName} ({pendingReactionElementA}+{pendingReactionElementB}) -> {finalDamage} damage to {target.Name} [QTE: {qteResult}]");
+        Debug.Log($"[CombatManager] REACTION SKILL! {skillName} + {pendingReactionName} ({pendingReactionFirstElement}+{pendingReactionDetonator}) -> {finalDamage} damage to {target.Name} [QTE: {qteResult}]");
+
+        // Apply reaction effects from CSV data
+        ReactionEffectEngine.ApplyPostHitEffects(pendingReactionId, player, target, finalDamage, attackElement);
+        
+        if (combatUI != null)
+        {
+            combatUI.UpdatePlayerHealth(player); // Update in case of shield effects
+        }
 
         bool targetKilled = !target.IsAlive();
         if (targetKilled)
@@ -1199,6 +1219,16 @@ public class CombatManager : MonoBehaviour
         {
             EndCombat(false);
             return;
+        }
+
+        // Tick temp resist durations for all combatants
+        player.TickTempResists();
+        foreach (var enemy in enemies)
+        {
+            if (enemy.IsAlive())
+            {
+                enemy.TickTempResists();
+            }
         }
 
         isPlayerTurn = true;

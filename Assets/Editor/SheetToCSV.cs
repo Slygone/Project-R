@@ -21,8 +21,11 @@ public static class SheetToCSV
     private const string RelicGid = "809776826";
     private static readonly string DefaultRelicCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={RelicGid}";
 
-    private const string ElementalInterractionsGid = "990517346";
-    private static readonly string DefaultElementalInterractionsCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={ElementalInterractionsGid}";
+    private const string ElementalReactionsGid = "990517346";
+    private static readonly string DefaultElementalReactionsCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={ElementalReactionsGid}";
+
+    private const string ElementalReactionEffectsGid = "1599028666";
+    private static readonly string DefaultElementalReactionEffectsCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={ElementalReactionEffectsGid}";
 
     private const string CharacterGid = "2103587809";
     private static readonly string DefaultCharacterCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={CharacterGid}";
@@ -32,7 +35,8 @@ public static class SheetToCSV
     private const string RestCsvPath = ResourcesDir + "/rest.csv";
     private const string PotionCsvPath = ResourcesDir + "/potion.csv";
     private const string RelicCsvPath = ResourcesDir + "/relic.csv";
-    private const string ElementalInterractionsCsvPath = ResourcesDir + "/elementalInterractions.csv";
+    private const string ElementalReactionsCsvPath = ResourcesDir + "/elementalReactions.csv";
+    private const string ElementalReactionEffectsCsvPath = ResourcesDir + "/elementalReactionEffects.csv";
     private const string CharacterCsvPath = ResourcesDir + "/character.csv";
 
     [MenuItem("Tools/Data/Update All CSVs")]
@@ -44,7 +48,8 @@ public static class SheetToCSV
             (RestCsvPath, DefaultRestCsvUrl),
             (PotionCsvPath, DefaultPotionCsvUrl),
             (RelicCsvPath, DefaultRelicCsvUrl),
-            (ElementalInterractionsCsvPath, DefaultElementalInterractionsCsvUrl),
+            (ElementalReactionsCsvPath, DefaultElementalReactionsCsvUrl),
+            (ElementalReactionEffectsCsvPath, DefaultElementalReactionEffectsCsvUrl),
             (CharacterCsvPath, DefaultCharacterCsvUrl),
         };
         int total = jobs.Count;

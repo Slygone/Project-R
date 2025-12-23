@@ -8,7 +8,8 @@ public enum StatusEffectType
     DoT,        // Damage over time
     Stun,       // Skip turn
     Block,      // Reduce next incoming damage by %
-    Shield      // Absorb damage (persists over combats, not worlds)
+    Shield,     // Absorb damage (persists over combats, not worlds)
+    TempResist  // Temporary resistance modifier (can be negative)
 }
 
 // Individual status effect instance
@@ -170,6 +171,67 @@ public class StatusEffectManager
         }
         
         return dotDamage;
+    }
+    
+    // Tick DoT effects instantly WITHOUT consuming duration (for reaction effects)
+    public int TickDoTEffectsInstant()
+    {
+        int dotDamage = 0;
+        
+        foreach (var effect in effects)
+        {
+            if (effect.Type == StatusEffectType.DoT)
+            {
+                int dmg = Mathf.RoundToInt(effect.Value);
+                dotDamage += dmg;
+                Debug.Log($"[StatusEffect] DoT instant tick: {dmg} damage from {effect.Source} (duration NOT consumed)");
+            }
+        }
+        
+        return dotDamage;
+    }
+    
+    // Tick temp resist durations (call at end of turn)
+    public void TickTempResists()
+    {
+        for (int i = effects.Count - 1; i >= 0; i--)
+        {
+            var effect = effects[i];
+            if (effect.Type == StatusEffectType.TempResist)
+            {
+                effect.Duration--;
+                if (effect.Duration <= 0)
+                {
+                    Debug.Log($"[StatusEffect] TempResist {effect.Source} expired");
+                    effects.RemoveAt(i);
+                }
+            }
+        }
+    }
+    
+    // Get total temp resist for a specific element (Source = element name or "All")
+    public int GetTempResist(string elementOrAll)
+    {
+        int total = 0;
+        foreach (var effect in effects)
+        {
+            if (effect.Type == StatusEffectType.TempResist)
+            {
+                if (effect.Source == elementOrAll || effect.Source == "All")
+                {
+                    total += Mathf.RoundToInt(effect.Value);
+                }
+            }
+        }
+        return total;
+    }
+    
+    // Add temp resist effect
+    public void AddTempResist(string elementOrAll, int deltaPct, int duration)
+    {
+        var effect = new StatusEffect(StatusEffectType.TempResist, duration, deltaPct, elementOrAll);
+        effects.Add(effect);
+        Debug.Log($"[StatusEffect] Added TempResist: {deltaPct}% for {elementOrAll}, {duration} turns");
     }
     
     // Legacy method - kept for compatibility but separated stun/DoT logic

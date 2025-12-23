@@ -13,7 +13,8 @@ public static class DataCache
     public static List<RelicData> Relics { get; private set; }
     public static PlayerData PlayerStats { get; private set; }
     public static Dictionary<string, float> QTEMultipliers { get; private set; }
-    public static List<ReactionData> Reactions { get; private set; }
+    public static Dictionary<string, ReactionData> Reactions { get; private set; }
+    public static Dictionary<string, List<ReactionEffectData>> ReactionEffects { get; private set; }
 
     public static bool IsLoaded { get; private set; }
 
@@ -27,9 +28,10 @@ public static class DataCache
         PlayerStats = LoadPlayerStats();
         QTEMultipliers = LoadQTEMultipliers();
         Reactions = LoadReactions();
+        ReactionEffects = LoadReactionEffects();
 
         IsLoaded = true;
-        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEMultipliers.Count} QTE results, {Reactions.Count} reactions, player stats");
+        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEMultipliers.Count} QTE results, {Reactions.Count} reactions, {ReactionEffects.Count} reaction effect groups, player stats");
     }
 
     // Parse multiplier from formula like "Health *1.7" or "Damage * 2"
@@ -355,30 +357,77 @@ public static class DataCache
         return dict;
     }
 
-    private static List<ReactionData> LoadReactions()
+    private static Dictionary<string, ReactionData> LoadReactions()
     {
-        var csv = Resources.Load<TextAsset>("Data/reaction");
-        var list = new List<ReactionData>();
+        var csv = Resources.Load<TextAsset>("Data/elementalReactions");
+        var dict = new Dictionary<string, ReactionData>();
         
         if (csv == null)
         {
-            Debug.LogWarning("[DataCache] reaction.csv not found");
-            return list;
+            Debug.LogWarning("[DataCache] elementalReactions.csv not found");
+            return dict;
         }
 
         var rows = CSVParser.Parse(csv.text);
         foreach (var row in rows)
         {
-            list.Add(new ReactionData
+            string reactionId = CSVParser.ParseString(row, "ReactionId", "");
+            if (string.IsNullOrEmpty(reactionId)) continue;
+            
+            dict[reactionId] = new ReactionData
             {
-                ElementA = CSVParser.ParseString(row, "ElementA"),
-                ElementB = CSVParser.ParseString(row, "ElementB"),
-                ReactionName = CSVParser.ParseString(row, "ReactionName"),
-                Multiplier = CSVParser.ParseFloat(row, "Multiplier")
-            });
+                ReactionId = reactionId,
+                Name = CSVParser.ParseString(row, "Name", "Unknown"),
+                DamageMultiplier = CSVParser.ParseFloat(row, "DamageMultiplier", 1f)
+            };
         }
 
-        return list;
+        return dict;
+    }
+    
+    private static Dictionary<string, List<ReactionEffectData>> LoadReactionEffects()
+    {
+        var csv = Resources.Load<TextAsset>("Data/elementalReactionEffects");
+        var dict = new Dictionary<string, List<ReactionEffectData>>();
+        
+        if (csv == null)
+        {
+            Debug.LogWarning("[DataCache] elementalReactionEffects.csv not found");
+            return dict;
+        }
+
+        var rows = CSVParser.Parse(csv.text);
+        foreach (var row in rows)
+        {
+            string reactionId = CSVParser.ParseString(row, "ReactionId", "");
+            if (string.IsNullOrEmpty(reactionId)) continue;
+            
+            var effect = new ReactionEffectData
+            {
+                ReactionId = reactionId,
+                Order = CSVParser.ParseInt(row, "Order", 0),
+                EffectType = CSVParser.ParseString(row, "EffectType", ""),
+                Target = CSVParser.ParseString(row, "Target", "Enemy"),
+                Value = CSVParser.ParseString(row, "Value", ""),
+                DurationTurns = CSVParser.ParseInt(row, "DurationTurns", 0),
+                ChancePct = CSVParser.ParseInt(row, "ChancePct", 100),
+                Notes = CSVParser.ParseString(row, "Notes", "")
+            };
+            
+            if (!dict.ContainsKey(reactionId))
+            {
+                dict[reactionId] = new List<ReactionEffectData>();
+            }
+            dict[reactionId].Add(effect);
+        }
+        
+        // Sort each list by Order
+        foreach (var kvp in dict)
+        {
+            kvp.Value.Sort((a, b) => a.Order.CompareTo(b.Order));
+        }
+
+        return dict;
     }
 
     public static float GetQTEMultiplier(QTEResult result)
@@ -391,25 +440,49 @@ public static class DataCache
         return 1.0f;
     }
 
-    public static (string name, float multiplier) GetReaction(Element a, Element b)
+    // Get reaction definition by directional ReactionId (e.g., "Ice_Fire" for Ice then Fire)
+    public static ReactionData GetReactionDef(string reactionId)
     {
-        if (a == b) return ("None", 1.0f);
+        if (string.IsNullOrEmpty(reactionId)) return GetDefaultReactionDef();
         
-        string aStr = a.ToString();
-        string bStr = b.ToString();
-        
-        if (Reactions != null)
+        if (Reactions != null && Reactions.TryGetValue(reactionId, out var reaction))
         {
-            foreach (var r in Reactions)
-            {
-                if ((r.ElementA == aStr && r.ElementB == bStr) ||
-                    (r.ElementA == bStr && r.ElementB == aStr))
-                {
-                    return (r.ReactionName, r.Multiplier);
-                }
-            }
+            return reaction;
         }
         
-        return ("Reaction", 1.25f);
+        return GetDefaultReactionDef();
+    }
+    
+    // Get reaction effects by ReactionId (returns empty list if none)
+    public static List<ReactionEffectData> GetReactionEffects(string reactionId)
+    {
+        if (string.IsNullOrEmpty(reactionId)) return new List<ReactionEffectData>();
+        
+        if (ReactionEffects != null && ReactionEffects.TryGetValue(reactionId, out var effects))
+        {
+            return effects;
+        }
+        
+        return new List<ReactionEffectData>();
+    }
+    
+    private static ReactionData GetDefaultReactionDef()
+    {
+        return new ReactionData
+        {
+            ReactionId = "Unknown",
+            Name = "Unknown",
+            DamageMultiplier = 1.0f
+        };
+    }
+    
+    // Build ReactionId from two elements (FirstElement_DetonatorElement)
+    public static string BuildReactionId(Element firstElement, Element detonatorElement)
+    {
+        if (firstElement == Element.None || detonatorElement == Element.None)
+            return null;
+        if (firstElement == detonatorElement)
+            return null;
+        return $"{firstElement}_{detonatorElement}";
     }
 }

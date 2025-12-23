@@ -497,6 +497,32 @@ public class Player : MonoBehaviour
         Debug.Log("[Player] Shield cleared for world transition");
     }
     
+    // Apply temporary resistance modifier to all elements
+    public void ApplyTempResistAll(int deltaPct, int duration)
+    {
+        statusEffects.AddTempResist("All", deltaPct, duration);
+        Debug.Log($"[Player] Applied +{deltaPct}% all resist for {duration} turns");
+    }
+    
+    // Apply temporary resistance modifier to a specific element
+    public void ApplyTempResist(Element element, int deltaPct, int duration)
+    {
+        statusEffects.AddTempResist(element.ToString(), deltaPct, duration);
+        Debug.Log($"[Player] Applied {deltaPct}% {element} resist for {duration} turns");
+    }
+    
+    // Get total temp resist for an element (includes "All" effects)
+    public int GetTempResist(Element element)
+    {
+        return statusEffects.GetTempResist(element.ToString());
+    }
+    
+    // Tick temp resist durations at end of turn
+    public void TickTempResists()
+    {
+        statusEffects.TickTempResists();
+    }
+    
     // ========== DIRTYSTAB TRACKING ==========
     // Can be used 3 turns in a row. Each consecutive use grants +20% damage (max 2 stacks).
     // After 3rd consecutive use, goes on 4-turn cooldown and stacks reset.

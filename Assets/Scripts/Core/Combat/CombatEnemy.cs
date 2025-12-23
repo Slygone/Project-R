@@ -135,4 +135,40 @@ public class CombatEnemy
     }
     
     public System.Collections.Generic.List<StatusEffect> GetStatusEffects() => statusEffects.GetAllEffects();
+    
+    // Tick all DoTs instantly without consuming duration (for reaction effects)
+    public int TickDoTEffectsInstant()
+    {
+        int dotDamage = statusEffects.TickDoTEffectsInstant();
+        if (dotDamage > 0)
+        {
+            TakeDamage(dotDamage);
+            UnityEngine.Debug.Log($"[CombatEnemy] {Name} took {dotDamage} instant DoT damage. Health: {Health}/{MaxHealth}");
+        }
+        return dotDamage;
+    }
+    
+    // Apply temporary resistance modifier to all elements
+    public void ApplyTempResistAll(int deltaPct, int duration)
+    {
+        statusEffects.AddTempResist("All", deltaPct, duration);
+    }
+    
+    // Apply temporary resistance modifier to a specific element
+    public void ApplyTempResist(Element element, int deltaPct, int duration)
+    {
+        statusEffects.AddTempResist(element.ToString(), deltaPct, duration);
+    }
+    
+    // Get total temp resist for an element (includes "All" effects)
+    public int GetTempResist(Element element)
+    {
+        return statusEffects.GetTempResist(element.ToString());
+    }
+    
+    // Tick temp resist durations at end of turn
+    public void TickTempResists()
+    {
+        statusEffects.TickTempResists();
+    }
 }
