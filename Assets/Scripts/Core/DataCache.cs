@@ -83,6 +83,73 @@ public static class DataCache
         
         return 0;
     }
+    
+    // Parse damage range like "14-16" into (min, max) tuple
+    private static (int min, int max) ParseDamageRange(string rangeStr)
+    {
+        if (string.IsNullOrEmpty(rangeStr)) return (0, 0);
+        
+        // Try to split by dash
+        var parts = rangeStr.Split('-');
+        if (parts.Length == 2)
+        {
+            if (int.TryParse(parts[0].Trim(), out int min) && 
+                int.TryParse(parts[1].Trim(), out int max))
+            {
+                return (min, max);
+            }
+        }
+        
+        // Fallback: try parsing as single number
+        if (int.TryParse(rangeStr.Trim(), out int single))
+        {
+            return (single, single);
+        }
+        
+        return (0, 0);
+    }
+    
+    // Parse cooldown from strings like "1 Turn", "2 Turns", "4 Turns" -> returns integer
+    private static int ParseCooldown(string cooldownStr)
+    {
+        if (string.IsNullOrEmpty(cooldownStr)) return 0;
+        
+        // Extract the first number from the string
+        string numPart = "";
+        foreach (char c in cooldownStr)
+        {
+            if (char.IsDigit(c))
+                numPart += c;
+            else if (numPart.Length > 0)
+                break; // Stop after we've collected digits
+        }
+        
+        if (int.TryParse(numPart, out int result))
+            return result;
+        
+        return 0;
+    }
+    
+    // Parse damage percent from strings like "125% of base damage", "150%" -> returns float (e.g., 125)
+    private static float ParseDamagePercent(string damageStr)
+    {
+        if (string.IsNullOrEmpty(damageStr)) return 100f;
+        
+        // Extract the first number from the string
+        string numPart = "";
+        foreach (char c in damageStr)
+        {
+            if (char.IsDigit(c) || c == '.')
+                numPart += c;
+            else if (numPart.Length > 0)
+                break; // Stop after we've collected digits
+        }
+        
+        if (float.TryParse(numPart, out float result))
+            return result;
+        
+        return 100f; // Default to 100% if parsing fails
+    }
 
     private static List<EnemyData> LoadEnemies()
     {
@@ -96,13 +163,17 @@ public static class DataCache
 
         foreach (var row in rows)
         {
+            // Parse damage range from CSV (e.g., "9-11") and use average as base damage
+            var damageRange = ParseDamageRange(CSVParser.ParseString(row, "DamageRange"));
+            int baseDamage = (damageRange.min + damageRange.max) / 2;
+            
             var enemy = new EnemyData
             {
                 Type = CSVParser.ParseString(row, "Type"),
                 DisplayName = CSVParser.ParseString(row, "DisplayName"),
                 EnemyID = CSVParser.ParseInt(row, "EnemyID"),
                 Health = CSVParser.ParseInt(row, "Health"),
-                Damage = CSVParser.ParseInt(row, "Damage"),
+                Damage = baseDamage, // Base damage - variance applied at attack time
                 BaseResistance = CSVParser.ParseInt(row, "BaseRessistance"),
                 BonusResistance = CSVParser.ParseInt(row, "BonusRessistance"),
                 World2HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World2HealthModifer", "1")),
@@ -148,21 +219,42 @@ public static class DataCache
 
         foreach (var row in rows)
         {
+            // Parse damage range from CSV (e.g., "14-16") and use average as base damage
+            string damageRangeLabel = CSVParser.ParseString(row, "DamageRange");
+            var damageRange = ParseDamageRange(damageRangeLabel);
+            int baseDamage = (damageRange.min + damageRange.max) / 2;
+            
             list.Add(new CharacterData
             {
                 DisplayName = CSVParser.ParseString(row, "DisplayName"),
                 CharacterID = CSVParser.ParseInt(row, "CharacterID"),
                 MaxHealth = CSVParser.ParseInt(row, "MaxHealth"),
-                Damage = CSVParser.ParseInt(row, "Damage"),
+                Damage = baseDamage, // Base damage - variance applied at attack time
+                DamageRangeLabel = damageRangeLabel,
                 Gold = CSVParser.ParseInt(row, "Gold"),
                 MaxEnergy = CSVParser.ParseInt(row, "MaxEnergy"),
                 CritChance = CSVParser.ParseFloat(row, "CritChance"),
                 CritDamage = CSVParser.ParseFloat(row, "CritDamage"),
                 BaseResistance = CSVParser.ParseInt(row, "BaseRessistance"),
                 BonusResistance = CSVParser.ParseInt(row, "BonusRessistance"),
-                Skill1 = CSVParser.ParseString(row, "Skill1"),
-                Skill2 = CSVParser.ParseString(row, "Skill2"),
-                Skill3 = CSVParser.ParseString(row, "Skill3")
+                // Skill 1 (supports new header Skill1_Name)
+                Skill1 = CSVParser.ParseString(row, "Skill1_Name", CSVParser.ParseString(row, "Skill1", "")),
+                Skill1DamagePercent = ParseDamagePercent(CSVParser.ParseString(row, "Skill1_Damage")),
+                Skill1Effect = CSVParser.ParseString(row, "Skill1_Effect_1", "null"),
+                Skill1Cooldown = ParseCooldown(CSVParser.ParseString(row, "Skill1_Cooldown")),
+                Skill1EnergyGain = CSVParser.ParseInt(row, "Skill1_EnergyGain"),
+                // Skill 2 (supports new header Skill2_Name)
+                Skill2 = CSVParser.ParseString(row, "Skill2_Name", CSVParser.ParseString(row, "Skill2", "")),
+                Skill2DamagePercent = ParseDamagePercent(CSVParser.ParseString(row, "Skill2_Damage")),
+                Skill2Effect = CSVParser.ParseString(row, "Skill2_Effect_1", "null"),
+                Skill2Cooldown = ParseCooldown(CSVParser.ParseString(row, "Skill2_Cooldown")),
+                Skill2EnergyGain = CSVParser.ParseInt(row, "Skill2_EnergyGain"),
+                // Skill 3 (supports new header Skill3_Name)
+                Skill3 = CSVParser.ParseString(row, "Skill3_Name", CSVParser.ParseString(row, "Skill3", "")),
+                Skill3DamagePercent = ParseDamagePercent(CSVParser.ParseString(row, "Skill3_Damage")),
+                Skill3Effect = CSVParser.ParseString(row, "Skill3_Effect_1", "null"),
+                Skill3Cooldown = ParseCooldown(CSVParser.ParseString(row, "Skill3_Cooldown")),
+                Skill3EnergyCost = CSVParser.ParseInt(row, "Skill3_EnergyCost")
             });
         }
 

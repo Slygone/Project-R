@@ -4,7 +4,7 @@ public class EnemyData
     public string DisplayName;
     public int EnemyID;
     public int Health;
-    public int Damage;
+    public int Damage; // Base damage value
     public int BaseResistance;
     public int BonusResistance;
     

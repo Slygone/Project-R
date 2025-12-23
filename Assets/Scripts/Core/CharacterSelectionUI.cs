@@ -92,6 +92,18 @@ public class CharacterSelectionUI : MonoBehaviour
 
     private List<CharacterData> GetRandomCharacters(int count)
     {
+        // Ensure DataCache is loaded
+        if (!DataCache.IsLoaded)
+        {
+            DataCache.LoadAll();
+        }
+        
+        if (DataCache.Characters == null || DataCache.Characters.Count == 0)
+        {
+            Debug.LogError("[CharacterSelectionUI] No characters loaded from DataCache!");
+            return new List<CharacterData>();
+        }
+        
         var allCharacters = new List<CharacterData>(DataCache.Characters);
         var result = new List<CharacterData>();
 
@@ -183,7 +195,10 @@ public class CharacterSelectionUI : MonoBehaviour
         var damageObj = new GameObject("Damage");
         damageObj.transform.SetParent(btnObj.transform, false);
         var damageText = damageObj.AddComponent<TextMeshProUGUI>();
-        damageText.text = $"+{character.Damage} Damage";
+        string dmgLabel = !string.IsNullOrEmpty(character.DamageRangeLabel)
+            ? character.DamageRangeLabel
+            : character.Damage.ToString();
+        damageText.text = $"Damage Range: {dmgLabel}";
         damageText.alignment = TextAlignmentOptions.Center;
         damageText.fontSize = 20;
         damageText.color = new Color(1f, 0.4f, 0.4f);

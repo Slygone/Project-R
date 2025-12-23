@@ -21,6 +21,7 @@ public class Referencer : MonoBehaviour
     public InfusionUI infusionUI;
     public ReactionQTEPanel reactionQTEPanel;
     public MysteryUI mysteryUI;
+    public DefensiveQTE defensiveQTE;
     
     public GameObject nodePopupPanel;
     public GameObject victoryPanel;
@@ -124,6 +125,22 @@ public class Referencer : MonoBehaviour
         {
             var mysteryObj = new GameObject("MysteryUI");
             mysteryUI = mysteryObj.AddComponent<MysteryUI>();
+        }
+        
+        // Debug overlay for testing (Phase 0)
+        var debugOverlay = FindFirstObjectByType<DebugOverlay>();
+        if (debugOverlay == null)
+        {
+            var debugObj = new GameObject("DebugOverlay");
+            debugObj.AddComponent<DebugOverlay>();
+        }
+        
+        // Defensive QTE (Phase 3)
+        defensiveQTE = FindFirstObjectByType<DefensiveQTE>();
+        if (defensiveQTE == null)
+        {
+            var dqteObj = new GameObject("DefensiveQTE");
+            defensiveQTE = dqteObj.AddComponent<DefensiveQTE>();
         }
 
         var mainCam = Camera.main;

@@ -107,28 +107,52 @@ public class UIManager : MonoBehaviour
 
         var lines = body.Split('\n');
         var sb = new StringBuilder();
+        
+        sb.AppendLine("<size=90%>");
 
         for (int i = 0; i < lines.Length; i++)
         {
             var line = lines[i].Trim();
             if (string.IsNullOrEmpty(line)) continue;
 
-            if (line.StartsWith("Found:"))
+            // Relic found
+            if (line.StartsWith("Found:") || line.Contains("Relic"))
             {
-                string item = line.Substring("Found:".Length).Trim();
-                sb.AppendLine($"<color=#aaaaaa>Found:</color> <color=#ffdd55>{item}</color>");
+                string item = line.Replace("Found:", "").Trim();
+                sb.AppendLine($"<color=#b388ff>★ RELIC</color>");
+                sb.AppendLine($"<color=#ffdd55><b>{item}</b></color>");
+                sb.AppendLine();
                 continue;
             }
 
+            // Gold gained
+            if (line.ToLower().Contains("gold"))
+            {
+                string goldText = line;
+                sb.AppendLine($"<color=#ffd700>◆ {goldText}</color>");
+                continue;
+            }
+
+            // Relic effect description in parentheses
             if (line.StartsWith("(") && line.EndsWith(")"))
             {
                 string details = line.Substring(1, line.Length - 2);
-                sb.AppendLine($"<color=#55ffaa>{details}</color>");
+                sb.AppendLine($"<color=#88ddaa><i>{details}</i></color>");
+                sb.AppendLine();
+                continue;
+            }
+
+            // XP gained
+            if (line.ToLower().Contains("xp"))
+            {
+                sb.AppendLine($"<color=#55ddff>✦ {line}</color>");
                 continue;
             }
 
             sb.AppendLine(line);
         }
+        
+        sb.AppendLine("</size>");
 
         return sb.ToString().Trim();
     }

@@ -103,13 +103,14 @@ public class InfusionUI : MonoBehaviour
         container.transform.SetParent(parent, false);
 
         var containerRect = container.AddComponent<RectTransform>();
-        containerRect.anchorMin = new Vector2(0.1f, 0.22f);
-        containerRect.anchorMax = new Vector2(0.9f, 0.65f);
+        containerRect.anchorMin = new Vector2(0.05f, 0.20f);
+        containerRect.anchorMax = new Vector2(0.95f, 0.68f);
         containerRect.offsetMin = Vector2.zero;
         containerRect.offsetMax = Vector2.zero;
 
         var layout = container.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 40;
+        layout.spacing = 20;
+        layout.padding = new RectOffset(10, 10, 5, 5);
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
@@ -139,48 +140,80 @@ public class InfusionUI : MonoBehaviour
         bool capturedIsOrbA = isOrbA;
         btn.onClick.AddListener(() => OnOrbClicked(capturedIsOrbA));
 
-        var layout = btnObj.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 10;
-        layout.padding = new RectOffset(20, 20, 25, 25);
+        // Use LayoutElement for flexible sizing instead of fixed padding
+        var btnLayout = btnObj.AddComponent<LayoutElement>();
+        btnLayout.flexibleWidth = 1;
+        btnLayout.flexibleHeight = 1;
+        btnLayout.minWidth = 120;
+        btnLayout.minHeight = 80;
+
+        // Create inner container with vertical layout for text elements
+        var innerContainer = new GameObject("Inner");
+        innerContainer.transform.SetParent(btnObj.transform, false);
+        var innerRect = innerContainer.AddComponent<RectTransform>();
+        innerRect.anchorMin = Vector2.zero;
+        innerRect.anchorMax = Vector2.one;
+        innerRect.offsetMin = new Vector2(10, 10);
+        innerRect.offsetMax = new Vector2(-10, -10);
+
+        var layout = innerContainer.AddComponent<VerticalLayoutGroup>();
+        layout.spacing = 5;
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.childControlWidth = true;
-        layout.childControlHeight = false;
+        layout.childControlHeight = true;
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
 
+        // Label (ORB A / ORB B)
         var labelObj = new GameObject("Label");
-        labelObj.transform.SetParent(btnObj.transform, false);
+        labelObj.transform.SetParent(innerContainer.transform, false);
         var labelText = labelObj.AddComponent<TextMeshProUGUI>();
         labelText.text = isOrbA ? "ORB A" : "ORB B";
         labelText.alignment = TextAlignmentOptions.Center;
-        labelText.fontSize = 18;
+        labelText.fontSize = 16;
+        labelText.enableAutoSizing = true;
+        labelText.fontSizeMin = 10;
+        labelText.fontSizeMax = 18;
         labelText.color = new Color(0.7f, 0.7f, 0.7f);
         var labelLayout = labelObj.AddComponent<LayoutElement>();
-        labelLayout.preferredHeight = 25;
+        labelLayout.flexibleHeight = 0.2f;
+        labelLayout.minHeight = 18;
 
+        // Element name (FIRE, ICE, etc)
         var elementObj = new GameObject("Element");
-        elementObj.transform.SetParent(btnObj.transform, false);
+        elementObj.transform.SetParent(innerContainer.transform, false);
         var elementText = elementObj.AddComponent<TextMeshProUGUI>();
         elementText.text = "---";
         elementText.alignment = TextAlignmentOptions.Center;
-        elementText.fontSize = 32;
+        elementText.fontSize = 28;
+        elementText.enableAutoSizing = true;
+        elementText.fontSizeMin = 16;
+        elementText.fontSizeMax = 32;
         elementText.fontStyle = FontStyles.Bold;
         elementText.color = Color.white;
         var elementLayout = elementObj.AddComponent<LayoutElement>();
-        elementLayout.preferredHeight = 45;
+        elementLayout.flexibleHeight = 0.5f;
+        elementLayout.minHeight = 30;
 
         if (isOrbA)
             orbAText = elementText;
         else
             orbBText = elementText;
 
+        // Status text (MARKED info)
         var statusObj = new GameObject("Status");
-        statusObj.transform.SetParent(btnObj.transform, false);
+        statusObj.transform.SetParent(innerContainer.transform, false);
         var statusText = statusObj.AddComponent<TextMeshProUGUI>();
         statusText.text = "";
         statusText.alignment = TextAlignmentOptions.Center;
-        statusText.fontSize = 14;
+        statusText.fontSize = 12;
+        statusText.enableAutoSizing = true;
+        statusText.fontSizeMin = 8;
+        statusText.fontSizeMax = 14;
         statusText.color = new Color(0.5f, 0.8f, 0.5f);
         var statusLayout = statusObj.AddComponent<LayoutElement>();
-        statusLayout.preferredHeight = 20;
+        statusLayout.flexibleHeight = 0.2f;
+        statusLayout.minHeight = 15;
 
         return btnObj;
     }
@@ -217,8 +250,8 @@ public class InfusionUI : MonoBehaviour
         orbAImage.color = GetElementColor(orbA);
         orbBImage.color = GetElementColor(orbB);
 
-        var statusA = orbAButton.transform.Find("Status")?.GetComponent<TextMeshProUGUI>();
-        var statusB = orbBButton.transform.Find("Status")?.GetComponent<TextMeshProUGUI>();
+        var statusA = orbAButton.transform.Find("Inner/Status")?.GetComponent<TextMeshProUGUI>();
+        var statusB = orbBButton.transform.Find("Inner/Status")?.GetComponent<TextMeshProUGUI>();
 
         if (statusA != null)
         {

@@ -4,6 +4,8 @@ public class GameManager : MonoBehaviour
 {
     private Referencer refs;
     private int completedNodes = 0;
+    // Pair selection reroll: 1 use per run
+    private static bool pairRerollUsed = false;
     private const int WORLD1_NODES = 20;
     private const int WORLD2_NODES = 25;
     private bool affinityChosen = false;
@@ -12,12 +14,51 @@ public class GameManager : MonoBehaviour
     
     private static int currentWorld = 1;
     public static int CurrentWorld => currentWorld;
+    
+    // XP System (Phase 1 prep)
+    private static int runXP = 0;
+    public static int RunXP => runXP;
+    
+    // Last QTE result for debug overlay
+    private static string lastQTEResult = "None";
+    public static string LastQTEResult => lastQTEResult;
+    
+    public static void AddRunXP(int amount)
+    {
+        runXP += amount;
+        Debug.Log($"[GameManager] Gained {amount} XP. Total: {runXP}");
+    }
+
+    // Reroll API for AffinitySelectionUI
+    public static bool IsPairRerollAvailable()
+    {
+        return !pairRerollUsed;
+    }
+
+    public static void UsePairReroll()
+    {
+        pairRerollUsed = true;
+        Debug.Log("[GameManager] Pair reroll used for this run");
+    }
+    
+    public static void SetLastQTEResult(string result)
+    {
+        lastQTEResult = result;
+    }
+    
+    public static void ResetRunXP()
+    {
+        runXP = 0;
+    }
 
     void Start()
     {
         refs = FindFirstObjectByType<Referencer>();
         currentWorld = 1;
         completedNodes = 0;
+        runXP = 0;
+        lastQTEResult = "None";
+        pairRerollUsed = false;
         UpdateNodeCounter();
         
         StartCharacterSelection();

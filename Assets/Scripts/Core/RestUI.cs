@@ -1,20 +1,34 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
 public class RestUI : MonoBehaviour
 {
+    // Heal amount
+    private const float HEAL_PERCENT = 0.40f;
+    
+    // XP costs for upgrades
+    private const int XP_COST_MAX_HP = 2;
+    private const int XP_COST_CRIT = 3;
+    private const int XP_COST_DAMAGE = 3;
+    
+    // Upgrade amounts
+    private const int MAX_HP_UPGRADE_AMOUNT = 8;
+    private const int CRIT_UPGRADE_AMOUNT = 4;
+    private const int DAMAGE_UPGRADE_AMOUNT = 2;
+
     private GameObject restPanel;
     private GameObject mainChoiceContainer;
-    private GameObject ascendChoiceContainer;
+    private GameObject ascendContainer;
+    private TextMeshProUGUI titleText;
+    private TextMeshProUGUI xpDisplayText;
+    private List<GameObject> upgradeButtons = new List<GameObject>();
     private Action onRestClosed;
     private bool isActive = false;
     private Player player;
     private NodeBase currentNode;
-    
-    private int healthUpgradePercent;
-    private int damageUpgradePercent;
 
     void Awake()
     {
@@ -46,11 +60,11 @@ public class RestUI : MonoBehaviour
         rect.offsetMax = Vector2.zero;
 
         var bg = panel.AddComponent<Image>();
-        bg.color = new Color(0.05f, 0.1f, 0.08f, 0.97f);
+        bg.color = new Color(0.06f, 0.08f, 0.12f, 0.97f);
 
         CreateTitle(panel.transform);
         CreateMainChoices(panel.transform);
-        CreateAscendChoices(panel.transform);
+        CreateAscendScreen(panel.transform);
 
         return panel;
     }
@@ -60,434 +74,434 @@ public class RestUI : MonoBehaviour
         var titleObj = new GameObject("Title");
         titleObj.transform.SetParent(parent, false);
         var titleRect = titleObj.AddComponent<RectTransform>();
-        titleRect.anchorMin = new Vector2(0, 0.8f);
-        titleRect.anchorMax = new Vector2(1, 0.95f);
+        titleRect.anchorMin = new Vector2(0, 0.85f);
+        titleRect.anchorMax = new Vector2(1, 0.98f);
         titleRect.offsetMin = Vector2.zero;
         titleRect.offsetMax = Vector2.zero;
-        var titleText = titleObj.AddComponent<TextMeshProUGUI>();
+        titleText = titleObj.AddComponent<TextMeshProUGUI>();
         titleText.text = "REST SITE";
         titleText.alignment = TextAlignmentOptions.Center;
         titleText.fontSize = 48;
         titleText.fontStyle = FontStyles.Bold;
-        titleText.color = new Color(0.4f, 1f, 0.5f);
+        titleText.color = new Color(0.9f, 0.8f, 0.5f);
     }
 
     private void CreateMainChoices(Transform parent)
     {
-        mainChoiceContainer = new GameObject("MainChoiceContainer");
+        mainChoiceContainer = new GameObject("MainChoices");
         mainChoiceContainer.transform.SetParent(parent, false);
-
         var containerRect = mainChoiceContainer.AddComponent<RectTransform>();
-        containerRect.anchorMin = new Vector2(0.15f, 0.25f);
-        containerRect.anchorMax = new Vector2(0.85f, 0.75f);
+        containerRect.anchorMin = new Vector2(0.1f, 0.25f);
+        containerRect.anchorMax = new Vector2(0.9f, 0.80f);
         containerRect.offsetMin = Vector2.zero;
         containerRect.offsetMax = Vector2.zero;
 
-        var layout = mainChoiceContainer.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 40;
-        layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.childControlWidth = true;
-        layout.childControlHeight = true;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = true;
+        // Heal Button (left side)
+        CreateMainChoiceButton(mainChoiceContainer.transform, 0, "HEAL", 
+            "Restore 40% Max HP\n& Remove Debuffs", 
+            new Color(0.3f, 0.6f, 0.3f), OnHealClicked);
 
-        CreateHealButton(mainChoiceContainer.transform);
-        CreateAscendButton(mainChoiceContainer.transform);
+        // Ascend Button (right side)
+        CreateMainChoiceButton(mainChoiceContainer.transform, 1, "ASCEND", 
+            "Spend XP to\nUpgrade Stats", 
+            new Color(0.5f, 0.3f, 0.6f), OnAscendClicked);
     }
 
-    private void CreateHealButton(Transform parent)
+    private void CreateMainChoiceButton(Transform parent, int index, string title, string description, Color bgColor, Action onClick)
     {
-        var btnObj = new GameObject("HealButton");
+        float buttonWidth = 0.42f;
+        float gap = 0.08f;
+        float startX = (1f - (2 * buttonWidth + gap)) / 2f;
+        float xMin = startX + index * (buttonWidth + gap);
+        float xMax = xMin + buttonWidth;
+
+        var btnObj = new GameObject($"Choice_{title}");
         btnObj.transform.SetParent(parent, false);
 
+        var btnRect = btnObj.AddComponent<RectTransform>();
+        btnRect.anchorMin = new Vector2(xMin, 0.1f);
+        btnRect.anchorMax = new Vector2(xMax, 0.9f);
+        btnRect.offsetMin = Vector2.zero;
+        btnRect.offsetMax = Vector2.zero;
+
         var btnImage = btnObj.AddComponent<Image>();
-        btnImage.color = new Color(0.15f, 0.3f, 0.2f, 1f);
+        btnImage.color = bgColor;
 
         var btn = btnObj.AddComponent<Button>();
         btn.targetGraphic = btnImage;
-        btn.onClick.AddListener(OnHealClicked);
+        btn.onClick.AddListener(() => onClick());
 
-        var layout = btnObj.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 10;
-        layout.padding = new RectOffset(20, 20, 30, 30);
-        layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
-
+        // Title
         var titleObj = new GameObject("Title");
         titleObj.transform.SetParent(btnObj.transform, false);
+        var titleRect = titleObj.AddComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0.05f, 0.55f);
+        titleRect.anchorMax = new Vector2(0.95f, 0.90f);
+        titleRect.offsetMin = Vector2.zero;
+        titleRect.offsetMax = Vector2.zero;
         var titleText = titleObj.AddComponent<TextMeshProUGUI>();
-        titleText.text = "HEAL";
+        titleText.text = title;
         titleText.alignment = TextAlignmentOptions.Center;
-        titleText.fontSize = 32;
+        titleText.fontSize = 36;
         titleText.fontStyle = FontStyles.Bold;
-        titleText.color = new Color(0.4f, 1f, 0.4f);
-        var titleLayout = titleObj.AddComponent<LayoutElement>();
-        titleLayout.preferredHeight = 50;
+        titleText.color = Color.white;
 
+        // Description
         var descObj = new GameObject("Description");
         descObj.transform.SetParent(btnObj.transform, false);
+        var descRect = descObj.AddComponent<RectTransform>();
+        descRect.anchorMin = new Vector2(0.05f, 0.10f);
+        descRect.anchorMax = new Vector2(0.95f, 0.55f);
+        descRect.offsetMin = Vector2.zero;
+        descRect.offsetMax = Vector2.zero;
         var descText = descObj.AddComponent<TextMeshProUGUI>();
-        descText.text = "Restore 30% of\nyour maximum health";
+        descText.text = description;
         descText.alignment = TextAlignmentOptions.Center;
         descText.fontSize = 20;
-        descText.color = new Color(0.7f, 0.9f, 0.7f);
-        var descLayout = descObj.AddComponent<LayoutElement>();
-        descLayout.preferredHeight = 60;
+        descText.color = new Color(0.9f, 0.9f, 0.9f);
     }
 
-    private void CreateAscendButton(Transform parent)
+    private void CreateAscendScreen(Transform parent)
     {
-        var btnObj = new GameObject("AscendButton");
-        btnObj.transform.SetParent(parent, false);
-
-        var btnImage = btnObj.AddComponent<Image>();
-        btnImage.color = new Color(0.25f, 0.2f, 0.35f, 1f);
-
-        var btn = btnObj.AddComponent<Button>();
-        btn.targetGraphic = btnImage;
-        btn.onClick.AddListener(OnAscendClicked);
-
-        var layout = btnObj.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 10;
-        layout.padding = new RectOffset(20, 20, 30, 30);
-        layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
-
-        var titleObj = new GameObject("Title");
-        titleObj.transform.SetParent(btnObj.transform, false);
-        var titleText = titleObj.AddComponent<TextMeshProUGUI>();
-        titleText.text = "ASCEND";
-        titleText.alignment = TextAlignmentOptions.Center;
-        titleText.fontSize = 32;
-        titleText.fontStyle = FontStyles.Bold;
-        titleText.color = new Color(0.8f, 0.6f, 1f);
-        var titleLayout = titleObj.AddComponent<LayoutElement>();
-        titleLayout.preferredHeight = 50;
-
-        var descObj = new GameObject("Description");
-        descObj.transform.SetParent(btnObj.transform, false);
-        var descText = descObj.AddComponent<TextMeshProUGUI>();
-        descText.text = "Permanently upgrade\nyour stats";
-        descText.alignment = TextAlignmentOptions.Center;
-        descText.fontSize = 20;
-        descText.color = new Color(0.8f, 0.7f, 0.9f);
-        var descLayout = descObj.AddComponent<LayoutElement>();
-        descLayout.preferredHeight = 60;
-    }
-
-    private void CreateAscendChoices(Transform parent)
-    {
-        ascendChoiceContainer = new GameObject("AscendChoiceContainer");
-        ascendChoiceContainer.transform.SetParent(parent, false);
-
-        var containerRect = ascendChoiceContainer.AddComponent<RectTransform>();
-        containerRect.anchorMin = new Vector2(0.1f, 0.2f);
-        containerRect.anchorMax = new Vector2(0.9f, 0.75f);
+        ascendContainer = new GameObject("AscendScreen");
+        ascendContainer.transform.SetParent(parent, false);
+        var containerRect = ascendContainer.AddComponent<RectTransform>();
+        containerRect.anchorMin = Vector2.zero;
+        containerRect.anchorMax = Vector2.one;
         containerRect.offsetMin = Vector2.zero;
         containerRect.offsetMax = Vector2.zero;
+        ascendContainer.SetActive(false);
 
-        ascendChoiceContainer.SetActive(false);
+        // XP Display
+        var xpObj = new GameObject("XPDisplay");
+        xpObj.transform.SetParent(ascendContainer.transform, false);
+        var xpRect = xpObj.AddComponent<RectTransform>();
+        xpRect.anchorMin = new Vector2(0.3f, 0.78f);
+        xpRect.anchorMax = new Vector2(0.7f, 0.85f);
+        xpRect.offsetMin = Vector2.zero;
+        xpRect.offsetMax = Vector2.zero;
+        xpDisplayText = xpObj.AddComponent<TextMeshProUGUI>();
+        xpDisplayText.text = "Available XP: 0";
+        xpDisplayText.alignment = TextAlignmentOptions.Center;
+        xpDisplayText.fontSize = 28;
+        xpDisplayText.fontStyle = FontStyles.Bold;
+        xpDisplayText.color = new Color(0.3f, 0.9f, 1f);
+
+        // Upgrade container
+        var upgradesObj = new GameObject("Upgrades");
+        upgradesObj.transform.SetParent(ascendContainer.transform, false);
+        var upgradesRect = upgradesObj.AddComponent<RectTransform>();
+        upgradesRect.anchorMin = new Vector2(0.1f, 0.25f);
+        upgradesRect.anchorMax = new Vector2(0.9f, 0.75f);
+        upgradesRect.offsetMin = Vector2.zero;
+        upgradesRect.offsetMax = Vector2.zero;
+
+        // Back Button
+        var backObj = new GameObject("BackButton");
+        backObj.transform.SetParent(ascendContainer.transform, false);
+        var backRect = backObj.AddComponent<RectTransform>();
+        backRect.anchorMin = new Vector2(0.35f, 0.08f);
+        backRect.anchorMax = new Vector2(0.65f, 0.18f);
+        backRect.offsetMin = Vector2.zero;
+        backRect.offsetMax = Vector2.zero;
+
+        var backImage = backObj.AddComponent<Image>();
+        backImage.color = new Color(0.5f, 0.3f, 0.2f);
+
+        var backBtn = backObj.AddComponent<Button>();
+        backBtn.targetGraphic = backImage;
+        backBtn.onClick.AddListener(OnBackFromAscendClicked);
+
+        var backTextObj = new GameObject("Text");
+        backTextObj.transform.SetParent(backObj.transform, false);
+        var backTextRect = backTextObj.AddComponent<RectTransform>();
+        backTextRect.anchorMin = Vector2.zero;
+        backTextRect.anchorMax = Vector2.one;
+        backTextRect.offsetMin = Vector2.zero;
+        backTextRect.offsetMax = Vector2.zero;
+        var backText = backTextObj.AddComponent<TextMeshProUGUI>();
+        backText.text = "Back";
+        backText.alignment = TextAlignmentOptions.Center;
+        backText.fontSize = 24;
+        backText.color = Color.white;
     }
 
-    private void PopulateAscendChoices()
+    public void Show(Player playerRef, NodeBase node, Action onClosed)
     {
-        foreach (Transform child in ascendChoiceContainer.transform)
-        {
-            Destroy(child.gameObject);
-        }
-
-        healthUpgradePercent = UnityEngine.Random.Range(5, 11);
-        damageUpgradePercent = UnityEngine.Random.Range(5, 11);
-
-        var layout = ascendChoiceContainer.GetComponent<VerticalLayoutGroup>();
-        if (layout == null)
-        {
-            layout = ascendChoiceContainer.AddComponent<VerticalLayoutGroup>();
-            layout.spacing = 20;
-            layout.childAlignment = TextAnchor.MiddleCenter;
-            layout.childControlWidth = true;
-            layout.childControlHeight = false;
-            layout.childForceExpandWidth = true;
-            layout.childForceExpandHeight = false;
-        }
-
-        var subtitleObj = new GameObject("Subtitle");
-        subtitleObj.transform.SetParent(ascendChoiceContainer.transform, false);
-        var subtitleText = subtitleObj.AddComponent<TextMeshProUGUI>();
-        subtitleText.text = "Choose your ascension:";
-        subtitleText.alignment = TextAlignmentOptions.Center;
-        subtitleText.fontSize = 28;
-        subtitleText.color = new Color(0.9f, 0.8f, 1f);
-        var subtitleLayout = subtitleObj.AddComponent<LayoutElement>();
-        subtitleLayout.preferredHeight = 50;
-
-        var choicesContainer = new GameObject("ChoicesRow");
-        choicesContainer.transform.SetParent(ascendChoiceContainer.transform, false);
-        var choicesRect = choicesContainer.AddComponent<RectTransform>();
-        var choicesLayout = choicesContainer.AddComponent<HorizontalLayoutGroup>();
-        choicesLayout.spacing = 40;
-        choicesLayout.childAlignment = TextAnchor.MiddleCenter;
-        choicesLayout.childControlWidth = true;
-        choicesLayout.childControlHeight = true;
-        choicesLayout.childForceExpandWidth = true;
-        choicesLayout.childForceExpandHeight = true;
-        var choicesLayoutElement = choicesContainer.AddComponent<LayoutElement>();
-        choicesLayoutElement.preferredHeight = 200;
-
-        CreateHealthUpgradeButton(choicesContainer.transform);
-        CreateDamageUpgradeButton(choicesContainer.transform);
-
-        CreateBackButton(ascendChoiceContainer.transform);
-    }
-
-    private void CreateHealthUpgradeButton(Transform parent)
-    {
-        var btnObj = new GameObject("HealthUpgradeButton");
-        btnObj.transform.SetParent(parent, false);
-
-        var btnImage = btnObj.AddComponent<Image>();
-        btnImage.color = new Color(0.3f, 0.15f, 0.15f, 1f);
-
-        var btn = btnObj.AddComponent<Button>();
-        btn.targetGraphic = btnImage;
-        btn.onClick.AddListener(OnHealthUpgradeClicked);
-
-        var layout = btnObj.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 8;
-        layout.padding = new RectOffset(20, 20, 20, 20);
-        layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
-
-        var titleObj = new GameObject("Title");
-        titleObj.transform.SetParent(btnObj.transform, false);
-        var titleText = titleObj.AddComponent<TextMeshProUGUI>();
-        titleText.text = "MAX HEALTH";
-        titleText.alignment = TextAlignmentOptions.Center;
-        titleText.fontSize = 26;
-        titleText.fontStyle = FontStyles.Bold;
-        titleText.color = new Color(1f, 0.5f, 0.5f);
-        var titleLayout = titleObj.AddComponent<LayoutElement>();
-        titleLayout.preferredHeight = 40;
-
-        int currentMaxHealth = player != null ? player.GetMaxHealth() : 100;
-        int healthGain = Mathf.RoundToInt(currentMaxHealth * (healthUpgradePercent / 100f));
-
-        var valueObj = new GameObject("Value");
-        valueObj.transform.SetParent(btnObj.transform, false);
-        var valueText = valueObj.AddComponent<TextMeshProUGUI>();
-        valueText.text = $"+{healthUpgradePercent}%";
-        valueText.alignment = TextAlignmentOptions.Center;
-        valueText.fontSize = 36;
-        valueText.fontStyle = FontStyles.Bold;
-        valueText.color = new Color(1f, 0.8f, 0.8f);
-        var valueLayout = valueObj.AddComponent<LayoutElement>();
-        valueLayout.preferredHeight = 50;
-
-        var descObj = new GameObject("Description");
-        descObj.transform.SetParent(btnObj.transform, false);
-        var descText = descObj.AddComponent<TextMeshProUGUI>();
-        descText.text = $"(+{healthGain} HP)";
-        descText.alignment = TextAlignmentOptions.Center;
-        descText.fontSize = 18;
-        descText.color = new Color(0.7f, 0.6f, 0.6f);
-        var descLayout = descObj.AddComponent<LayoutElement>();
-        descLayout.preferredHeight = 30;
-    }
-
-    private void CreateDamageUpgradeButton(Transform parent)
-    {
-        var btnObj = new GameObject("DamageUpgradeButton");
-        btnObj.transform.SetParent(parent, false);
-
-        var btnImage = btnObj.AddComponent<Image>();
-        btnImage.color = new Color(0.2f, 0.15f, 0.3f, 1f);
-
-        var btn = btnObj.AddComponent<Button>();
-        btn.targetGraphic = btnImage;
-        btn.onClick.AddListener(OnDamageUpgradeClicked);
-
-        var layout = btnObj.AddComponent<VerticalLayoutGroup>();
-        layout.spacing = 8;
-        layout.padding = new RectOffset(20, 20, 20, 20);
-        layout.childAlignment = TextAnchor.MiddleCenter;
-        layout.childControlWidth = true;
-        layout.childControlHeight = false;
-
-        var titleObj = new GameObject("Title");
-        titleObj.transform.SetParent(btnObj.transform, false);
-        var titleText = titleObj.AddComponent<TextMeshProUGUI>();
-        titleText.text = "CHARACTER DAMAGE";
-        titleText.alignment = TextAlignmentOptions.Center;
-        titleText.fontSize = 26;
-        titleText.fontStyle = FontStyles.Bold;
-        titleText.color = new Color(0.7f, 0.5f, 1f);
-        var titleLayout = titleObj.AddComponent<LayoutElement>();
-        titleLayout.preferredHeight = 40;
-
-        int currentDamage = player != null ? player.GetCharacterDamage() : 10;
-        int damageGain = Mathf.RoundToInt(currentDamage * (damageUpgradePercent / 100f));
-        if (damageGain < 1) damageGain = 1;
-
-        var valueObj = new GameObject("Value");
-        valueObj.transform.SetParent(btnObj.transform, false);
-        var valueText = valueObj.AddComponent<TextMeshProUGUI>();
-        valueText.text = $"+{damageUpgradePercent}%";
-        valueText.alignment = TextAlignmentOptions.Center;
-        valueText.fontSize = 36;
-        valueText.fontStyle = FontStyles.Bold;
-        valueText.color = new Color(0.9f, 0.8f, 1f);
-        var valueLayout = valueObj.AddComponent<LayoutElement>();
-        valueLayout.preferredHeight = 50;
-
-        var descObj = new GameObject("Description");
-        descObj.transform.SetParent(btnObj.transform, false);
-        var descText = descObj.AddComponent<TextMeshProUGUI>();
-        descText.text = $"(+{damageGain} Damage)";
-        descText.alignment = TextAlignmentOptions.Center;
-        descText.fontSize = 18;
-        descText.color = new Color(0.6f, 0.6f, 0.7f);
-        var descLayout = descObj.AddComponent<LayoutElement>();
-        descLayout.preferredHeight = 30;
-    }
-
-    private void CreateBackButton(Transform parent)
-    {
-        var btnObj = new GameObject("BackButton");
-        btnObj.transform.SetParent(parent, false);
-
-        var btnImage = btnObj.AddComponent<Image>();
-        btnImage.color = new Color(0.3f, 0.25f, 0.2f, 1f);
-
-        var btn = btnObj.AddComponent<Button>();
-        btn.targetGraphic = btnImage;
-        btn.onClick.AddListener(OnBackFromAscendClicked);
-
-        var layoutElement = btnObj.AddComponent<LayoutElement>();
-        layoutElement.preferredHeight = 50;
-        layoutElement.preferredWidth = 150;
-
-        var textObj = new GameObject("Text");
-        textObj.transform.SetParent(btnObj.transform, false);
-        var textRect = textObj.AddComponent<RectTransform>();
-        textRect.anchorMin = Vector2.zero;
-        textRect.anchorMax = Vector2.one;
-        textRect.offsetMin = Vector2.zero;
-        textRect.offsetMax = Vector2.zero;
-        var text = textObj.AddComponent<TextMeshProUGUI>();
-        text.text = "Back";
-        text.alignment = TextAlignmentOptions.Center;
-        text.fontSize = 22;
-        text.color = Color.white;
-    }
-
-    public void Show(Player p, NodeBase node, Action onClosed)
-    {
-        player = p;
+        player = playerRef;
         currentNode = node;
         onRestClosed = onClosed;
 
-        mainChoiceContainer.SetActive(true);
-        ascendChoiceContainer.SetActive(false);
+        // Show main choices first
+        ShowMainChoices();
 
         restPanel.SetActive(true);
         isActive = true;
+    }
 
-        Debug.Log("[RestUI] Rest site opened");
+    private void ShowMainChoices()
+    {
+        titleText.text = "REST SITE";
+        mainChoiceContainer.SetActive(true);
+        ascendContainer.SetActive(false);
+    }
+
+    private void ShowAscendScreen()
+    {
+        titleText.text = "ASCENSION";
+        mainChoiceContainer.SetActive(false);
+        ascendContainer.SetActive(true);
+        RefreshXPDisplay();
+        PopulateUpgrades();
+    }
+
+    private void RefreshXPDisplay()
+    {
+        if (xpDisplayText != null)
+        {
+            xpDisplayText.text = $"Available XP: {GameManager.RunXP}";
+        }
+    }
+
+    private void PopulateUpgrades()
+    {
+        // Clear existing buttons
+        foreach (var btn in upgradeButtons)
+        {
+            if (btn != null) Destroy(btn);
+        }
+        upgradeButtons.Clear();
+
+        var upgradesContainer = ascendContainer.transform.Find("Upgrades");
+        if (upgradesContainer == null) return;
+
+        // Get current values
+        int currentMaxHP = player != null ? player.GetMaxHealth() : 100;
+        int currentCrit = player != null ? player.GetCritChance() : 5;
+        int currentDmgMin = player != null ? player.GetDamageMin() : 10;
+        int currentDmgMax = player != null ? player.GetDamageMax() : 12;
+        float currentCritDmg = player != null ? player.GetCritDamage() : 1.7f;
+
+        // Create 4 upgrade buttons in a single row
+        CreateUpgradeButton(upgradesContainer, 0, 4, "Max HP", $"{currentMaxHP}", $"+{MAX_HP_UPGRADE_AMOUNT}", 
+            XP_COST_MAX_HP, OnMaxHPUpgradeClicked, new Color(0.4f, 0.8f, 0.4f));
+        
+        CreateUpgradeButton(upgradesContainer, 1, 4, "Crit Rating", $"{currentCrit}%", $"+{CRIT_UPGRADE_AMOUNT}%", 
+            XP_COST_CRIT, OnCritUpgradeClicked, new Color(1f, 0.8f, 0.3f));
+
+        CreateUpgradeButton(upgradesContainer, 2, 4, "Crit Damage", $"{currentCritDmg:F1}x", $"+0.1x", 
+            XP_COST_CRIT, OnCritDamageUpgradeClicked, new Color(1f, 0.5f, 0.6f));
+        
+        CreateUpgradeButton(upgradesContainer, 3, 4, "Damage", $"{currentDmgMin}-{currentDmgMax}", $"+{DAMAGE_UPGRADE_AMOUNT}", 
+            XP_COST_DAMAGE, OnDamageUpgradeClicked, new Color(1f, 0.5f, 0.4f));
+    }
+
+    private void CreateUpgradeButton(Transform parent, int index, int totalColumns, string statName, string currentValue, 
+        string upgradeValue, int xpCost, Action onClick, Color accentColor)
+    {
+        // Layout math for N columns across the row
+        float gap = 0.02f;
+        float buttonWidth = (1f - ((totalColumns - 1) * gap)) / totalColumns;
+        float xMin = index * (buttonWidth + gap);
+        float xMax = xMin + buttonWidth;
+
+        bool canAfford = GameManager.RunXP >= xpCost;
+
+        var btnObj = new GameObject($"Upgrade_{statName}");
+        btnObj.transform.SetParent(parent, false);
+        upgradeButtons.Add(btnObj);
+
+        var btnRect = btnObj.AddComponent<RectTransform>();
+        btnRect.anchorMin = new Vector2(xMin, 0.05f);
+        btnRect.anchorMax = new Vector2(xMax, 0.95f);
+        btnRect.offsetMin = Vector2.zero;
+        btnRect.offsetMax = Vector2.zero;
+
+        var btnImage = btnObj.AddComponent<Image>();
+        btnImage.color = canAfford ? new Color(0.15f, 0.18f, 0.22f, 0.95f) : new Color(0.08f, 0.08f, 0.1f, 0.7f);
+
+        var btn = btnObj.AddComponent<Button>();
+        btn.targetGraphic = btnImage;
+        btn.interactable = canAfford;
+        btn.onClick.AddListener(() => onClick());
+
+        // Stat Name
+        var nameObj = new GameObject("StatName");
+        nameObj.transform.SetParent(btnObj.transform, false);
+        var nameRect = nameObj.AddComponent<RectTransform>();
+        nameRect.anchorMin = new Vector2(0.05f, 0.72f);
+        nameRect.anchorMax = new Vector2(0.95f, 0.95f);
+        nameRect.offsetMin = Vector2.zero;
+        nameRect.offsetMax = Vector2.zero;
+        var nameText = nameObj.AddComponent<TextMeshProUGUI>();
+        nameText.text = statName;
+        nameText.alignment = TextAlignmentOptions.Center;
+        nameText.fontSize = 22;
+        nameText.fontStyle = FontStyles.Bold;
+        nameText.color = canAfford ? accentColor : new Color(0.35f, 0.35f, 0.35f);
+
+        // Current Value
+        var currentObj = new GameObject("CurrentValue");
+        currentObj.transform.SetParent(btnObj.transform, false);
+        var currentRect = currentObj.AddComponent<RectTransform>();
+        currentRect.anchorMin = new Vector2(0.05f, 0.50f);
+        currentRect.anchorMax = new Vector2(0.95f, 0.72f);
+        currentRect.offsetMin = Vector2.zero;
+        currentRect.offsetMax = Vector2.zero;
+        var currentText = currentObj.AddComponent<TextMeshProUGUI>();
+        currentText.text = $"(<color=#BBBBBB>{currentValue}</color>)";
+        currentText.alignment = TextAlignmentOptions.Center;
+        currentText.fontSize = 18;
+        currentText.color = canAfford ? new Color(0.8f, 0.85f, 0.9f) : new Color(0.5f, 0.5f, 0.5f);
+
+        // Upgrade Amount
+        var upgradeObj = new GameObject("UpgradeValue");
+        upgradeObj.transform.SetParent(btnObj.transform, false);
+        var upgradeRect = upgradeObj.AddComponent<RectTransform>();
+        upgradeRect.anchorMin = new Vector2(0.05f, 0.28f);
+        upgradeRect.anchorMax = new Vector2(0.95f, 0.50f);
+        upgradeRect.offsetMin = Vector2.zero;
+        upgradeRect.offsetMax = Vector2.zero;
+        var upgradeText = upgradeObj.AddComponent<TextMeshProUGUI>();
+        upgradeText.text = upgradeValue;
+        upgradeText.alignment = TextAlignmentOptions.Center;
+        upgradeText.fontSize = 26;
+        upgradeText.fontStyle = FontStyles.Bold;
+        upgradeText.color = canAfford ? new Color(0.35f, 1f, 0.55f) : new Color(0.25f, 0.45f, 0.3f);
+
+        // Cost
+        var costObj = new GameObject("Cost");
+        costObj.transform.SetParent(btnObj.transform, false);
+        var costRect = costObj.AddComponent<RectTransform>();
+        costRect.anchorMin = new Vector2(0.05f, 0.05f);
+        costRect.anchorMax = new Vector2(0.95f, 0.28f);
+        costRect.offsetMin = Vector2.zero;
+        costRect.offsetMax = Vector2.zero;
+        var costText = costObj.AddComponent<TextMeshProUGUI>();
+        costText.text = $"<color=#77D0FF>Cost:</color> {xpCost} XP";
+        costText.alignment = TextAlignmentOptions.Center;
+        costText.fontSize = 18;
+        costText.fontStyle = FontStyles.Bold;
+        costText.color = canAfford ? new Color(0.5f, 0.9f, 1f) : new Color(0.75f, 0.35f, 0.35f);
     }
 
     private void OnHealClicked()
     {
         if (player == null) return;
 
-        int healAmount = Mathf.RoundToInt(player.GetMaxHealth() * 0.30f);
+        int healAmount = Mathf.RoundToInt(player.GetMaxHealth() * HEAL_PERCENT);
         player.Heal(healAmount);
-
-        Debug.Log($"[RestUI] Player healed for {healAmount} HP (30% of max)");
-
-        var refs = FindFirstObjectByType<Referencer>();
-        if (refs != null && refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
-        {
-            refs.playerStatsUI.UpdateStats();
-        }
-
-        CloseRest();
+        
+        // Remove debuffs/counters
+        player.ClearDebuffs();
+        
+        Debug.Log($"[RestUI] Healed {healAmount} HP (40% of {player.GetMaxHealth()}) and cleared debuffs");
+        
+        // Auto-close after heal
+        CloseRestSite();
     }
 
     private void OnAscendClicked()
     {
-        mainChoiceContainer.SetActive(false);
-        PopulateAscendChoices();
-        ascendChoiceContainer.SetActive(true);
-
-        Debug.Log("[RestUI] Showing ascend choices");
+        ShowAscendScreen();
     }
 
-    private void OnBackFromAscendClicked()
-    {
-        ascendChoiceContainer.SetActive(false);
-        mainChoiceContainer.SetActive(true);
-    }
-
-    private void OnHealthUpgradeClicked()
+    private void OnMaxHPUpgradeClicked()
     {
         if (player == null) return;
-
-        int currentMaxHealth = player.GetMaxHealth();
-        int healthGain = Mathf.RoundToInt(currentMaxHealth * (healthUpgradePercent / 100f));
+        if (!SpendXP(XP_COST_MAX_HP)) return;
         
-        player.IncreaseMaxHealth(healthGain);
+        player.IncreaseMaxHealth(MAX_HP_UPGRADE_AMOUNT);
+        Debug.Log($"[RestUI] Upgraded Max HP +{MAX_HP_UPGRADE_AMOUNT} for {XP_COST_MAX_HP} XP");
+        RefreshAscendUI();
+    }
 
-        Debug.Log($"[RestUI] Player ascended: +{healthUpgradePercent}% Max Health (+{healthGain} HP)");
+    private void OnCritUpgradeClicked()
+    {
+        if (player == null) return;
+        if (!SpendXP(XP_COST_CRIT)) return;
+        
+        player.AddCritChance(CRIT_UPGRADE_AMOUNT);
+        Debug.Log($"[RestUI] Upgraded Crit Rating +{CRIT_UPGRADE_AMOUNT}% for {XP_COST_CRIT} XP");
+        RefreshAscendUI();
+    }
 
-        var refs = FindFirstObjectByType<Referencer>();
-        if (refs != null && refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
-        {
-            refs.playerStatsUI.UpdateStats();
-        }
+    private void OnCritDamageUpgradeClicked()
+    {
+        if (player == null) return;
+        if (!SpendXP(XP_COST_CRIT)) return;
 
-        CloseRest();
+        player.AddCritDamage(0.1f);
+        Debug.Log($"[RestUI] Upgraded Crit Damage +0.1x for {XP_COST_CRIT} XP (now {player.GetCritDamage():F1}x)");
+        RefreshAscendUI();
     }
 
     private void OnDamageUpgradeClicked()
     {
         if (player == null) return;
+        if (!SpendXP(XP_COST_DAMAGE)) return;
+        
+        // Increase both min and max damage
+        player.IncreaseDamageRange(DAMAGE_UPGRADE_AMOUNT);
+        Debug.Log($"[RestUI] Upgraded Damage +{DAMAGE_UPGRADE_AMOUNT} (both min and max) for {XP_COST_DAMAGE} XP");
+        RefreshAscendUI();
+    }
 
-        int currentDamage = player.GetCharacterDamage();
-        int damageGain = Mathf.RoundToInt(currentDamage * (damageUpgradePercent / 100f));
-        if (damageGain < 1) damageGain = 1;
+    private bool SpendXP(int amount)
+    {
+        if (GameManager.RunXP < amount) return false;
+        GameManager.AddRunXP(-amount);
+        return true;
+    }
 
-        player.IncreaseCharacterDamage(damageGain);
-
-        Debug.Log($"[RestUI] Player ascended: +{damageUpgradePercent}% Character Damage (+{damageGain})");
-
+    private void RefreshAscendUI()
+    {
+        RefreshXPDisplay();
+        PopulateUpgrades();
+        
         var refs = FindFirstObjectByType<Referencer>();
         if (refs != null && refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
         {
             refs.playerStatsUI.UpdateStats();
         }
-
-        CloseRest();
     }
 
-    private void CloseRest()
+    private void OnBackFromAscendClicked()
+    {
+        // Close the rest site completely when pressing back from ascend
+        CloseRestSite();
+    }
+
+    private void CloseRestSite()
     {
         restPanel.SetActive(false);
         isActive = false;
-
+        
         if (currentNode != null)
         {
             currentNode.OnNodeCompleted();
             currentNode = null;
         }
-
+        
         onRestClosed?.Invoke();
         onRestClosed = null;
-
         Debug.Log("[RestUI] Rest site closed");
     }
 
     public bool IsActive() => isActive;
+
+    void Update()
+    {
+        if (isActive && Input.GetKeyDown(KeyCode.Escape))
+        {
+            if (ascendContainer.activeSelf)
+            {
+                OnBackFromAscendClicked();
+            }
+            else
+            {
+                CloseRestSite();
+            }
+        }
+    }
 }

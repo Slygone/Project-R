@@ -135,39 +135,42 @@ public class PlayerStatsUI : MonoBehaviour
         var statsObj = new GameObject("Stats");
         statsObj.transform.SetParent(panel.transform, false);
         var statsRect = statsObj.AddComponent<RectTransform>();
-        statsRect.anchorMin = new Vector2(0, 0.37f);
+        statsRect.anchorMin = new Vector2(0, 0.42f);
         statsRect.anchorMax = new Vector2(1, 0.88f);
-        statsRect.offsetMin = new Vector2(15, 0);
+        statsRect.offsetMin = new Vector2(15, 5);
         statsRect.offsetMax = new Vector2(-15, 0);
         statsText = statsObj.AddComponent<TextMeshProUGUI>();
         statsText.alignment = TextAlignmentOptions.TopLeft;
-        statsText.fontSize = 15;
+        statsText.fontSize = 14;
         statsText.color = Color.white;
+        statsText.overflowMode = TextOverflowModes.Truncate;
 
         var relicsTitleObj = new GameObject("RelicsTitle");
         relicsTitleObj.transform.SetParent(panel.transform, false);
         var relicsTitleRect = relicsTitleObj.AddComponent<RectTransform>();
-        relicsTitleRect.anchorMin = new Vector2(0, 0.29f);
-        relicsTitleRect.anchorMax = new Vector2(1, 0.36f);
+        relicsTitleRect.anchorMin = new Vector2(0, 0.34f);
+        relicsTitleRect.anchorMax = new Vector2(1, 0.40f);
         relicsTitleRect.offsetMin = new Vector2(15, 0);
         relicsTitleRect.offsetMax = new Vector2(-15, 0);
         var relicsTitleText = relicsTitleObj.AddComponent<TextMeshProUGUI>();
         relicsTitleText.text = "RELICS";
         relicsTitleText.alignment = TextAlignmentOptions.Left;
-        relicsTitleText.fontSize = 20;
+        relicsTitleText.fontSize = 18;
+        relicsTitleText.fontStyle = FontStyles.Bold;
         relicsTitleText.color = new Color(0.6f, 0.8f, 1f);
 
         var relicsObj = new GameObject("RelicsList");
         relicsObj.transform.SetParent(panel.transform, false);
         var relicsRect = relicsObj.AddComponent<RectTransform>();
-        relicsRect.anchorMin = new Vector2(0, 0.05f);
-        relicsRect.anchorMax = new Vector2(1, 0.29f);
+        relicsRect.anchorMin = new Vector2(0, 0.06f);
+        relicsRect.anchorMax = new Vector2(1, 0.34f);
         relicsRect.offsetMin = new Vector2(15, 0);
         relicsRect.offsetMax = new Vector2(-15, 0);
         relicsText = relicsObj.AddComponent<TextMeshProUGUI>();
         relicsText.alignment = TextAlignmentOptions.TopLeft;
-        relicsText.fontSize = 15;
+        relicsText.fontSize = 14;
         relicsText.color = new Color(0.8f, 0.8f, 0.8f);
+        relicsText.overflowMode = TextOverflowModes.Ellipsis;
 
         var hintObj = new GameObject("Hint");
         hintObj.transform.SetParent(panel.transform, false);
@@ -208,6 +211,11 @@ public class PlayerStatsUI : MonoBehaviour
 
         sb.AppendLine("<color=#ffffff><b>PLAYER STATS</b></color>");
         sb.AppendLine($"Health: {player.GetHealth()} / {player.GetMaxHealth()}");
+        int shield = player.GetShield();
+        if (shield > 0)
+        {
+            sb.AppendLine($"<color=#44aaff>Shield: {shield}</color>");
+        }
         sb.AppendLine($"Gold: {player.GetGold()}");
         sb.AppendLine($"Energy: {player.GetEnergy()} / {player.GetMaxEnergy()}");
         sb.AppendLine($"Crit Rate: {player.GetCritChance()}%");
@@ -217,8 +225,11 @@ public class PlayerStatsUI : MonoBehaviour
         var character = player.GetCharacter();
         string characterName = character != null ? character.DisplayName : "None";
         int characterDmg = player.GetCharacterDamage();
+        int totalBaseDamage = player.GetTotalDamage();
+        int totalMin = Mathf.RoundToInt(totalBaseDamage * CombatConfig.VARIANCE_MIN);
+        int totalMax = Mathf.RoundToInt(totalBaseDamage * CombatConfig.VARIANCE_MAX);
         sb.AppendLine("<color=#ffffff><b>LOADOUT</b></color>");
-        sb.AppendLine($"Character: {characterName} (+{characterDmg})");
+        sb.AppendLine($"Character: {characterName}");
         
         var affinity = player.GetAffinity();
         
@@ -248,22 +259,46 @@ public class PlayerStatsUI : MonoBehaviour
         }
         
         int affinityBonus = player.GetAffinityBonus();
+        string dmgRangeLabel = character != null && !string.IsNullOrEmpty(character.DamageRangeLabel)
+            ? character.DamageRangeLabel
+            : $"{characterDmg}-{characterDmg}";
+        int baseMin = characterDmg, baseMax = characterDmg;
+        var parts = dmgRangeLabel.Split('-');
+        if (parts.Length == 2)
+        {
+            int.TryParse(parts[0], out baseMin);
+            int.TryParse(parts[1], out baseMax);
+        }
+
+        // Active elemental bonuses depend on player's choice (pair or single affinity)
+        int totalBonus = 0;
+        sb.AppendLine($"Base Damage: {baseMin}-{baseMax}");
+
         if (player.HasElementPair())
         {
-            var aElem = player.GetOrbAElement();
-            var bElem = player.GetOrbBElement();
-            int aBonus = player.GetElementalBonus(aElem);
-            int bBonus = player.GetElementalBonus(bElem);
-            int totalElem = aBonus + bBonus;
-            sb.AppendLine($"Damage: {player.GetTotalDamage()} (Character {characterDmg} + Elemental {totalElem})");
-            string aColor = GetElementColor(aElem);
-            string bColor = GetElementColor(bElem);
-            sb.AppendLine($"Elemental Sources: <color={aColor}>{aElem}</color> (+{aBonus}) -> <color={bColor}>{bElem}</color> (+{bBonus})");
+            var elemA = player.GetOrbAElement();
+            var elemB = player.GetOrbBElement();
+            int bonusA = player.GetElementalBonus(elemA);
+            int bonusB = player.GetElementalBonus(elemB);
+            totalBonus = bonusA + bonusB;
+            string colorA = GetElementColor(elemA);
+            string colorB = GetElementColor(elemB);
+            sb.AppendLine($"Bonus <color={colorA}>{elemA}</color> Damage: {bonusA}");
+            sb.AppendLine($"Bonus <color={colorB}>{elemB}</color> Damage: {bonusB}");
         }
         else
         {
-            sb.AppendLine($"Damage: {player.GetTotalDamage()} (Character {characterDmg} + Elemental {affinityBonus})");
+            var aff = player.GetAffinity();
+            int affBonus = aff != Element.None ? player.GetElementalBonus(aff) : 0;
+            totalBonus = affBonus;
+            string affColor = GetElementColor(aff);
+            string affLabel = aff != Element.None ? $"<color={affColor}>{aff}</color>" : "None";
+            sb.AppendLine($"Bonus {affLabel} Damage: {affBonus}");
         }
+
+        int totalMinRange = baseMin + totalBonus;
+        int totalMaxRange = baseMax + totalBonus;
+        sb.AppendLine($"Total Damage: {totalMinRange}-{totalMaxRange}");
         sb.AppendLine(divider);
 
         sb.AppendLine("<color=#ffffff><b>ELEMENTS</b></color>");
