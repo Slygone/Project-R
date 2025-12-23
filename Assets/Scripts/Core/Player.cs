@@ -248,7 +248,7 @@ public class Player : MonoBehaviour
     // Clear all wounds (used by Rest node healing)
     public void ClearWounds()
     {
-        lowestThresholdLevel = health / THRESHOLD_SIZE; // Reset to current threshold
+        lowestThresholdLevel = -1;
         Debug.Log($"[Player] Wounds cleared! Can now heal to {GetMaxRecoverableHP()}");
     }
     
@@ -258,8 +258,7 @@ public class Player : MonoBehaviour
         int healAmount = Mathf.RoundToInt(maxHealth * (healPercent / 100f));
         health += healAmount;
         if (health > maxHealth) health = maxHealth;
-        // Clear wounds AFTER healing so we can heal to full, then reset threshold based on new health
-        lowestThresholdLevel = health / THRESHOLD_SIZE;
+        lowestThresholdLevel = -1;
         Debug.Log($"[Player] Full rest: healed {healAmount} HP, wounds cleared. Health: {health}/{maxHealth} (MaxRecoverable: {GetMaxRecoverableHP()})");
     }
 
@@ -463,7 +462,6 @@ public class Player : MonoBehaviour
     public void ResetCombatState()
     {
         // NOTE: Cooldowns are NOT reset - they persist between combats
-        energy = 0;
         combatTurnCount = 0;
         dirtyStabConsecutiveUses = 0;
         statusEffects.ClearCombatEffects(); // Keep shield, clear block

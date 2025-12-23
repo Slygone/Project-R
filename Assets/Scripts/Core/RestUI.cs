@@ -390,6 +390,7 @@ public class RestUI : MonoBehaviour
         if (player == null) return;
 
         int healAmount = Mathf.RoundToInt(player.GetMaxHealth() * HEAL_PERCENT);
+        player.ClearWounds();
         player.Heal(healAmount);
         
         // Remove debuffs/counters
