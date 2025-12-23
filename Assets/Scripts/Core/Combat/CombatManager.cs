@@ -964,6 +964,12 @@ public class CombatManager : MonoBehaviour
     private List<CombatEnemy> pendingAttackers = new List<CombatEnemy>();
     private int currentAttackerIndex = 0;
     private const float DELAY_BETWEEN_ENEMY_ATTACKS = 0.8f; // Delay in seconds between enemy attacks
+
+    private CombatEnemy pendingDefensiveQTEAttacker;
+    private int pendingDefensiveQTEDamage;
+    private int pendingDefensiveQTEBaseDamage;
+    private int pendingDefensiveQTEAfterVariance;
+    private int pendingDefensiveQTEResistPercent;
     
     private void EnemyTurn()
     {
@@ -1058,19 +1064,14 @@ public class CombatManager : MonoBehaviour
         
         var enemy = pendingAttackers[currentAttackerIndex];
         
-        // Enemy Attack Order:
-        // 1. Base damage
-        int baseDamage = enemy.Damage;
-        
-        // 2. Apply variance (0.90-1.10)
-        int afterVariance = enemy.RollDamageWithVariance();
-        
-        // 3. Apply player resistance
-        int resistPercent = player.CalculateResistance(enemy.Affinity);
-        int finalDamage = player.ApplyResistance(afterVariance, enemy.Affinity);
-        
+        pendingDefensiveQTEAttacker = enemy;
+        pendingDefensiveQTEBaseDamage = enemy.Damage;
+        pendingDefensiveQTEAfterVariance = enemy.RollDamageWithVariance();
+        pendingDefensiveQTEResistPercent = player.CalculateResistance(enemy.Affinity);
+        pendingDefensiveQTEDamage = player.ApplyResistance(pendingDefensiveQTEAfterVariance, enemy.Affinity);
+
         string elementText = enemy.Affinity != Element.None ? $" ({enemy.Affinity})" : "";
-        Debug.Log($"[CombatManager] {enemy.Name}{elementText} attacks for {finalDamage} damage (base: {baseDamage}, variance: {afterVariance})");
+        Debug.Log($"[CombatManager] {enemy.Name}{elementText} attacks for {pendingDefensiveQTEDamage} damage (base: {pendingDefensiveQTEBaseDamage}, variance: {pendingDefensiveQTEAfterVariance})");
 
         // Detailed log
         string resMarker = "";
@@ -1087,61 +1088,31 @@ public class CombatManager : MonoBehaviour
             resMarker = "Affinity";
         }
 
-        Debug.Log($"[CombatLog] EnemyAttack | Attacker={enemy.Name} | Element={enemy.Affinity} | Base={baseDamage} | Variance={afterVariance} | ResistTotal={resistPercent}% | ResistBonusFrom={resMarker} | Final={finalDamage}");
-        
-        if (finalDamage > 0)
-        {
-            player.TakeDamage(finalDamage);
+        Debug.Log($"[CombatLog] EnemyAttack | Attacker={enemy.Name} | Element={enemy.Affinity} | Base={pendingDefensiveQTEBaseDamage} | Variance={pendingDefensiveQTEAfterVariance} | ResistTotal={pendingDefensiveQTEResistPercent}% | ResistBonusFrom={resMarker} | Final={pendingDefensiveQTEDamage}");
 
-            if (combatUI != null)
-            {
-                // Get damage info for shield floating text
-                var dmgInfo = player.GetLastDamageInfo();
-                
-                // Show shield absorption if any
-                if (dmgInfo.shieldAbsorbed > 0)
-                {
-                    combatUI.ShowShieldToPlayer(dmgInfo.shieldAbsorbed, FloatingTextType.ShieldAbsorb);
-                }
-                
-                // Show shield broken if applicable
-                if (dmgInfo.shieldBroken)
-                {
-                    combatUI.ShowShieldToPlayer(0, FloatingTextType.ShieldBroken);
-                }
-                
-                // Show actual damage taken (after shield)
-                if (dmgInfo.finalDamage > 0)
-                {
-                    combatUI.ShowDamageToPlayer(dmgInfo.finalDamage);
-                }
-                
-                combatUI.UpdatePlayerHealth(player);
-            }
-        }
-
-        // Check if player died from the attack
-        if (!player.IsAlive())
+        if (pendingDefensiveQTEDamage <= 0)
         {
-            EndCombat(false);
+            OnDefensiveQTEComplete(enemy, DefensiveQTEResult.Bad);
             return;
         }
-        
-        // THEN start defensive QTE for healing reaction
+
         if (defensiveQTE != null)
         {
             defensiveQTE.StartQTE((result) => OnDefensiveQTEComplete(enemy, result), enemy.Name);
         }
         else
         {
-            // Fallback if no QTE available
             OnDefensiveQTEComplete(enemy, DefensiveQTEResult.Bad);
         }
     }
     
     private void OnDefensiveQTEComplete(CombatEnemy enemy, DefensiveQTEResult qteResult)
     {
-        // Apply healing AFTER QTE (player reacts to heal back some damage)
+        if (pendingDefensiveQTEAttacker != enemy)
+        {
+            pendingDefensiveQTEAttacker = enemy;
+        }
+
         float healPercent = DefensiveQTE.GetHealPercent(qteResult);
         int healAmount = Mathf.RoundToInt(player.GetMaxHealth() * healPercent);
         if (healAmount > 0)
@@ -1159,12 +1130,40 @@ public class CombatManager : MonoBehaviour
 
         Debug.Log($"[CombatLog] DefensiveQTE | Attacker={enemy.Name} | QTE={qteResult} | Healed={healAmount}");
 
-        // Check if player died (shouldn't happen after healing, but safety check)
+        if (pendingDefensiveQTEDamage > 0)
+        {
+            player.TakeDamage(pendingDefensiveQTEDamage);
+
+            if (combatUI != null)
+            {
+                var dmgInfo = player.GetLastDamageInfo();
+                if (dmgInfo.shieldAbsorbed > 0)
+                {
+                    combatUI.ShowShieldToPlayer(dmgInfo.shieldAbsorbed, FloatingTextType.ShieldAbsorb);
+                }
+                if (dmgInfo.shieldBroken)
+                {
+                    combatUI.ShowShieldToPlayer(0, FloatingTextType.ShieldBroken);
+                }
+                if (dmgInfo.finalDamage > 0)
+                {
+                    combatUI.ShowDamageToPlayer(dmgInfo.finalDamage);
+                }
+                combatUI.UpdatePlayerHealth(player);
+            }
+        }
+
         if (!player.IsAlive())
         {
             EndCombat(false);
             return;
         }
+
+        pendingDefensiveQTEAttacker = null;
+        pendingDefensiveQTEDamage = 0;
+        pendingDefensiveQTEBaseDamage = 0;
+        pendingDefensiveQTEAfterVariance = 0;
+        pendingDefensiveQTEResistPercent = 0;
         
         // Process next attacker with delay so player has time to prepare
         currentAttackerIndex++;
