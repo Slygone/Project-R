@@ -42,7 +42,18 @@ public static class ReactionEffectEngine
                 int roll = Random.Range(0, 100);
                 if (roll >= effect.ChancePct)
                 {
-                    Debug.Log($"[ReactionEffect] id={reactionId} type={effect.EffectType} MISSED (roll={roll}, need<{effect.ChancePct})");
+                    GameLog.Reaction(GameLog.Join(
+                        "Effect",
+                        GameLog.KV("id", reactionId),
+                        GameLog.KV("order", effect.Order),
+                        GameLog.KV("type", effect.EffectType),
+                        GameLog.KV("target", effect.Target),
+                        GameLog.KV("value", effect.Value),
+                        GameLog.KV("dur", effect.DurationTurns),
+                        GameLog.KV("chance", effect.ChancePct),
+                        GameLog.KV("applied", false),
+                        GameLog.KV("roll", roll)
+                    ), GameLogVerbosity.Verbose);
                     continue;
                 }
             }
@@ -120,7 +131,18 @@ public static class ReactionEffectEngine
                 int roll = Random.Range(0, 100);
                 if (roll >= effect.ChancePct)
                 {
-                    Debug.Log($"[ReactionEffect] id={reactionId} type={effect.EffectType} MISSED (roll={roll}, need<{effect.ChancePct})");
+                    GameLog.Reaction(GameLog.Join(
+                        "Effect",
+                        GameLog.KV("id", reactionId),
+                        GameLog.KV("order", effect.Order),
+                        GameLog.KV("type", effect.EffectType),
+                        GameLog.KV("target", effect.Target),
+                        GameLog.KV("value", effect.Value),
+                        GameLog.KV("dur", effect.DurationTurns),
+                        GameLog.KV("chance", effect.ChancePct),
+                        GameLog.KV("applied", false),
+                        GameLog.KV("roll", roll)
+                    ), GameLogVerbosity.Verbose);
                     continue;
                 }
             }
@@ -133,8 +155,18 @@ public static class ReactionEffectEngine
     {
         string effectType = effect.EffectType;
         float value = effect.GetValueAsFloat();
-        
-        Debug.Log($"[ReactionEffect] id={context.ReactionId} type={effectType} target={effect.Target} value={effect.Value} dur={effect.DurationTurns} chance={effect.ChancePct}");
+
+        GameLog.Reaction(GameLog.Join(
+            "Effect",
+            GameLog.KV("id", context.ReactionId),
+            GameLog.KV("order", effect.Order),
+            GameLog.KV("type", effectType),
+            GameLog.KV("target", effect.Target),
+            GameLog.KV("value", effect.Value),
+            GameLog.KV("dur", effect.DurationTurns),
+            GameLog.KV("chance", effect.ChancePct),
+            GameLog.KV("applied", true)
+        ), GameLogVerbosity.Verbose);
         
         switch (effectType)
         {
@@ -156,8 +188,18 @@ public static class ReactionEffectEngine
         string target = effect.Target;
         float value = effect.GetValueAsFloat();
         int duration = effect.DurationTurns;
-        
-        Debug.Log($"[ReactionEffect] id={context.ReactionId} type={effectType} target={target} value={effect.Value} dur={duration} chance={effect.ChancePct}");
+
+        GameLog.Reaction(GameLog.Join(
+            "Effect",
+            GameLog.KV("id", context.ReactionId),
+            GameLog.KV("order", effect.Order),
+            GameLog.KV("type", effectType),
+            GameLog.KV("target", target),
+            GameLog.KV("value", effect.Value),
+            GameLog.KV("dur", duration),
+            GameLog.KV("chance", effect.ChancePct),
+            GameLog.KV("applied", true)
+        ), GameLogVerbosity.Verbose);
         
         switch (effectType)
         {
@@ -211,7 +253,7 @@ public static class ReactionEffectEngine
                 break;
                 
             default:
-                Debug.LogWarning($"[ReactionEffectEngine] Unknown effect type: {effectType}");
+                GameLog.Warn(GameLogCategory.Reaction, "[Reaction]", $"EffectUnknown | id={context.ReactionId} | type={effectType}");
                 break;
         }
     }
@@ -224,7 +266,6 @@ public static class ReactionEffectEngine
         if (dotDamagePerTurn <= 0) return;
         
         context.Target.ApplyDoT(dotDamagePerTurn, duration, "Reaction");
-        Debug.Log($"[ReactionEffectEngine] Applied DoT: {dotDamagePerTurn}/turn for {duration} turns to {context.Target.Name}");
     }
     
     private static void TriggerExistingDotsInstant(ReactionEffectContext context)
@@ -232,7 +273,6 @@ public static class ReactionEffectEngine
         if (context.Target == null || !context.Target.IsAlive()) return;
         
         int instantDamage = context.Target.TickDoTEffectsInstant();
-        Debug.Log($"[ReactionEffectEngine] Triggered existing DoTs instantly for {instantDamage} damage on {context.Target.Name}");
     }
     
     private static void AddShieldFromHitPct(ReactionEffectContext context, float pct)
@@ -241,17 +281,33 @@ public static class ReactionEffectEngine
         
         int shieldAmount = Mathf.RoundToInt(context.FinalDamageDealt * pct);
         if (shieldAmount <= 0) return;
-        
+
+        int before = context.Attacker.GetShield();
         context.Attacker.AddShield(shieldAmount);
-        Debug.Log($"[ReactionEffectEngine] Added shield: {shieldAmount} to player");
+        GameLog.Combat(GameLog.Join(
+            "ShieldGain",
+            GameLog.KV("who", "Player"),
+            GameLog.KV("amount", shieldAmount),
+            GameLog.KV("source", "Reaction"),
+            GameLog.KV("shieldBefore", before),
+            GameLog.KV("shieldAfter", context.Attacker.GetShield())
+        ));
     }
     
     private static void AddShieldFlat(ReactionEffectContext context, int amount)
     {
         if (context.Attacker == null || amount <= 0) return;
-        
+
+        int before = context.Attacker.GetShield();
         context.Attacker.AddShield(amount);
-        Debug.Log($"[ReactionEffectEngine] Added flat shield: {amount} to player");
+        GameLog.Combat(GameLog.Join(
+            "ShieldGain",
+            GameLog.KV("who", "Player"),
+            GameLog.KV("amount", amount),
+            GameLog.KV("source", "Reaction"),
+            GameLog.KV("shieldBefore", before),
+            GameLog.KV("shieldAfter", context.Attacker.GetShield())
+        ));
     }
     
     private static void ApplyResistAllDelta(ReactionEffectContext context, float deltaPct, int duration, string target)
@@ -261,12 +317,10 @@ public static class ReactionEffectEngine
         if (target == "Attacker" && context.Attacker != null)
         {
             context.Attacker.ApplyTempResistAll(deltaInt, duration);
-            Debug.Log($"[ReactionEffectEngine] Applied +{deltaInt}% all resist to player for {duration} turns");
         }
         else if (target == "Enemy" && context.Target != null)
         {
             context.Target.ApplyTempResistAll(deltaInt, duration);
-            Debug.Log($"[ReactionEffectEngine] Applied {deltaInt}% all resist to {context.Target.Name} for {duration} turns");
         }
     }
     
@@ -277,12 +331,10 @@ public static class ReactionEffectEngine
         if (target == "Attacker" && context.Attacker != null)
         {
             context.Attacker.ApplyTempResist(element, deltaInt, duration);
-            Debug.Log($"[ReactionEffectEngine] Applied {deltaInt}% {element} resist to player for {duration} turns");
         }
         else if (target == "Enemy" && context.Target != null)
         {
             context.Target.ApplyTempResist(element, deltaInt, duration);
-            Debug.Log($"[ReactionEffectEngine] Applied {deltaInt}% {element} resist to {context.Target.Name} for {duration} turns");
         }
     }
     
@@ -297,16 +349,14 @@ public static class ReactionEffectEngine
             // Burn is a DoT - use base damage percentage
             int burnDamage = Mathf.RoundToInt(context.FinalDamageDealt * 0.1f);
             context.Target.ApplyDoT(burnDamage, duration > 0 ? duration : 2, "Burn");
-            Debug.Log($"[ReactionEffectEngine] Applied Burn status to {context.Target.Name}");
         }
         else if (statusLower == "stun")
         {
             context.Target.ApplyStun(duration > 0 ? duration : 1);
-            Debug.Log($"[ReactionEffectEngine] Applied Stun status to {context.Target.Name} for {duration} turns");
         }
         else
         {
-            Debug.LogWarning($"[ReactionEffectEngine] Unknown status: {statusName}");
+            GameLog.Warn(GameLogCategory.Status, "[Status]", $"ApplyUnknown | target={(context.Target != null ? context.Target.Name : "null")} | status={statusName}");
         }
     }
 }

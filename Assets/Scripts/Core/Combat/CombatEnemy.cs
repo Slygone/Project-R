@@ -88,13 +88,26 @@ public class CombatEnemy
     public void ApplyStun(int duration)
     {
         statusEffects.AddEffect(new StatusEffect(StatusEffectType.Stun, duration, 0, "Stun"));
-        UnityEngine.Debug.Log($"[CombatEnemy] {Name} is stunned for {duration} turn(s)!");
+        GameLog.Status(GameLog.Join(
+            "Apply",
+            GameLog.KV("target", Name),
+            GameLog.KV("type", "Stun"),
+            GameLog.KV("value", 1),
+            GameLog.KV("dur", duration)
+        ), GameLogVerbosity.Minimal);
     }
     
     public void ApplyDoT(int damagePerTurn, int duration, string source)
     {
         statusEffects.AddEffect(new StatusEffect(StatusEffectType.DoT, duration, damagePerTurn, source));
-        UnityEngine.Debug.Log($"[CombatEnemy] {Name} has DoT applied: {damagePerTurn} damage/turn for {duration} turns from {source}");
+        GameLog.Status(GameLog.Join(
+            "Apply",
+            GameLog.KV("target", Name),
+            GameLog.KV("type", "DoT"),
+            GameLog.KV("value", damagePerTurn),
+            GameLog.KV("dur", duration),
+            GameLog.KV("source", source)
+        ), GameLogVerbosity.Minimal);
     }
     
     /// <summary>
@@ -105,10 +118,6 @@ public class CombatEnemy
     public bool CheckAndConsumeStun()
     {
         bool wasStunned = statusEffects.CheckAndConsumeStun();
-        if (wasStunned)
-        {
-            UnityEngine.Debug.Log($"[CombatEnemy] {Name} is STUNNED and skips their turn!");
-        }
         return wasStunned;
     }
     
@@ -123,7 +132,6 @@ public class CombatEnemy
         if (dotDamage > 0)
         {
             TakeDamage(dotDamage);
-            UnityEngine.Debug.Log($"[CombatEnemy] {Name} took {dotDamage} DoT damage. Health: {Health}/{MaxHealth}");
         }
         return dotDamage;
     }
@@ -143,7 +151,6 @@ public class CombatEnemy
         if (dotDamage > 0)
         {
             TakeDamage(dotDamage);
-            UnityEngine.Debug.Log($"[CombatEnemy] {Name} took {dotDamage} instant DoT damage. Health: {Health}/{MaxHealth}");
         }
         return dotDamage;
     }

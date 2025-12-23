@@ -61,7 +61,6 @@ public class StatusEffectManager
             {
                 int newDuration = existing.Duration + effect.Duration;
                 existing.Duration = Mathf.Min(newDuration, MAX_STUN_DURATION);
-                Debug.Log($"[StatusEffect] Stun stacked. New duration: {existing.Duration} turns (capped at {MAX_STUN_DURATION})");
                 return;
             }
         }
@@ -77,7 +76,6 @@ public class StatusEffectManager
                 {
                     // At max stacks, just refresh duration but don't increase damage further
                     existing.Duration = effect.Duration;
-                    Debug.Log($"[StatusEffect] DoT at max stacks ({MAX_DOT_STACKS}). Duration refreshed, damage unchanged: {existing.Value}/turn");
                     return;
                 }
                 
@@ -88,14 +86,11 @@ public class StatusEffectManager
                 existing.Value = newDamage;
                 existing.Duration = effect.Duration; // Reset to full duration
                 existing.StackCount++;
-                
-                Debug.Log($"[StatusEffect] DoT STACKED! Base: {effect.Value}, Carryover: {carryover:F1}, New total: {newDamage:F1}/turn, Stacks: {existing.StackCount}/{MAX_DOT_STACKS}, Duration: {existing.Duration}");
                 return;
             }
         }
         
         effects.Add(effect);
-        Debug.Log($"[StatusEffect] Added {effect.Type} (Value: {effect.Value}, Duration: {effect.Duration}, Source: {effect.Source})");
     }
     
     public void RemoveEffect(StatusEffectType type)
@@ -129,16 +124,10 @@ public class StatusEffectManager
         var stun = effects.Find(e => e.Type == StatusEffectType.Stun);
         if (stun != null)
         {
-            Debug.Log($"[StatusEffect] Unit is STUNNED! Turns remaining before decrement: {stun.Duration}");
             stun.Duration--;
             if (stun.Duration <= 0)
             {
                 effects.Remove(stun);
-                Debug.Log("[StatusEffect] Stun expired after this turn skip");
-            }
-            else
-            {
-                Debug.Log($"[StatusEffect] Stun continues. Turns remaining: {stun.Duration}");
             }
             return true; // Was stunned, skip turn
         }
@@ -159,12 +148,10 @@ public class StatusEffectManager
             {
                 int dmg = Mathf.RoundToInt(effect.Value);
                 dotDamage += dmg;
-                Debug.Log($"[StatusEffect] DoT tick: {dmg} damage from {effect.Source} (Stacks: {effect.StackCount}, Duration left: {effect.Duration - 1})");
                 
                 effect.Duration--;
                 if (effect.Duration <= 0)
                 {
-                    Debug.Log($"[StatusEffect] DoT from {effect.Source} expired");
                     effects.RemoveAt(i);
                 }
             }
@@ -184,7 +171,6 @@ public class StatusEffectManager
             {
                 int dmg = Mathf.RoundToInt(effect.Value);
                 dotDamage += dmg;
-                Debug.Log($"[StatusEffect] DoT instant tick: {dmg} damage from {effect.Source} (duration NOT consumed)");
             }
         }
         
@@ -202,7 +188,6 @@ public class StatusEffectManager
                 effect.Duration--;
                 if (effect.Duration <= 0)
                 {
-                    Debug.Log($"[StatusEffect] TempResist {effect.Source} expired");
                     effects.RemoveAt(i);
                 }
             }
@@ -231,7 +216,6 @@ public class StatusEffectManager
     {
         var effect = new StatusEffect(StatusEffectType.TempResist, duration, deltaPct, elementOrAll);
         effects.Add(effect);
-        Debug.Log($"[StatusEffect] Added TempResist: {deltaPct}% for {elementOrAll}, {duration} turns");
     }
     
     // Legacy method - kept for compatibility but separated stun/DoT logic
@@ -249,7 +233,6 @@ public class StatusEffectManager
         {
             float reduction = block.Value / 100f;
             int reducedDamage = Mathf.RoundToInt(damage * (1f - reduction));
-            Debug.Log($"[StatusEffect] Block reduced damage from {damage} to {reducedDamage} ({block.Value}% reduction)");
             
             // Block is consumed after use
             RemoveEffect(StatusEffectType.Block);
@@ -323,7 +306,6 @@ public class StatusEffectManager
         {
             // Shield broken
             int remaining = damage - shieldValue;
-            Debug.Log($"[StatusEffect] Shield absorbed {shieldValue} damage and broke. {remaining} damage passes through.");
             RemoveEffect(StatusEffectType.Shield);
             return remaining;
         }
@@ -331,7 +313,6 @@ public class StatusEffectManager
         {
             // Shield absorbs all damage
             shield.Value -= damage;
-            Debug.Log($"[StatusEffect] Shield absorbed {damage} damage. {shield.Value} shield remaining.");
             return 0;
         }
     }

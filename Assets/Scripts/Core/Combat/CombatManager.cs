@@ -69,7 +69,16 @@ public class CombatManager : MonoBehaviour
         isPlayerTurn = true;
 
         string bossNames = string.Join(" & ", enemies.ConvertAll(e => e.Name));
-        Debug.Log($"[CombatManager] BOSS FIGHT started: {bossNames} (World {world})");
+        GameLog.Combat(GameLog.Join(
+            "CombatStart",
+            GameLog.KV("type", "Boss"),
+            GameLog.KV("world", world),
+            GameLog.KV("enemies", bossNames)
+        ));
+
+        // Disable player free roam during boss combat
+        var pcBoss = FindFirstObjectByType<PlayerController>();
+        if (pcBoss != null) pcBoss.SetCanMove(false);
 
         string title = world >= 2 ? "FINAL BOSS FIGHT!" : "BOSS FIGHT!";
         if (combatUI != null)
@@ -104,7 +113,7 @@ public class CombatManager : MonoBehaviour
         
         if (enemyPool == null || enemyPool.Count == 0)
         {
-            Debug.LogError("[CombatManager] No enemies loaded from DataCache!");
+            GameLog.Error(GameLogCategory.Combat, "[Combat]", "CombatStartError | reason=no_enemies_loaded");
             return;
         }
 
@@ -122,8 +131,16 @@ public class CombatManager : MonoBehaviour
         // Reset player combat state (energy to 0, cooldowns cleared)
         player.ResetCombatState();
 
-        string combatTypeLabel = currentCombatType == CombatType.Elite ? "ELITE " : "";
-        Debug.Log($"[CombatManager] {combatTypeLabel}Combat started with {enemies.Count} enemies");
+        // Disable player free roam during combat
+        var pc = FindFirstObjectByType<PlayerController>();
+        if (pc != null) pc.SetCanMove(false);
+
+        string combatTypeLabel = currentCombatType == CombatType.Elite ? "Elite" : "Normal";
+        GameLog.Combat(GameLog.Join(
+            "CombatStart",
+            GameLog.KV("type", combatTypeLabel),
+            GameLog.KV("enemyCount", enemies.Count)
+        ));
 
         if (combatUI != null)
         {
@@ -132,7 +149,7 @@ public class CombatManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[CombatManager] CombatUI is null - cannot show combat screen");
+            GameLog.Error(GameLogCategory.Combat, "[Combat]", "CombatStartError | reason=combat_ui_null");
         }
     }
 
@@ -185,7 +202,7 @@ public class CombatManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("[CombatManager] InfusionUI not found, executing without infusion");
+            GameLog.Warn(GameLogCategory.Combat, "[Combat]", "InfusionMissing | action=execute_without_infusion");
             if (isAttack)
                 ExecuteAttack(target);
             else
@@ -222,7 +239,11 @@ public class CombatManager : MonoBehaviour
         // Update debug overlay
         GameManager.SetLastQTEResult($"Reaction: {result}");
         
-        Debug.Log($"[CombatLog] ReactionQTEComplete | Result={result} | QTEMultiplier={qteMultiplier:F1}x");
+        GameLog.Combat(GameLog.Join(
+            "ReactionQTEComplete",
+            GameLog.KV("result", result),
+            GameLog.KV("qteMult", qteMultiplier.ToString("F2"))
+        ), GameLogVerbosity.Verbose);
         
         if (pendingIsAttack)
         {
@@ -284,7 +305,18 @@ public class CombatManager : MonoBehaviour
         
         orbSystem.ClearMarks();
         
-        Debug.Log($"[Reaction] id={pendingReactionId} name={pendingReactionName} mult={pendingReactionMultiplier:F2} effects={effects.Count}");
+        string attackerName = player != null && player.GetCharacter() != null ? player.GetCharacter().DisplayName : "Player";
+        GameLog.Reaction(GameLog.Join(
+            "Trigger",
+            GameLog.KV("id", pendingReactionId),
+            GameLog.KV("name", pendingReactionName),
+            GameLog.KV("mult", pendingReactionMultiplier.ToString("F2")),
+            GameLog.KV("first", pendingReactionFirstElement),
+            GameLog.KV("det", pendingReactionDetonator),
+            GameLog.KV("attacker", attackerName),
+            GameLog.KV("target", pendingTarget != null ? pendingTarget.Name : "null"),
+            GameLog.KV("effects", effects.Count)
+        ));
         
         // Show reaction floating text on target
         if (combatUI != null && pendingTarget != null)
@@ -303,7 +335,7 @@ public class CombatManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("[CombatManager] ReactionQTEPanel not found, executing with Good QTE result");
+            GameLog.Warn(GameLogCategory.Combat, "[Combat]", "ReactionQTEPanelMissing | action=auto_good");
             OnQTEComplete(QTEResult.Good);
         }
     }
@@ -311,40 +343,67 @@ public class CombatManager : MonoBehaviour
     private void ExecuteAttack(CombatEnemy target, float reactionMultiplier = 1f, Element? forcedElement = null)
     {
         Element attackElement = forcedElement ?? player.GetAffinity();
-        
+
+        string attackerName = player != null && player.GetCharacter() != null ? player.GetCharacter().DisplayName : "Player";
+        string reactionId = reactionMultiplier > 1f ? "nonDirectional" : "none";
+
         // Player Attack Order:
         // 1. Base damage (character damage + elemental bonuses)
         int baseDamage = player.GetTotalDamage();
         
+        GameLog.Combat(GameLog.Join(
+            "AttackStart",
+            GameLog.KV("attacker", attackerName),
+            GameLog.KV("target", target != null ? target.Name : "null"),
+            GameLog.KV("element", attackElement),
+            GameLog.KV("dmgRange", $"{Mathf.RoundToInt(baseDamage * 0.9f)}-{Mathf.RoundToInt(baseDamage * 1.1f)}"),
+            GameLog.KV("bonuses", "base"),
+            GameLog.KV("reactionId", reactionId)
+        ));
+
         // 2. Apply variance (0.90-1.10)
         int afterVariance = player.ApplyVariance(baseDamage);
         
         // 3. No OQTE for basic attack without reaction
         
         // 4. Apply crit
-        bool isCrit = Random.Range(0, 100) < player.GetCritChance();
+        int critChance = player.GetCritChance();
+        int critRoll = Random.Range(0, 100);
+        bool isCrit = critRoll < critChance;
         int afterCrit = isCrit ? Mathf.RoundToInt(afterVariance * player.GetCritDamage()) : afterVariance;
         
         // 5. Apply reaction multiplier
         int totalDamage = Mathf.RoundToInt(afterCrit * reactionMultiplier);
 
+        GameLog.Combat(GameLog.Join(
+            "AttackRoll",
+            GameLog.KV("roll", afterVariance),
+            GameLog.KV("reactionMult", reactionMultiplier.ToString("F2")),
+            GameLog.KV("critRoll", critRoll),
+            GameLog.KV("critChance", critChance),
+            GameLog.KV("crit", isCrit),
+            GameLog.KV("critMult", (isCrit ? player.GetCritDamage() : 1f).ToString("F2")),
+            GameLog.KV("preResist", totalDamage)
+        ));
+
         // 6. Apply enemy resistance
         int damage = target.ApplyResistance(totalDamage, attackElement);
         int resistPercent = target.CalculateResistance(attackElement);
-        
-        target.TakeDamage(damage);
-        string critText = isCrit ? " (CRIT!)" : "";
-        string resistText = resistPercent > 0 ? $" ({resistPercent}% resisted)" : "";
-        string reactionText = reactionMultiplier > 1f ? $" (REACTION x{reactionMultiplier:F1})" : "";
-        Debug.Log($"[CombatManager] Player dealt {damage} {attackElement} damage to {target.Name}{critText}{resistText}{reactionText}. Enemy HP: {target.Health}/{target.MaxHealth}");
 
-        string infusedSrc = "";
-        if (player.HasElementPair())
-        {
-            if (attackElement == player.GetOrbAElement()) infusedSrc = "A";
-            else if (attackElement == player.GetOrbBElement()) infusedSrc = "B";
-        }
-        Debug.Log($"[CombatLog] PlayerAttack | Element={attackElement} | InfusedFrom={infusedSrc} | Base={baseDamage} | Variance={afterVariance} | Crit={isCrit} | AfterCrit={afterCrit} | Reaction={reactionMultiplier:F1}x | Resist={resistPercent}% | Final={damage} | Target={target.Name}");
+        int hpBefore = target.Health;
+        target.TakeDamage(damage);
+        int hpAfter = target.Health;
+        GameLog.Combat(GameLog.Join(
+            "DamageApply",
+            GameLog.KV("target", target.Name),
+            GameLog.KV("resistTotal", $"{resistPercent}%"),
+            GameLog.KV("shieldBefore", 0),
+            GameLog.KV("shieldAbsorbed", 0),
+            GameLog.KV("shieldAfter", 0),
+            GameLog.KV("hpBefore", hpBefore),
+            GameLog.KV("dmgFinal", damage),
+            GameLog.KV("hpAfter", hpAfter)
+        ));
 
         if (combatUI != null)
         {
@@ -354,7 +413,7 @@ public class CombatManager : MonoBehaviour
 
         if (!target.IsAlive())
         {
-            Debug.Log($"[CombatManager] {target.Name} defeated!");
+            GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
         }
 
         if (AllEnemiesDead())
@@ -370,6 +429,16 @@ public class CombatManager : MonoBehaviour
     private void ExecuteAttackWithReaction(CombatEnemy target, float reactionMultiplier, float qteMultiplier, Element? forcedElement, QTEResult qteResult)
     {
         Element attackElement = forcedElement ?? player.GetAffinity();
+
+        string attackerName = player != null && player.GetCharacter() != null ? player.GetCharacter().DisplayName : "Player";
+        GameLog.Combat(GameLog.Join(
+            "AttackStart",
+            GameLog.KV("attacker", attackerName),
+            GameLog.KV("target", target != null ? target.Name : "null"),
+            GameLog.KV("element", attackElement),
+            GameLog.KV("bonuses", GameLog.Join(GameLog.KV("oqte", qteMultiplier.ToString("F2")))),
+            GameLog.KV("reactionId", pendingReactionId ?? "none")
+        ));
         
         // Player Attack Order with Reaction:
         // 1. Base damage (character damage + elemental bonuses)
@@ -382,7 +451,9 @@ public class CombatManager : MonoBehaviour
         float afterOQTE = afterVariance * qteMultiplier;
         
         // 4. Apply crit (direct hit only)
-        bool isCrit = Random.Range(0, 100) < player.GetCritChance();
+        int critChance = player.GetCritChance();
+        int critRoll = Random.Range(0, 100);
+        bool isCrit = critRoll < critChance;
         float critMultiplier = isCrit ? player.GetCritDamage() : 1f;
         float directAfterCrit = afterOQTE * critMultiplier;
         
@@ -393,21 +464,35 @@ public class CombatManager : MonoBehaviour
         float totalDamage = directAfterCrit + reactionDamage;
         int damageBeforeResist = Mathf.RoundToInt(totalDamage);
         
+        GameLog.Combat(GameLog.Join(
+            "AttackRoll",
+            GameLog.KV("roll", afterVariance),
+            GameLog.KV("reactionMult", reactionMultiplier.ToString("F2")),
+            GameLog.KV("critRoll", critRoll),
+            GameLog.KV("critChance", critChance),
+            GameLog.KV("crit", isCrit),
+            GameLog.KV("critMult", critMultiplier.ToString("F2")),
+            GameLog.KV("preResist", damageBeforeResist)
+        ));
+
         // 7. Apply enemy resistance
         int damage = target.ApplyResistance(damageBeforeResist, attackElement);
         int resistPercent = target.CalculateResistance(attackElement);
-        
+
+        int hpBefore = target.Health;
         target.TakeDamage(damage);
-        
-        string infusedSrc = "";
-        if (player.HasElementPair())
-        {
-            if (attackElement == player.GetOrbAElement()) infusedSrc = "A";
-            else if (attackElement == player.GetOrbBElement()) infusedSrc = "B";
-        }
-        
-        Debug.Log($"[CombatLog] PlayerAttackReaction | Reaction={pendingReactionName} | Base={baseDamage} | Variance={afterVariance} | OQTE={afterOQTE:F0} | Crit={isCrit} | CritMult={critMultiplier:F1}x | ReactionBonus={reactionDamage:F0} | FinalDamage={damage} | Element={attackElement} | InfusedFrom={infusedSrc} | Resist={resistPercent}% | Target={target.Name}");
-        Debug.Log($"[CombatManager] REACTION ATTACK! {pendingReactionName} ({pendingReactionFirstElement}+{pendingReactionDetonator}) -> {damage} damage to {target.Name} [QTE: {qteResult}]");
+        int hpAfter = target.Health;
+        GameLog.Combat(GameLog.Join(
+            "DamageApply",
+            GameLog.KV("target", target.Name),
+            GameLog.KV("resistTotal", $"{resistPercent}%"),
+            GameLog.KV("shieldBefore", 0),
+            GameLog.KV("shieldAbsorbed", 0),
+            GameLog.KV("shieldAfter", 0),
+            GameLog.KV("hpBefore", hpBefore),
+            GameLog.KV("dmgFinal", damage),
+            GameLog.KV("hpAfter", hpAfter)
+        ));
 
         // Apply reaction effects from CSV data
         ReactionEffectEngine.ApplyPostHitEffects(pendingReactionId, player, target, damage, attackElement);
@@ -421,7 +506,7 @@ public class CombatManager : MonoBehaviour
 
         if (!target.IsAlive())
         {
-            Debug.Log($"[CombatManager] {target.Name} defeated!");
+            GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
         }
 
         if (AllEnemiesDead())
@@ -451,7 +536,13 @@ public class CombatManager : MonoBehaviour
         var character = player.GetCharacter();
         if (character == null)
         {
-            Debug.Log("[CombatManager] No character selected");
+            GameLog.Combat(
+                GameLog.Join(
+                    "SkillBlocked",
+                    GameLog.KV("reason", "no_character")
+                ),
+                GameLogVerbosity.Verbose
+            );
             return;
         }
         
@@ -459,14 +550,25 @@ public class CombatManager : MonoBehaviour
         int skillIndex = skillNumber - 1;
         if (player.IsSkillOnCooldown(skillIndex))
         {
-            Debug.Log($"[CombatManager] Skill {skillNumber} is on cooldown ({player.GetSkillCooldown(skillIndex)} turns remaining)");
+            GameLog.Combat(GameLog.Join(
+                "SkillBlocked",
+                GameLog.KV("skill", skillNumber),
+                GameLog.KV("reason", "cooldown"),
+                GameLog.KV("cd", player.GetSkillCooldown(skillIndex))
+            ), GameLogVerbosity.Verbose);
             return;
         }
         
         // Check energy for Skill 3
         if (skillNumber == 3 && !player.CanUseSkill3())
         {
-            Debug.Log($"[CombatManager] Not enough energy for Skill 3. Need {player.GetSkill3EnergyCost()}, have {player.GetEnergy()}");
+            GameLog.Combat(GameLog.Join(
+                "SkillBlocked",
+                GameLog.KV("skill", skillNumber),
+                GameLog.KV("reason", "energy"),
+                GameLog.KV("need", player.GetSkill3EnergyCost()),
+                GameLog.KV("have", player.GetEnergy())
+            ), GameLogVerbosity.Verbose);
             return;
         }
 
@@ -547,7 +649,6 @@ public class CombatManager : MonoBehaviour
             if (stacks > 0)
             {
                 dirtyStabBonus = 1f + (Mathf.Min(stacks, 2) * 0.2f);
-                Debug.Log($"[CombatManager] DirtyStab bonus: {dirtyStabBonus:F1}x from {stacks} stacks");
             }
         }
         else if (skillEffect != null && skillEffect.ToLower().Contains("aoe"))
@@ -567,6 +668,23 @@ public class CombatManager : MonoBehaviour
         
         int totalDamageDealt = 0;
         
+        string attackerName = player != null && player.GetCharacter() != null ? player.GetCharacter().DisplayName : "Player";
+        GameLog.Combat(GameLog.Join(
+            "AttackStart",
+            GameLog.KV("attacker", attackerName),
+            GameLog.KV("target", target != null ? target.Name : "null"),
+            GameLog.KV("element", attackElement),
+            GameLog.KV("dmgRange", $"{Mathf.RoundToInt(baseDamage * 0.9f)}-{Mathf.RoundToInt(baseDamage * 1.1f)}"),
+            GameLog.KV("bonuses", GameLog.Join(
+                GameLog.KV("skill", skillName),
+                GameLog.KV("hitCount", hitCount),
+                GameLog.KV("critChanceBonus", tempCritBonus),
+                GameLog.KV("critDmgBonus", tempCritDmgBonus.ToString("F2")),
+                GameLog.KV("dirtyStab", dirtyStabBonus.ToString("F2"))
+            )),
+            GameLog.KV("reactionId", reactionMultiplier > 1f ? (pendingReactionId ?? "unknown") : "none")
+        ));
+
         // Execute hits
         for (int hit = 0; hit < hitCount; hit++)
         {
@@ -578,10 +696,26 @@ public class CombatManager : MonoBehaviour
             // Apply crit with temp bonuses
             int effectiveCritChance = player.GetCritChance() + tempCritBonus;
             float effectiveCritDmg = player.GetCritDamage() + tempCritDmgBonus;
-            bool isCrit = Random.Range(0, 100) < effectiveCritChance;
+            int critRoll = Random.Range(0, 100);
+            bool isCrit = critRoll < effectiveCritChance;
             
             int afterCrit = isCrit ? Mathf.RoundToInt(damage * effectiveCritDmg) : damage;
             int afterReaction = Mathf.RoundToInt(afterCrit * reactionMultiplier);
+
+            int resistPercent = target.CalculateResistance(attackElement);
+            GameLog.Combat(GameLog.Join(
+                "AttackRoll",
+                GameLog.KV("hit", hit + 1),
+                GameLog.KV("hitCount", hitCount),
+                GameLog.KV("roll", damage),
+                GameLog.KV("reactionMult", reactionMultiplier.ToString("F2")),
+                GameLog.KV("critRoll", critRoll),
+                GameLog.KV("critChance", effectiveCritChance),
+                GameLog.KV("crit", isCrit),
+                GameLog.KV("critMult", (isCrit ? effectiveCritDmg : 1f).ToString("F2")),
+                GameLog.KV("preResist", afterReaction)
+            ), hitCount > 1 ? GameLogVerbosity.Verbose : GameLogVerbosity.Minimal);
+
             int finalDamage = target.ApplyResistance(afterReaction, attackElement);
             
             if (isAoE)
@@ -591,7 +725,21 @@ public class CombatManager : MonoBehaviour
             }
             else
             {
+                int hpBefore = target.Health;
                 target.TakeDamage(finalDamage);
+                int hpAfter = target.Health;
+                GameLog.Combat(GameLog.Join(
+                    "DamageApply",
+                    GameLog.KV("hit", hit + 1),
+                    GameLog.KV("target", target.Name),
+                    GameLog.KV("resistTotal", $"{resistPercent}%"),
+                    GameLog.KV("shieldBefore", 0),
+                    GameLog.KV("shieldAbsorbed", 0),
+                    GameLog.KV("shieldAfter", 0),
+                    GameLog.KV("hpBefore", hpBefore),
+                    GameLog.KV("dmgFinal", finalDamage),
+                    GameLog.KV("hpAfter", hpAfter)
+                ), hitCount > 1 ? GameLogVerbosity.Verbose : GameLogVerbosity.Minimal);
                 if (combatUI != null)
                 {
                     combatUI.ShowDamageToEnemy(target, finalDamage, isCrit);
@@ -600,9 +748,15 @@ public class CombatManager : MonoBehaviour
             
             totalDamageDealt += finalDamage;
             
-            string hitLabel = hitCount > 1 ? $" (hit {hit + 1}/{hitCount})" : "";
-            Debug.Log($"[CombatManager] {skillName} deals {finalDamage} damage{hitLabel}{(isCrit ? " CRIT!" : "")}");
+            // Per-hit detailed logs handled above (verbose)
         }
+
+        GameLog.Combat(GameLog.Join(
+            "SkillSummary",
+            GameLog.KV("skill", skillName),
+            GameLog.KV("target", target != null ? target.Name : "null"),
+            GameLog.KV("totalDamage", totalDamageDealt)
+        ));
         
         // Apply skill-specific effects AFTER damage
         ApplySkillEffects(skillLower, skillEffect, target, totalDamageDealt, attackElement);
@@ -615,7 +769,7 @@ public class CombatManager : MonoBehaviour
         bool targetKilled = !target.IsAlive();
         if (targetKilled)
         {
-            Debug.Log($"[CombatManager] {target.Name} defeated!");
+            GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
         }
 
         if (AllEnemiesDead())
@@ -725,7 +879,12 @@ public class CombatManager : MonoBehaviour
         {
             int healAmount = Mathf.RoundToInt(damageDealt * 0.20f);
             player.Heal(healAmount);
-            Debug.Log($"[CombatManager] Judgement healed player for {healAmount} HP");
+            GameLog.Combat(GameLog.Join(
+                "Heal",
+                GameLog.KV("who", "Player"),
+                GameLog.KV("amount", healAmount),
+                GameLog.KV("source", "Skill:Judgement")
+            ));
             
             // Show heal floating text
             if (combatUI != null)
@@ -739,7 +898,12 @@ public class CombatManager : MonoBehaviour
         {
             int shieldAmount = Mathf.RoundToInt(damageDealt * 0.70f);
             player.AddShield(shieldAmount);
-            Debug.Log($"[CombatManager] HolyNova granted {shieldAmount} shield");
+            GameLog.Combat(GameLog.Join(
+                "ShieldGain",
+                GameLog.KV("who", "Player"),
+                GameLog.KV("amount", shieldAmount),
+                GameLog.KV("source", "Skill:HolyNova")
+            ));
             
             // Show shield gain floating text
             if (combatUI != null)
@@ -764,8 +928,13 @@ public class CombatManager : MonoBehaviour
             
             // Set cooldown to 2 turns instead of normal cooldown
             player.SetSkillCooldown(2, 2);
-            
-            Debug.Log($"[CombatManager] Ambush kill! Refunded {refund} energy, CD reduced to 2 turns");
+
+            GameLog.Combat(GameLog.Join(
+                "KillEffect",
+                GameLog.KV("skill", "Ambush"),
+                GameLog.KV("energyRefund", refund),
+                GameLog.KV("cooldownSet", 2)
+            ));
 
             if (combatUI != null)
             {
@@ -780,8 +949,21 @@ public class CombatManager : MonoBehaviour
             if (nextTarget != null)
             {
                 int chainDamage = Mathf.RoundToInt(damageDealt * 1.50f);
+                int hpBefore = nextTarget.Health;
                 nextTarget.TakeDamage(chainDamage);
-                Debug.Log($"[CombatManager] DoubleUp chain! {nextTarget.Name} takes {chainDamage} damage");
+
+                GameLog.Combat(GameLog.Join(
+                    "DamageApply",
+                    GameLog.KV("target", nextTarget.Name),
+                    GameLog.KV("resistTotal", "0%"),
+                    GameLog.KV("shieldBefore", 0),
+                    GameLog.KV("shieldAbsorbed", 0),
+                    GameLog.KV("shieldAfter", 0),
+                    GameLog.KV("hpBefore", hpBefore),
+                    GameLog.KV("dmgFinal", chainDamage),
+                    GameLog.KV("hpAfter", nextTarget.Health),
+                    GameLog.KV("source", "Skill:DoubleUpChain")
+                ));
                 
                 if (combatUI != null)
                 {
@@ -791,7 +973,7 @@ public class CombatManager : MonoBehaviour
                 
                 if (!nextTarget.IsAlive())
                 {
-                    Debug.Log($"[CombatManager] {nextTarget.Name} defeated by DoubleUp chain!");
+                    GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", nextTarget.Name), GameLog.KV("source", "DoubleUpChain")));
                 }
             }
         }
@@ -886,15 +1068,26 @@ public class CombatManager : MonoBehaviour
         // Apply skill effects
         ApplySkillEffects(skillLower, skillEffect, target, finalDamage, attackElement);
         
-        string infusedSrc = "";
-        if (player.HasElementPair())
-        {
-            if (attackElement == player.GetOrbAElement()) infusedSrc = "A";
-            else if (attackElement == player.GetOrbBElement()) infusedSrc = "B";
-        }
-        
-        Debug.Log($"[CombatLog] PlayerSkillReaction | Skill={skillName} | Reaction={pendingReactionName} | Base={baseDamage:F0} | Variance={afterVariance} | OQTE={afterOQTE:F0} | Crit={isCrit} | CritMult={critMultiplier:F1}x | ReactionBonus={reactionDamage:F0} | FinalDamage={finalDamage} | Element={attackElement} | InfusedFrom={infusedSrc} | Resist={resistPercent}% | Target={target.Name}");
-        Debug.Log($"[CombatManager] REACTION SKILL! {skillName} + {pendingReactionName} ({pendingReactionFirstElement}+{pendingReactionDetonator}) -> {finalDamage} damage to {target.Name} [QTE: {qteResult}]");
+        GameLog.Combat(GameLog.Join(
+            "AttackRoll",
+            GameLog.KV("skill", skillName),
+            GameLog.KV("roll", afterVariance),
+            GameLog.KV("reactionMult", reactionMultiplier.ToString("F2")),
+            GameLog.KV("crit", isCrit),
+            GameLog.KV("critMult", critMultiplier.ToString("F2")),
+            GameLog.KV("preResist", damageBeforeResist)
+        ));
+
+        GameLog.Reaction(GameLog.Join(
+            "Trigger",
+            GameLog.KV("id", pendingReactionId ?? "none"),
+            GameLog.KV("name", pendingReactionName),
+            GameLog.KV("mult", reactionMultiplier.ToString("F2")),
+            GameLog.KV("first", pendingReactionFirstElement),
+            GameLog.KV("det", pendingReactionDetonator),
+            GameLog.KV("attacker", player != null && player.GetCharacter() != null ? player.GetCharacter().DisplayName : "Player"),
+            GameLog.KV("target", target != null ? target.Name : "null")
+        ), GameLogVerbosity.Minimal);
 
         // Apply reaction effects from CSV data
         ReactionEffectEngine.ApplyPostHitEffects(pendingReactionId, player, target, finalDamage, attackElement);
@@ -907,7 +1100,7 @@ public class CombatManager : MonoBehaviour
         bool targetKilled = !target.IsAlive();
         if (targetKilled)
         {
-            Debug.Log($"[CombatManager] {target.Name} defeated!");
+            GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
         }
 
         if (AllEnemiesDead())
@@ -976,14 +1169,21 @@ public class CombatManager : MonoBehaviour
             if (enemy.IsAlive())
             {
                 int finalDamage = enemy.ApplyResistance(damage, attackElement);
+                int resistPercent = enemy.CalculateResistance(attackElement);
+                int hpBefore = enemy.Health;
                 enemy.TakeDamage(finalDamage);
-                string infusedSrcAoE = "";
-                if (player.HasElementPair())
-                {
-                    if (attackElement == player.GetOrbAElement()) infusedSrcAoE = "A";
-                    else if (attackElement == player.GetOrbBElement()) infusedSrcAoE = "B";
-                }
-                Debug.Log($"[CombatLog] PlayerAoE | Element={attackElement} | InfusedFrom={infusedSrcAoE} | Damage={finalDamage} | Target={enemy.Name}");
+                GameLog.Combat(GameLog.Join(
+                    "DamageApply",
+                    GameLog.KV("target", enemy.Name),
+                    GameLog.KV("resistTotal", $"{resistPercent}%"),
+                    GameLog.KV("shieldBefore", 0),
+                    GameLog.KV("shieldAbsorbed", 0),
+                    GameLog.KV("shieldAfter", 0),
+                    GameLog.KV("hpBefore", hpBefore),
+                    GameLog.KV("dmgFinal", finalDamage),
+                    GameLog.KV("hpAfter", enemy.Health),
+                    GameLog.KV("source", "AoE")
+                ));
                 if (combatUI != null)
                 {
                     // Show floating text for each enemy hit by AOE
@@ -1032,6 +1232,17 @@ public class CombatManager : MonoBehaviour
                 
                 // STEP 2: Tick DoT effects (DoT still ticks even when stunned)
                 int dotDamage = enemy.TickDoTEffects();
+
+                if (dotDamage > 0)
+                {
+                    GameLog.Status(GameLog.Join(
+                        "Tick",
+                        GameLog.KV("target", enemy.Name),
+                        GameLog.KV("type", "DoT"),
+                        GameLog.KV("tick", dotDamage),
+                        GameLog.KV("hpAfter", enemy.Health)
+                    ));
+                }
                 
                 // Show DoT tick floating text
                 if (dotDamage > 0 && combatUI != null)
@@ -1049,14 +1260,19 @@ public class CombatManager : MonoBehaviour
                 // Check if enemy died from DoT
                 if (!enemy.IsAlive())
                 {
-                    Debug.Log($"[CombatManager] {enemy.Name} died from DoT!");
+                    GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", enemy.Name), GameLog.KV("source", "DoT")));
                     continue;
                 }
                 
                 // STEP 3: If stunned, skip attack phase entirely
                 if (isStunned)
                 {
-                    Debug.Log($"[CombatManager] {enemy.Name} turn skipped due to STUN!");
+                    GameLog.Status(GameLog.Join(
+                        "Tick",
+                        GameLog.KV("target", enemy.Name),
+                        GameLog.KV("type", "Stun"),
+                        GameLog.KV("tick", "skip")
+                    ));
                     continue;
                 }
                 
@@ -1104,25 +1320,27 @@ public class CombatManager : MonoBehaviour
         pendingDefensiveQTEResistPercent = player.CalculateResistance(enemy.Affinity);
         pendingDefensiveQTEDamage = player.ApplyResistance(pendingDefensiveQTEAfterVariance, enemy.Affinity);
 
-        string elementText = enemy.Affinity != Element.None ? $" ({enemy.Affinity})" : "";
-        Debug.Log($"[CombatManager] {enemy.Name}{elementText} attacks for {pendingDefensiveQTEDamage} damage (base: {pendingDefensiveQTEBaseDamage}, variance: {pendingDefensiveQTEAfterVariance})");
+        GameLog.Combat(GameLog.Join(
+            "AttackStart",
+            GameLog.KV("attacker", enemy.Name),
+            GameLog.KV("target", "Player"),
+            GameLog.KV("element", enemy.Affinity),
+            GameLog.KV("dmgRange", "unknown"),
+            GameLog.KV("bonuses", GameLog.Join(
+                GameLog.KV("base", pendingDefensiveQTEBaseDamage),
+                GameLog.KV("variance", pendingDefensiveQTEAfterVariance)
+            )),
+            GameLog.KV("reactionId", "none")
+        ));
 
-        // Detailed log
-        string resMarker = "";
-        if (player.HasElementPair())
-        {
-            bool isA = enemy.Affinity == player.GetOrbAElement();
-            bool isB = enemy.Affinity == player.GetOrbBElement();
-            if (isA && isB) resMarker = "A,B";
-            else if (isA) resMarker = "A";
-            else if (isB) resMarker = "B";
-        }
-        else if (player.HasAffinity() && enemy.Affinity == player.GetAffinity())
-        {
-            resMarker = "Affinity";
-        }
-
-        Debug.Log($"[CombatLog] EnemyAttack | Attacker={enemy.Name} | Element={enemy.Affinity} | Base={pendingDefensiveQTEBaseDamage} | Variance={pendingDefensiveQTEAfterVariance} | ResistTotal={pendingDefensiveQTEResistPercent}% | ResistBonusFrom={resMarker} | Final={pendingDefensiveQTEDamage}");
+        GameLog.Combat(GameLog.Join(
+            "AttackRoll",
+            GameLog.KV("roll", pendingDefensiveQTEAfterVariance),
+            GameLog.KV("reactionMult", "1.00"),
+            GameLog.KV("crit", false),
+            GameLog.KV("critMult", "1.00"),
+            GameLog.KV("preResist", pendingDefensiveQTEDamage)
+        ));
 
         if (pendingDefensiveQTEDamage <= 0)
         {
@@ -1152,7 +1370,12 @@ public class CombatManager : MonoBehaviour
         if (healAmount > 0)
         {
             player.Heal(healAmount);
-            Debug.Log($"[CombatManager] Defensive QTE {qteResult}: healed {healAmount} HP ({healPercent * 100}% of max)");
+            GameLog.Combat(GameLog.Join(
+                "Heal",
+                GameLog.KV("who", "Player"),
+                GameLog.KV("amount", healAmount),
+                GameLog.KV("source", $"DefensiveQTE:{qteResult}")
+            ));
             
             if (combatUI != null)
             {
@@ -1162,15 +1385,34 @@ public class CombatManager : MonoBehaviour
             }
         }
 
-        Debug.Log($"[CombatLog] DefensiveQTE | Attacker={enemy.Name} | QTE={qteResult} | Healed={healAmount}");
+        GameLog.Combat(GameLog.Join(
+            "DefensiveQTE",
+            GameLog.KV("attacker", enemy.Name),
+            GameLog.KV("result", qteResult),
+            GameLog.KV("healed", healAmount)
+        ), GameLogVerbosity.Verbose);
 
         if (pendingDefensiveQTEDamage > 0)
         {
+            int shieldBefore = player.GetShield();
+            int hpBefore = player.GetHealth();
             player.TakeDamage(pendingDefensiveQTEDamage);
+            var dmgInfo = player.GetLastDamageInfo();
+
+            GameLog.Combat(GameLog.Join(
+                "DamageApply",
+                GameLog.KV("target", "Player"),
+                GameLog.KV("resistTotal", $"{pendingDefensiveQTEResistPercent}%"),
+                GameLog.KV("shieldBefore", shieldBefore),
+                GameLog.KV("shieldAbsorbed", dmgInfo.shieldAbsorbed),
+                GameLog.KV("shieldAfter", player.GetShield()),
+                GameLog.KV("hpBefore", hpBefore),
+                GameLog.KV("dmgFinal", dmgInfo.finalDamage),
+                GameLog.KV("hpAfter", player.GetHealth())
+            ));
 
             if (combatUI != null)
             {
-                var dmgInfo = player.GetLastDamageInfo();
                 if (dmgInfo.shieldAbsorbed > 0)
                 {
                     combatUI.ShowShieldToPlayer(dmgInfo.shieldAbsorbed, FloatingTextType.ShieldAbsorb);
@@ -1263,7 +1505,15 @@ public class CombatManager : MonoBehaviour
     private void EndCombat(bool victory)
     {
         combatActive = false;
-        Debug.Log($"[CombatManager] Combat ended. Victory: {victory}, Type: {currentCombatType}");
+        GameLog.Combat(GameLog.Join(
+            "CombatEnd",
+            GameLog.KV("victory", victory),
+            GameLog.KV("type", currentCombatType)
+        ));
+
+        // Re-enable player free roam at combat end
+        var pcEnd = FindFirstObjectByType<PlayerController>();
+        if (pcEnd != null) pcEnd.SetCanMove(true);
 
         if (currentCombatType == CombatType.Boss)
         {
@@ -1325,7 +1575,7 @@ public class CombatManager : MonoBehaviour
             {
                 combatUI.HideCombat();
             }
-            Debug.Log("[CombatManager] Player defeated!");
+            GameLog.Combat("PlayerDefeated");
         }
     }
 
@@ -1342,6 +1592,10 @@ public class CombatManager : MonoBehaviour
         }
 
         currentNode = null;
+
+        // Ensure movement is enabled after loot is collected
+        var pcLoot = FindFirstObjectByType<PlayerController>();
+        if (pcLoot != null) pcLoot.SetCanMove(true);
     }
 
     public bool IsCombatActive() => combatActive;

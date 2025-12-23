@@ -49,7 +49,14 @@ public class FloatingText : MonoBehaviour
         }
         if (textComponent == null)
         {
-            Debug.LogError("[FloatingText] TextMeshProUGUI component not found!");
+            GameLog.Error(
+                GameLogCategory.System,
+                "[FloatingText]",
+                GameLog.Join(
+                    "ShowFail",
+                    GameLog.KV("reason", "TextComponentNotFound")
+                )
+            );
             return;
         }
         
@@ -83,8 +90,12 @@ public class FloatingText : MonoBehaviour
         UpdatePosition();
         
         gameObject.SetActive(true);
-        
-        Debug.Log($"[FloatingText] Showing '{displayText}' at position {transform.position}, target: {(target != null ? target.name : "null")}");
+
+        GameLog.System(GameLog.Join(
+            "FloatingTextShow",
+            GameLog.KV("text", displayText),
+            GameLog.KV("target", target != null ? target.name : "null")
+        ), GameLogVerbosity.Verbose);
     }
     
     /// <summary>
@@ -103,7 +114,14 @@ public class FloatingText : MonoBehaviour
         }
         if (textComponent == null)
         {
-            Debug.LogError("[FloatingText] TextMeshProUGUI component not found!");
+            GameLog.Error(
+                GameLogCategory.System,
+                "[FloatingText]",
+                GameLog.Join(
+                    "ShowAtPositionFail",
+                    GameLog.KV("reason", "TextComponentNotFound")
+                )
+            );
             return;
         }
         

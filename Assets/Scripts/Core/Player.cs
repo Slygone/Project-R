@@ -52,7 +52,14 @@ public class Player : MonoBehaviour
         var stats = DataCache.PlayerStats;
         if (stats == null)
         {
-            Debug.LogError("[Player] PlayerStats is null! DataCache may not have loaded properly.");
+            GameLog.Error(
+                GameLogCategory.Data,
+                "[Player]",
+                GameLog.Join(
+                    "InitFail",
+                    GameLog.KV("reason", "PlayerStatsNull")
+                )
+            );
             return;
         }
         
@@ -67,7 +74,14 @@ public class Player : MonoBehaviour
         baseResistance = stats.BaseResistance;
         bonusResistance = stats.BonusResistance;
 
-        Debug.Log($"[Player] Initialized - HP: {health}/{maxHealth}, Gold: {gold}, Energy: {energy}/{maxEnergy}, Crit: {critChance}% x{critDamage}, Resist: {baseResistance}+{bonusResistance}");
+        GameLog.System(GameLog.Join(
+            "PlayerInit",
+            GameLog.KV("hp", $"{health}/{maxHealth}"),
+            GameLog.KV("gold", gold),
+            GameLog.KV("energy", $"{energy}/{maxEnergy}"),
+            GameLog.KV("crit", $"{critChance}%x{critDamage}"),
+            GameLog.KV("resist", $"{baseResistance}+{bonusResistance}")
+        ), GameLogVerbosity.Verbose);
     }
 
     // Damage variance range (applied each attack)
@@ -190,7 +204,15 @@ public class Player : MonoBehaviour
         if (amount <= 0)
         {
             lastDamageInfo.finalDamage = 0;
-            Debug.Log($"[Player] Incoming {originalAmount} damage fully absorbed by block/shield!");
+            GameLog.Combat(GameLog.Join(
+                "DamageApply",
+                GameLog.KV("target", "Player"),
+                GameLog.KV("amount", 0),
+                GameLog.KV("incoming", originalAmount),
+                GameLog.KV("blocked", lastDamageInfo.blockedDamage),
+                GameLog.KV("shieldAbsorb", lastDamageInfo.shieldAbsorbed),
+                GameLog.KV("shieldBroken", lastDamageInfo.shieldBroken)
+            ), GameLogVerbosity.Verbose);
             return;
         }
         
@@ -208,11 +230,26 @@ public class Player : MonoBehaviour
             lowestThresholdLevel = currentThresholdLevel;
             if (oldLowest >= 0)
             {
-                Debug.Log($"[Player] Dropped to threshold level {currentThresholdLevel}! Max recoverable now: {GetMaxRecoverableHP()}");
+                GameLog.Status(GameLog.Join(
+                    "Threshold",
+                    GameLog.KV("who", "Player"),
+                    GameLog.KV("level", currentThresholdLevel),
+                    GameLog.KV("maxRecoverable", GetMaxRecoverableHP()),
+                    GameLog.KV("wounds", WoundCount)
+                ), GameLogVerbosity.Verbose);
             }
         }
-        
-        Debug.Log($"[Player] Took {amount} damage (original: {originalAmount}). Health: {health}/{maxHealth}, Shield: {GetShield()} (MaxRecoverable: {GetMaxRecoverableHP()}, Wounds: {WoundCount})");
+
+        GameLog.Combat(GameLog.Join(
+            "DamageApply",
+            GameLog.KV("target", "Player"),
+            GameLog.KV("amount", amount),
+            GameLog.KV("incoming", originalAmount),
+            GameLog.KV("blocked", lastDamageInfo.blockedDamage),
+            GameLog.KV("shieldAbsorb", lastDamageInfo.shieldAbsorbed),
+            GameLog.KV("shieldBroken", lastDamageInfo.shieldBroken),
+            GameLog.KV("hpAfter", $"{health}/{maxHealth}")
+        ), GameLogVerbosity.Verbose);
     }
 
     public void Heal(int amount)
@@ -228,8 +265,15 @@ public class Player : MonoBehaviour
             health = maxRecoverable;
         }
         if (health > maxHealth) health = maxHealth;
-        
-        Debug.Log($"[Player] Healed {amount}. Health: {health}/{maxHealth} (Max recoverable: {maxRecoverable}, Wounds: {WoundCount})");
+
+        GameLog.Combat(GameLog.Join(
+            "Heal",
+            GameLog.KV("who", "Player"),
+            GameLog.KV("amount", amount),
+            GameLog.KV("hpAfter", $"{health}/{maxHealth}"),
+            GameLog.KV("maxRecoverable", maxRecoverable),
+            GameLog.KV("wounds", WoundCount)
+        ), GameLogVerbosity.Verbose);
     }
     
     // Get max HP player can recover to (limited by lowest threshold reached)
@@ -249,7 +293,11 @@ public class Player : MonoBehaviour
     public void ClearWounds()
     {
         lowestThresholdLevel = -1;
-        Debug.Log($"[Player] Wounds cleared! Can now heal to {GetMaxRecoverableHP()}");
+        GameLog.Status(GameLog.Join(
+            "WoundsClear",
+            GameLog.KV("who", "Player"),
+            GameLog.KV("maxRecoverable", GetMaxRecoverableHP())
+        ), GameLogVerbosity.Verbose);
     }
     
     // Heal and clear wounds (full rest)
@@ -259,14 +307,24 @@ public class Player : MonoBehaviour
         health += healAmount;
         if (health > maxHealth) health = maxHealth;
         lowestThresholdLevel = -1;
-        Debug.Log($"[Player] Full rest: healed {healAmount} HP, wounds cleared. Health: {health}/{maxHealth} (MaxRecoverable: {GetMaxRecoverableHP()})");
+        GameLog.System(GameLog.Join(
+            "FullRest",
+            GameLog.KV("heal", healAmount),
+            GameLog.KV("hpAfter", $"{health}/{maxHealth}"),
+            GameLog.KV("maxRecoverable", GetMaxRecoverableHP())
+        ), GameLogVerbosity.Verbose);
     }
 
     public void IncreaseMaxHealth(int amount)
     {
         maxHealth += amount;
         health += amount;
-        Debug.Log($"[Player] Max health increased by {amount}. Now {health}/{maxHealth}");
+        GameLog.System(GameLog.Join(
+            "StatGain",
+            GameLog.KV("stat", "MaxHealth"),
+            GameLog.KV("delta", amount),
+            GameLog.KV("hp", $"{health}/{maxHealth}")
+        ), GameLogVerbosity.Verbose);
     }
 
     public void IncreaseCharacterDamage(int amount)
@@ -274,11 +332,24 @@ public class Player : MonoBehaviour
         if (selectedCharacter != null)
         {
             selectedCharacter.Damage += amount;
-            Debug.Log($"[Player] Character damage increased by {amount}. Now {selectedCharacter.Damage}");
+            GameLog.System(GameLog.Join(
+                "StatGain",
+                GameLog.KV("stat", "CharacterDamage"),
+                GameLog.KV("delta", amount),
+                GameLog.KV("now", selectedCharacter.Damage)
+            ), GameLogVerbosity.Verbose);
         }
         else
         {
-            Debug.LogWarning("[Player] No character selected, cannot increase damage");
+            GameLog.Warn(
+                GameLogCategory.System,
+                "[Player]",
+                GameLog.Join(
+                    "StatGainFail",
+                    GameLog.KV("reason", "NoCharacter"),
+                    GameLog.KV("stat", "CharacterDamage")
+                )
+            );
         }
     }
     
@@ -286,13 +357,23 @@ public class Player : MonoBehaviour
     public void AddCritChance(int amount)
     {
         critChance += amount;
-        Debug.Log($"[Player] Crit chance increased by {amount}%. Now {critChance}%");
+        GameLog.System(GameLog.Join(
+            "StatGain",
+            GameLog.KV("stat", "CritChance"),
+            GameLog.KV("delta", amount),
+            GameLog.KV("now", critChance)
+        ), GameLogVerbosity.Verbose);
     }
     
     public void AddCritDamage(float amount)
     {
         critDamage += amount;
-        Debug.Log($"[Player] Crit damage increased by {amount}. Now {critDamage:F1}x");
+        GameLog.System(GameLog.Join(
+            "StatGain",
+            GameLog.KV("stat", "CritDamage"),
+            GameLog.KV("delta", amount),
+            GameLog.KV("now", critDamage.ToString("F2"))
+        ), GameLogVerbosity.Verbose);
     }
     
     public void IncreaseDamageRange(int amount)
@@ -300,11 +381,24 @@ public class Player : MonoBehaviour
         if (selectedCharacter != null)
         {
             selectedCharacter.Damage += amount;
-            Debug.Log($"[Player] Damage range increased by {amount}. Base damage now {selectedCharacter.Damage}");
+            GameLog.System(GameLog.Join(
+                "StatGain",
+                GameLog.KV("stat", "DamageRange"),
+                GameLog.KV("delta", amount),
+                GameLog.KV("now", selectedCharacter.Damage)
+            ), GameLogVerbosity.Verbose);
         }
         else
         {
-            Debug.LogWarning("[Player] No character selected, cannot increase damage range");
+            GameLog.Warn(
+                GameLogCategory.System,
+                "[Player]",
+                GameLog.Join(
+                    "StatGainFail",
+                    GameLog.KV("reason", "NoCharacter"),
+                    GameLog.KV("stat", "DamageRange")
+                )
+            );
         }
     }
     
@@ -312,25 +406,41 @@ public class Player : MonoBehaviour
     {
         statusEffects.ClearDebuffs();
         dirtyStabConsecutiveUses = 0;
-        Debug.Log("[Player] Cleared all debuffs and counters");
+        GameLog.Status(GameLog.Join(
+            "ClearDebuffs",
+            GameLog.KV("who", "Player")
+        ), GameLogVerbosity.Verbose);
     }
 
     public void AddBaseDamage(int amount)
     {
         baseDamage += amount;
-        Debug.Log($"[Player] Base damage increased by {amount}. Total base damage: {baseDamage}");
+        GameLog.System(GameLog.Join(
+            "StatGain",
+            GameLog.KV("stat", "BaseDamage"),
+            GameLog.KV("delta", amount),
+            GameLog.KV("now", baseDamage)
+        ), GameLogVerbosity.Verbose);
     }
 
     public void AddElementalDamage(Element element, int amount)
     {
         elementalDamage.Add(element, amount);
-        Debug.Log($"[Player] {element} damage increased by {amount}. Total {element} bonus: {elementalDamage.Get(element)}");
+        GameLog.System(GameLog.Join(
+            "StatGain",
+            GameLog.KV("stat", $"ElementalDamage_{element}"),
+            GameLog.KV("delta", amount),
+            GameLog.KV("now", elementalDamage.Get(element))
+        ), GameLogVerbosity.Verbose);
     }
 
     public void SetAffinity(Element element)
     {
         affinity = element;
-        Debug.Log($"[Player] Affinity set to {element}");
+        GameLog.System(GameLog.Join(
+            "AffinitySet",
+            GameLog.KV("element", element)
+        ), GameLogVerbosity.Verbose);
     }
     
     public void SetElementPair(ElementPair pair)
@@ -338,7 +448,12 @@ public class Player : MonoBehaviour
         orbSystem.SetElementPair(pair.OrbA, pair.OrbB);
         affinity = pair.OrbA;
         hasElementPair = true;
-        Debug.Log($"[Player] Element pair set: {pair.DisplayName} ({pair.OrbA} + {pair.OrbB})");
+        GameLog.System(GameLog.Join(
+            "ElementPairSet",
+            GameLog.KV("pair", pair.DisplayName),
+            GameLog.KV("a", pair.OrbA),
+            GameLog.KV("b", pair.OrbB)
+        ), GameLogVerbosity.Verbose);
     }
     
     public ElementalOrbSystem GetOrbSystem() => orbSystem;
@@ -386,7 +501,12 @@ public class Player : MonoBehaviour
         skillCooldowns[0] = 0;
         skillCooldowns[1] = 0;
         skillCooldowns[2] = 0;
-        Debug.Log($"[Player] Selected {character.DisplayName} (+{character.Damage} damage, MaxEnergy: {maxEnergy})");
+        GameLog.System(GameLog.Join(
+            "CharacterSelect",
+            GameLog.KV("name", character.DisplayName),
+            GameLog.KV("damage", character.Damage),
+            GameLog.KV("maxEnergy", maxEnergy)
+        ), GameLogVerbosity.Verbose);
     }
     
     // ========== SKILL COOLDOWN & ENERGY SYSTEM ==========
@@ -398,7 +518,11 @@ public class Player : MonoBehaviour
         if (skillIndex >= 0 && skillIndex < 3)
         {
             skillCooldowns[skillIndex] = cooldown;
-            Debug.Log($"[Player] Skill {skillIndex + 1} cooldown set to {cooldown} turns");
+            GameLog.System(GameLog.Join(
+                "CooldownSet",
+                GameLog.KV("skill", skillIndex + 1),
+                GameLog.KV("cd", cooldown)
+            ), GameLogVerbosity.Verbose);
         }
     }
     
@@ -422,17 +546,38 @@ public class Player : MonoBehaviour
             case 0: // Skill 1
                 skillCooldowns[0] = selectedCharacter.Skill1Cooldown;
                 GainEnergy(selectedCharacter.Skill1EnergyGain);
-                Debug.Log($"[Player] Used Skill1, gained {selectedCharacter.Skill1EnergyGain} energy. Energy: {energy}/{maxEnergy}. CD: {skillCooldowns[0]} turns");
+                GameLog.Combat(GameLog.Join(
+                    "SkillUse",
+                    GameLog.KV("who", "Player"),
+                    GameLog.KV("skill", 1),
+                    GameLog.KV("cd", skillCooldowns[0]),
+                    GameLog.KV("energyGain", selectedCharacter.Skill1EnergyGain),
+                    GameLog.KV("energy", $"{energy}/{maxEnergy}")
+                ), GameLogVerbosity.Verbose);
                 break;
             case 1: // Skill 2
                 skillCooldowns[1] = selectedCharacter.Skill2Cooldown;
                 GainEnergy(selectedCharacter.Skill2EnergyGain);
-                Debug.Log($"[Player] Used Skill2, gained {selectedCharacter.Skill2EnergyGain} energy. Energy: {energy}/{maxEnergy}. CD: {skillCooldowns[1]} turns");
+                GameLog.Combat(GameLog.Join(
+                    "SkillUse",
+                    GameLog.KV("who", "Player"),
+                    GameLog.KV("skill", 2),
+                    GameLog.KV("cd", skillCooldowns[1]),
+                    GameLog.KV("energyGain", selectedCharacter.Skill2EnergyGain),
+                    GameLog.KV("energy", $"{energy}/{maxEnergy}")
+                ), GameLogVerbosity.Verbose);
                 break;
             case 2: // Skill 3
                 skillCooldowns[2] = selectedCharacter.Skill3Cooldown;
                 SpendEnergy(selectedCharacter.Skill3EnergyCost);
-                Debug.Log($"[Player] Used Skill3, spent {selectedCharacter.Skill3EnergyCost} energy. Energy: {energy}/{maxEnergy}. CD: {skillCooldowns[2]} turns");
+                GameLog.Combat(GameLog.Join(
+                    "SkillUse",
+                    GameLog.KV("who", "Player"),
+                    GameLog.KV("skill", 3),
+                    GameLog.KV("cd", skillCooldowns[2]),
+                    GameLog.KV("energySpend", selectedCharacter.Skill3EnergyCost),
+                    GameLog.KV("energy", $"{energy}/{maxEnergy}")
+                ), GameLogVerbosity.Verbose);
                 break;
         }
     }
@@ -441,7 +586,11 @@ public class Player : MonoBehaviour
     {
         energy += amount;
         if (energy > maxEnergy) energy = maxEnergy;
-        Debug.Log($"[Player] Gained {amount} energy. Total: {energy}/{maxEnergy}");
+        GameLog.System(GameLog.Join(
+            "EnergyGain",
+            GameLog.KV("delta", amount),
+            GameLog.KV("energy", $"{energy}/{maxEnergy}")
+        ), GameLogVerbosity.Verbose);
     }
     
     // Called at start of player's turn to tick down cooldowns
@@ -455,7 +604,13 @@ public class Player : MonoBehaviour
             }
         }
         combatTurnCount++;
-        Debug.Log($"[Player] Turn {combatTurnCount}: Cooldowns ticked. Skill1 CD: {skillCooldowns[0]}, Skill2 CD: {skillCooldowns[1]}, Skill3 CD: {skillCooldowns[2]}");
+        GameLog.System(GameLog.Join(
+            "CooldownTick",
+            GameLog.KV("turn", combatTurnCount),
+            GameLog.KV("s1", skillCooldowns[0]),
+            GameLog.KV("s2", skillCooldowns[1]),
+            GameLog.KV("s3", skillCooldowns[2])
+        ), GameLogVerbosity.Verbose);
     }
     
     // Reset combat-specific state at combat start (cooldowns PERSIST between combats)
@@ -465,7 +620,14 @@ public class Player : MonoBehaviour
         combatTurnCount = 0;
         dirtyStabConsecutiveUses = 0;
         statusEffects.ClearCombatEffects(); // Keep shield, clear block
-        Debug.Log($"[Player] Combat state reset. Energy: {energy}/{maxEnergy}, Shield: {GetShield()}. Cooldowns preserved: S1={skillCooldowns[0]}, S2={skillCooldowns[1]}, S3={skillCooldowns[2]}");
+        GameLog.System(GameLog.Join(
+            "CombatStateReset",
+            GameLog.KV("energy", $"{energy}/{maxEnergy}"),
+            GameLog.KV("shield", GetShield()),
+            GameLog.KV("s1", skillCooldowns[0]),
+            GameLog.KV("s2", skillCooldowns[1]),
+            GameLog.KV("s3", skillCooldowns[2])
+        ), GameLogVerbosity.Verbose);
     }
     
     public int GetCombatTurnCount() => combatTurnCount;
@@ -479,13 +641,25 @@ public class Player : MonoBehaviour
     {
         int maxShield = GetMaxShield();
         statusEffects.AddShield(amount, maxShield);
-        Debug.Log($"[Player] Gained {amount} shield. Total: {GetShield()}/{maxShield}");
+        GameLog.Combat(GameLog.Join(
+            "ShieldGain",
+            GameLog.KV("who", "Player"),
+            GameLog.KV("amount", amount),
+            GameLog.KV("shield", $"{GetShield()}/{maxShield}")
+        ), GameLogVerbosity.Verbose);
     }
     
     public void ApplyBlock(float percentReduction)
     {
         statusEffects.AddEffect(new StatusEffect(StatusEffectType.Block, 1, percentReduction, "Riposte"));
-        Debug.Log($"[Player] Riposte stance active: {percentReduction}% damage reduction on next hit");
+        GameLog.Status(GameLog.Join(
+            "Apply",
+            GameLog.KV("target", "Player"),
+            GameLog.KV("type", "Block"),
+            GameLog.KV("value", percentReduction),
+            GameLog.KV("dur", 1),
+            GameLog.KV("source", "Riposte")
+        ), GameLogVerbosity.Verbose);
     }
     
     public bool HasBlock() => statusEffects.HasEffect(StatusEffectType.Block);
@@ -494,21 +668,36 @@ public class Player : MonoBehaviour
     public void ClearShieldForWorldTransition()
     {
         statusEffects.ClearAllIncludingShield();
-        Debug.Log("[Player] Shield cleared for world transition");
+        GameLog.System(GameLog.Join(
+            "ShieldClear",
+            GameLog.KV("reason", "WorldTransition")
+        ), GameLogVerbosity.Verbose);
     }
     
     // Apply temporary resistance modifier to all elements
     public void ApplyTempResistAll(int deltaPct, int duration)
     {
         statusEffects.AddTempResist("All", deltaPct, duration);
-        Debug.Log($"[Player] Applied +{deltaPct}% all resist for {duration} turns");
+        GameLog.Status(GameLog.Join(
+            "Apply",
+            GameLog.KV("target", "Player"),
+            GameLog.KV("type", "ResistAllDelta"),
+            GameLog.KV("value", deltaPct),
+            GameLog.KV("dur", duration)
+        ), GameLogVerbosity.Verbose);
     }
     
     // Apply temporary resistance modifier to a specific element
     public void ApplyTempResist(Element element, int deltaPct, int duration)
     {
         statusEffects.AddTempResist(element.ToString(), deltaPct, duration);
-        Debug.Log($"[Player] Applied {deltaPct}% {element} resist for {duration} turns");
+        GameLog.Status(GameLog.Join(
+            "Apply",
+            GameLog.KV("target", "Player"),
+            GameLog.KV("type", $"ResistDelta_{element}"),
+            GameLog.KV("value", deltaPct),
+            GameLog.KV("dur", duration)
+        ), GameLogVerbosity.Verbose);
     }
     
     // Get total temp resist for an element (includes "All" effects)
@@ -532,14 +721,23 @@ public class Player : MonoBehaviour
     public void IncrementDirtyStabUse()
     {
         dirtyStabConsecutiveUses++;
-        Debug.Log($"[Player] DirtyStab consecutive use: {dirtyStabConsecutiveUses}");
+        GameLog.System(GameLog.Join(
+            "DirtyStab",
+            GameLog.KV("event", "Use"),
+            GameLog.KV("stacks", dirtyStabConsecutiveUses)
+        ), GameLogVerbosity.Verbose);
         
         // After 3rd use, apply 4-turn cooldown and reset stacks
         if (dirtyStabConsecutiveUses >= 3)
         {
             skillCooldowns[0] = 4; // Force 4-turn cooldown on Skill1 (DirtyStab)
             dirtyStabConsecutiveUses = 0;
-            Debug.Log("[Player] DirtyStab used 3 times! 4-turn cooldown triggered, stacks reset.");
+            GameLog.System(GameLog.Join(
+                "DirtyStab",
+                GameLog.KV("event", "CooldownTrigger"),
+                GameLog.KV("cd", 4),
+                GameLog.KV("stacks", 0)
+            ), GameLogVerbosity.Verbose);
         }
     }
     
@@ -547,7 +745,11 @@ public class Player : MonoBehaviour
     {
         if (dirtyStabConsecutiveUses > 0)
         {
-            Debug.Log($"[Player] DirtyStab stacks reset (was {dirtyStabConsecutiveUses})");
+            GameLog.System(GameLog.Join(
+                "DirtyStab",
+                GameLog.KV("event", "Reset"),
+                GameLog.KV("was", dirtyStabConsecutiveUses)
+            ), GameLogVerbosity.Verbose);
             dirtyStabConsecutiveUses = 0;
         }
     }
@@ -557,7 +759,11 @@ public class Player : MonoBehaviour
     public void AddGold(int amount)
     {
         gold += amount;
-        Debug.Log($"[Player] Gold changed by {amount}. Total gold: {gold}");
+        GameLog.System(GameLog.Join(
+            "Gold",
+            GameLog.KV("delta", amount),
+            GameLog.KV("total", gold)
+        ), GameLogVerbosity.Verbose);
     }
 
     public void SpendEnergy(int amount)
@@ -576,7 +782,10 @@ public class Player : MonoBehaviour
     {
         relics.Add(relic);
         ApplyRelicBonus(relic);
-        Debug.Log($"[Player] Acquired relic: {relic.DisplayName}");
+        GameLog.System(GameLog.Join(
+            "RelicGain",
+            GameLog.KV("relic", relic != null ? relic.DisplayName : "null")
+        ), GameLogVerbosity.Verbose);
     }
 
     private void ApplyRelicBonus(RelicData relic)
@@ -590,7 +799,11 @@ public class Player : MonoBehaviour
             elementalDamage.Add(Element.Water, relic.Amount);
             elementalDamage.Add(Element.Wind, relic.Amount);
             elementalDamage.Add(Element.Rock, relic.Amount);
-            Debug.Log($"[Player] All Elements relic applied: +{relic.Amount} to each element");
+            GameLog.System(GameLog.Join(
+                "RelicApply",
+                GameLog.KV("type", "AllElements"),
+                GameLog.KV("amount", relic.Amount)
+            ), GameLogVerbosity.Verbose);
             return;
         }
         
@@ -600,11 +813,24 @@ public class Player : MonoBehaviour
             elementalDamage.Add(element, relic.Amount);
             if (element == affinity)
             {
-                Debug.Log($"[Player] {element} relic matches affinity! +{relic.Amount} damage");
+                GameLog.System(GameLog.Join(
+                    "RelicApply",
+                    GameLog.KV("type", "Element"),
+                    GameLog.KV("element", element),
+                    GameLog.KV("amount", relic.Amount),
+                    GameLog.KV("matchesAffinity", true)
+                ), GameLogVerbosity.Verbose);
             }
             else
             {
-                Debug.Log($"[Player] {element} relic stored but doesn't match {affinity} affinity");
+                GameLog.System(GameLog.Join(
+                    "RelicApply",
+                    GameLog.KV("type", "Element"),
+                    GameLog.KV("element", element),
+                    GameLog.KV("amount", relic.Amount),
+                    GameLog.KV("matchesAffinity", false),
+                    GameLog.KV("affinity", affinity)
+                ), GameLogVerbosity.Verbose);
             }
             return;
         }
@@ -615,24 +841,44 @@ public class Player : MonoBehaviour
             case "maxhealth":
                 maxHealth += relic.Amount;
                 health += relic.Amount;
-                Debug.Log($"[Player] Health relic applied: +{relic.Amount} max health");
+                GameLog.System(GameLog.Join(
+                    "RelicApply",
+                    GameLog.KV("stat", "MaxHealth"),
+                    GameLog.KV("delta", relic.Amount),
+                    GameLog.KV("hp", $"{health}/{maxHealth}")
+                ), GameLogVerbosity.Verbose);
                 break;
             case "crit rate":
             case "critrate":
             case "critchance":
                 critChance += relic.Amount;
-                Debug.Log($"[Player] Crit Rate relic applied: +{relic.Amount}% crit chance (now {critChance}%)");
+                GameLog.System(GameLog.Join(
+                    "RelicApply",
+                    GameLog.KV("stat", "CritChance"),
+                    GameLog.KV("delta", relic.Amount),
+                    GameLog.KV("now", critChance)
+                ), GameLogVerbosity.Verbose);
                 break;
             case "crit damage":
             case "critdamage":
                 critDamage += relic.Amount / 100f;
-                Debug.Log($"[Player] Crit Damage relic applied: +{relic.Amount}% crit damage (now x{critDamage:F2})");
+                GameLog.System(GameLog.Join(
+                    "RelicApply",
+                    GameLog.KV("stat", "CritDamage"),
+                    GameLog.KV("deltaPct", relic.Amount),
+                    GameLog.KV("now", critDamage.ToString("F2"))
+                ), GameLogVerbosity.Verbose);
                 break;
             case "energy":
             case "maxenergy":
                 maxEnergy += relic.Amount;
                 energy += relic.Amount;
-                Debug.Log($"[Player] Energy relic applied: +{relic.Amount} max energy");
+                GameLog.System(GameLog.Join(
+                    "RelicApply",
+                    GameLog.KV("stat", "MaxEnergy"),
+                    GameLog.KV("delta", relic.Amount),
+                    GameLog.KV("energy", $"{energy}/{maxEnergy}")
+                ), GameLogVerbosity.Verbose);
                 break;
         }
     }
@@ -650,18 +896,42 @@ public class Player : MonoBehaviour
     {
         if (potionInventory.Count >= MAX_POTIONS)
         {
-            Debug.Log($"[Player] Potion inventory full, cannot add {potion.DisplayName}");
+            GameLog.Warn(
+                GameLogCategory.System,
+                "[Player]",
+                GameLog.Join(
+                    "PotionAddFail",
+                    GameLog.KV("reason", "InventoryFull"),
+                    GameLog.KV("potion", potion != null ? potion.DisplayName : "null"),
+                    GameLog.KV("count", potionInventory.Count),
+                    GameLog.KV("max", MAX_POTIONS)
+                )
+            );
             return;
         }
         potionInventory.Add(potion);
-        Debug.Log($"[Player] Added {potion.DisplayName} to inventory ({potionInventory.Count}/{MAX_POTIONS})");
+        GameLog.System(GameLog.Join(
+            "PotionAdd",
+            GameLog.KV("potion", potion != null ? potion.DisplayName : "null"),
+            GameLog.KV("count", potionInventory.Count),
+            GameLog.KV("max", MAX_POTIONS)
+        ), GameLogVerbosity.Verbose);
     }
 
     public bool UsePotion(int index, CombatEnemy target = null, Element elementOverride = Element.None)
     {
         if (index < 0 || index >= potionInventory.Count)
         {
-            Debug.Log($"[Player] Invalid potion index: {index}");
+            GameLog.Warn(
+                GameLogCategory.System,
+                "[Player]",
+                GameLog.Join(
+                    "PotionUseFail",
+                    GameLog.KV("reason", "InvalidIndex"),
+                    GameLog.KV("index", index),
+                    GameLog.KV("count", potionInventory.Count)
+                )
+            );
             return false;
         }
 
@@ -673,7 +943,12 @@ public class Player : MonoBehaviour
         {
             case "health":
                 Heal(potion.Amount);
-                Debug.Log($"[Player] Used {potion.DisplayName}: Healed {potion.Amount} HP");
+                GameLog.Combat(GameLog.Join(
+                    "PotionUse",
+                    GameLog.KV("potion", potion.DisplayName),
+                    GameLog.KV("type", "Heal"),
+                    GameLog.KV("amount", potion.Amount)
+                ), GameLogVerbosity.Normal);
                 break;
             case "elemental afinity direct damage":
                 if (target != null && target.IsAlive())
@@ -681,25 +956,60 @@ public class Player : MonoBehaviour
                     Element element = elementOverride != Element.None ? elementOverride : GetRandomElement();
                     int damage = target.ApplyResistance(potion.Amount, element);
                     target.TakeDamage(damage);
-                    Debug.Log($"[Player] Used {potion.DisplayName} ({element}): Dealt {damage} damage to {target.Name}");
+                    GameLog.Combat(GameLog.Join(
+                        "PotionUse",
+                        GameLog.KV("potion", potion.DisplayName),
+                        GameLog.KV("type", "Damage"),
+                        GameLog.KV("element", element),
+                        GameLog.KV("target", target.Name),
+                        GameLog.KV("amount", damage)
+                    ), GameLogVerbosity.Normal);
                 }
                 else
                 {
-                    Debug.Log($"[Player] Used {potion.DisplayName}: No valid target for damage potion");
+                    GameLog.Warn(
+                        GameLogCategory.Combat,
+                        "[Combat]",
+                        GameLog.Join(
+                            "PotionUseFail",
+                            GameLog.KV("potion", potion.DisplayName),
+                            GameLog.KV("reason", "NoValidTarget")
+                        )
+                    );
                     potionInventory.Insert(index, potion);
                     return false;
                 }
                 break;
             case "crit rate":
                 tempCritChanceBonus += potion.Amount;
-                Debug.Log($"[Player] Used {potion.DisplayName}: +{potion.Amount}% crit chance (now {GetCritChance()}%)");
+                GameLog.Status(GameLog.Join(
+                    "PotionUse",
+                    GameLog.KV("potion", potion.DisplayName),
+                    GameLog.KV("type", "CritChance"),
+                    GameLog.KV("delta", potion.Amount),
+                    GameLog.KV("now", GetCritChance())
+                ), GameLogVerbosity.Normal);
                 break;
             case "crit damage":
                 tempCritDamageBonus += potion.Amount;
-                Debug.Log($"[Player] Used {potion.DisplayName}: +{potion.Amount}% crit damage (now {GetCritDamage():F2}x)");
+                GameLog.Status(GameLog.Join(
+                    "PotionUse",
+                    GameLog.KV("potion", potion.DisplayName),
+                    GameLog.KV("type", "CritDamage"),
+                    GameLog.KV("deltaPct", potion.Amount),
+                    GameLog.KV("now", GetCritDamage().ToString("F2"))
+                ), GameLogVerbosity.Normal);
                 break;
             default:
-                Debug.LogWarning($"[Player] Unknown potion stat: {potion.StatAffected}");
+                GameLog.Warn(
+                    GameLogCategory.System,
+                    "[Player]",
+                    GameLog.Join(
+                        "PotionUseFail",
+                        GameLog.KV("reason", "UnknownStat"),
+                        GameLog.KV("stat", potion.StatAffected)
+                    )
+                );
                 return false;
         }
 
@@ -729,7 +1039,9 @@ public class Player : MonoBehaviour
     {
         tempCritChanceBonus = 0;
         tempCritDamageBonus = 0;
-        Debug.Log("[Player] World bonuses reset");
+        GameLog.System(GameLog.Join(
+            "WorldBonusesReset"
+        ), GameLogVerbosity.Verbose);
     }
     
     public void ResetForNewWorld()
@@ -746,8 +1058,17 @@ public class Player : MonoBehaviour
         
         // Restore energy to max
         energy = maxEnergy;
-        
-        Debug.Log($"[Player] Reset for new world - HP restored to {health}/{maxHealth}, potions cleared, temp bonuses reset");
-        Debug.Log($"[Player] Keeping: {relics.Count} relics, {GetCharacterDamage()} character damage, elemental bonuses");
+
+        GameLog.System(GameLog.Join(
+            "WorldReset",
+            GameLog.KV("hp", $"{health}/{maxHealth}"),
+            GameLog.KV("potions", 0),
+            GameLog.KV("tempBonuses", 0)
+        ), GameLogVerbosity.Verbose);
+        GameLog.System(GameLog.Join(
+            "WorldResetKeep",
+            GameLog.KV("relics", relics.Count),
+            GameLog.KV("charDamage", GetCharacterDamage())
+        ), GameLogVerbosity.Verbose);
     }
 }

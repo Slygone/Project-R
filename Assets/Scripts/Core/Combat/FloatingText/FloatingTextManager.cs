@@ -60,7 +60,14 @@ public class FloatingTextManager : MonoBehaviour
         if (config == null)
         {
             config = ScriptableObject.CreateInstance<FloatingTextConfig>();
-            Debug.LogWarning("[FloatingTextManager] No config assigned, using default values");
+            GameLog.Warn(
+                GameLogCategory.System,
+                "[FloatingTextManager]",
+                GameLog.Join(
+                    "ConfigMissing",
+                    GameLog.KV("fallback", "default")
+                )
+            );
         }
         
         // Pre-populate pool
@@ -69,7 +76,12 @@ public class FloatingTextManager : MonoBehaviour
             CreatePooledText();
         }
         
-        Debug.Log($"[FloatingTextManager] Initialized! Config: {(config != null ? "assigned" : "default")}, Canvas: {floatingTextCanvas.name}, Pool size: {pool.Count}");
+        GameLog.System(GameLog.Join(
+            "Init",
+            GameLog.KV("config", config != null ? "assigned" : "default"),
+            GameLog.KV("canvas", floatingTextCanvas != null ? floatingTextCanvas.name : "null"),
+            GameLog.KV("pool", pool.Count)
+        ), GameLogVerbosity.Verbose);
     }
     
     private void Update()
@@ -208,7 +220,11 @@ public class FloatingTextManager : MonoBehaviour
         var style = config.GetStyle(type);
         if (!style.enabled) 
         {
-            Debug.Log($"[FloatingTextManager] Style {type} is disabled, skipping");
+            GameLog.System(GameLog.Join(
+                "Skip",
+                GameLog.KV("reason", "StyleDisabled"),
+                GameLog.KV("type", type)
+            ), GameLogVerbosity.Verbose);
             return;
         }
         
@@ -217,8 +233,14 @@ public class FloatingTextManager : MonoBehaviour
         // Calculate offset with stacking
         int stackIndex = usePosition ? 0 : GetAndIncrementTargetCount(target);
         Vector3 offset = Vector3.up * (config.verticalOffset + stackIndex * config.stackOffset);
-        
-        Debug.Log($"[FloatingTextManager] Spawning text '{text}' at offset {offset}, target: {(target != null ? target.name : "null")}");
+
+        GameLog.System(GameLog.Join(
+            "Spawn",
+            GameLog.KV("text", text),
+            GameLog.KV("type", type),
+            GameLog.KV("target", target != null ? target.name : "null"),
+            GameLog.KV("offset", offset)
+        ), GameLogVerbosity.Verbose);
         
         if (usePosition)
         {
@@ -257,11 +279,20 @@ public class FloatingTextManager : MonoBehaviour
     /// </summary>
     public void ShowDamage(Transform target, int amount, bool isCrit = false, string sourceType = "")
     {
-        Debug.Log($"[FloatingTextManager] ShowDamage called: {amount} (crit: {isCrit}) on {(target != null ? target.name : "null")}");
+        GameLog.System(GameLog.Join(
+            "ShowDamage",
+            GameLog.KV("amount", amount),
+            GameLog.KV("crit", isCrit),
+            GameLog.KV("target", target != null ? target.name : "null")
+        ), GameLogVerbosity.Verbose);
         
         if (!config.IsEnabled(isCrit ? FloatingTextType.CriticalHit : FloatingTextType.DamageDealt)) 
         {
-            Debug.Log("[FloatingTextManager] Text type is disabled in config");
+            GameLog.System(GameLog.Join(
+                "Skip",
+                GameLog.KV("reason", "TypeDisabled"),
+                GameLog.KV("type", isCrit ? FloatingTextType.CriticalHit : FloatingTextType.DamageDealt)
+            ), GameLogVerbosity.Verbose);
             return;
         }
         

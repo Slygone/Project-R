@@ -30,7 +30,14 @@ public class InfusionUI : MonoBehaviour
         var canvas = GameObject.Find("Canvas");
         if (canvas == null)
         {
-            Debug.LogError("[InfusionUI] Canvas not found");
+            GameLog.Error(
+                GameLogCategory.System,
+                "[InfusionUI]",
+                GameLog.Join(
+                    "SetupFail",
+                    GameLog.KV("reason", "CanvasNotFound")
+                )
+            );
             return;
         }
 
@@ -232,7 +239,10 @@ public class InfusionUI : MonoBehaviour
         infusionPanel.SetActive(true);
         isActive = true;
 
-        Debug.Log($"[InfusionUI] Showing infusion selection for {actionName}");
+        GameLog.Reaction(GameLog.Join(
+            "InfusionUIShow",
+            GameLog.KV("action", actionName)
+        ), GameLogVerbosity.Verbose);
     }
 
     private void UpdateOrbDisplay()
@@ -315,7 +325,13 @@ public class InfusionUI : MonoBehaviour
 
         string orbName = useOrbA ? "Orb A" : "Orb B";
         Element element = useOrbA ? player.GetOrbAElement() : player.GetOrbBElement();
-        Debug.Log($"[InfusionUI] Player chose {orbName} ({element}) for {pendingActionName}");
+
+        GameLog.Reaction(GameLog.Join(
+            "InfusionSelect",
+            GameLog.KV("orb", useOrbA ? "A" : "B"),
+            GameLog.KV("element", element),
+            GameLog.KV("action", pendingActionName)
+        ), GameLogVerbosity.Normal);
 
         onInfusionSelected?.Invoke(useOrbA);
     }

@@ -25,7 +25,11 @@ public class ElementalOrbSystem
         orbAElement = a;
         orbBElement = b;
         ClearMarks();
-        Debug.Log($"[ElementalOrbSystem] Element pair set: Orb A = {a}, Orb B = {b}");
+        GameLog.Reaction(GameLog.Join(
+            "ElementPairSet",
+            GameLog.KV("orbA", a),
+            GameLog.KV("orbB", b)
+        ), GameLogVerbosity.Normal);
     }
     
     public void InfuseOrb(bool useOrbA)
@@ -44,7 +48,12 @@ public class ElementalOrbSystem
             orbAActive = true;
             infusedElement = orbAElement;
             ApplyElementBuff(orbAElement);
-            Debug.Log($"[ElementalOrbSystem] Orb A infused with {orbAElement} - mark applied (order: {infusionOrder})");
+            GameLog.Reaction(GameLog.Join(
+                "Infuse",
+                GameLog.KV("orb", "A"),
+                GameLog.KV("element", orbAElement),
+                GameLog.KV("order", infusionOrder)
+            ), GameLogVerbosity.Verbose);
         }
         else
         {
@@ -52,7 +61,12 @@ public class ElementalOrbSystem
             orbBActive = true;
             infusedElement = orbBElement;
             ApplyElementBuff(orbBElement);
-            Debug.Log($"[ElementalOrbSystem] Orb B infused with {orbBElement} - mark applied (order: {infusionOrder})");
+            GameLog.Reaction(GameLog.Join(
+                "Infuse",
+                GameLog.KV("orb", "B"),
+                GameLog.KV("element", orbBElement),
+                GameLog.KV("order", infusionOrder)
+            ), GameLogVerbosity.Verbose);
         }
         
         // Update first/detonator tracking
@@ -69,7 +83,11 @@ public class ElementalOrbSystem
             detonatorElement = Element.None;
         }
         
-        Debug.Log($"[ElementalOrbSystem] First={firstElement}, Detonator={detonatorElement}");
+        GameLog.Reaction(GameLog.Join(
+            "Marks",
+            GameLog.KV("first", firstElement),
+            GameLog.KV("detonator", detonatorElement)
+        ), GameLogVerbosity.Verbose);
     }
     
     public Element GetInfusedElement(bool useOrbA)
@@ -91,13 +109,21 @@ public class ElementalOrbSystem
     {
         if (!HasReactionReady())
         {
-            Debug.Log("[ElementalOrbSystem] No reaction ready to trigger");
+            GameLog.Reaction(GameLog.Join(
+                "Trigger",
+                GameLog.KV("ready", false)
+            ), GameLogVerbosity.Verbose);
             return;
         }
         
         string reactionId = GetReactionId();
         string reactionName = GetReactionName();
-        Debug.Log($"[ElementalOrbSystem] REACTION TRIGGERED: {reactionId} ({reactionName})");
+        GameLog.Reaction(GameLog.Join(
+            "Trigger",
+            GameLog.KV("ready", true),
+            GameLog.KV("reactionId", reactionId ?? "null"),
+            GameLog.KV("reaction", reactionName)
+        ), GameLogVerbosity.Normal);
         ClearMarks();
     }
     
@@ -110,7 +136,9 @@ public class ElementalOrbSystem
         detonatorElement = Element.None;
         firstElement = Element.None;
         infusionOrder = 0;
-        Debug.Log("[ElementalOrbSystem] Marks cleared");
+        GameLog.Reaction(GameLog.Join(
+            "MarksClear"
+        ), GameLogVerbosity.Verbose);
     }
     
     // Get the first element (the one applied before the detonator)
@@ -131,22 +159,22 @@ public class ElementalOrbSystem
         switch (element)
         {
             case Element.Fire:
-                Debug.Log("[ElementalOrbSystem] BUFF: Fire - Attack power increased (TBD)");
+                GameLog.Reaction(GameLog.Join("Buff", GameLog.KV("element", "Fire")), GameLogVerbosity.Verbose);
                 break;
             case Element.Ice:
-                Debug.Log("[ElementalOrbSystem] BUFF: Ice - Crit chance increased (TBD)");
+                GameLog.Reaction(GameLog.Join("Buff", GameLog.KV("element", "Ice")), GameLogVerbosity.Verbose);
                 break;
             case Element.Water:
-                Debug.Log("[ElementalOrbSystem] BUFF: Water - Damage reduction applied (TBD)");
+                GameLog.Reaction(GameLog.Join("Buff", GameLog.KV("element", "Water")), GameLogVerbosity.Verbose);
                 break;
             case Element.Wind:
-                Debug.Log("[ElementalOrbSystem] BUFF: Wind - Speed/evasion increased (TBD)");
+                GameLog.Reaction(GameLog.Join("Buff", GameLog.KV("element", "Wind")), GameLogVerbosity.Verbose);
                 break;
             case Element.Rock:
-                Debug.Log("[ElementalOrbSystem] BUFF: Rock - Shield granted (TBD)");
+                GameLog.Reaction(GameLog.Join("Buff", GameLog.KV("element", "Rock")), GameLogVerbosity.Verbose);
                 break;
             default:
-                Debug.Log("[ElementalOrbSystem] BUFF: None");
+                GameLog.Reaction(GameLog.Join("Buff", GameLog.KV("element", "None")), GameLogVerbosity.Verbose);
                 break;
         }
     }

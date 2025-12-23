@@ -89,7 +89,14 @@ public class CombatUI : MonoBehaviour
         var canvas = GameObject.Find("Canvas");
         if (canvas == null)
         {
-            Debug.LogError("[CombatUI] Canvas not found");
+            GameLog.Error(
+                GameLogCategory.System,
+                "[CombatUI]",
+                GameLog.Join(
+                    "SetupFail",
+                    GameLog.KV("reason", "CanvasNotFound")
+                )
+            );
             return;
         }
 
@@ -827,7 +834,14 @@ public class CombatUI : MonoBehaviour
     {
         if (combatPanel == null)
         {
-            Debug.LogError("[CombatUI] combatPanel is null - SetupUI may have failed");
+            GameLog.Error(
+                GameLogCategory.System,
+                "[CombatUI]",
+                GameLog.Join(
+                    "ShowCombatFail",
+                    GameLog.KV("reason", "CombatPanelNull")
+                )
+            );
             SetupUI();
         }
 
@@ -851,7 +865,11 @@ public class CombatUI : MonoBehaviour
         UpdatePlayerHealth(player);
         RefreshPotionButtons(player);
         combatPanel.SetActive(true);
-        Debug.Log($"[CombatUI] Combat panel shown with {enemies.Count} enemies");
+        GameLog.System(GameLog.Join(
+            "CombatUIShow",
+            GameLog.KV("enemies", enemies.Count),
+            GameLog.KV("title", title ?? "COMBAT")
+        ), GameLogVerbosity.Verbose);
         SetPlayerTurn(true);
         isPotionTargeting = false;
         selectedPotionIndex = -1;
@@ -1145,21 +1163,41 @@ public class CombatUI : MonoBehaviour
 
     public void ShowDamageToEnemy(CombatEnemy enemy, int damage, bool isCrit = false)
     {
-        string critText = isCrit ? " CRIT!" : "";
-        Debug.Log($"[CombatUI] Enemy {enemy.Name} took {damage} damage{critText}");
+        GameLog.System(GameLog.Join(
+            "FloatingText",
+            GameLog.KV("target", enemy != null ? enemy.Name : "null"),
+            GameLog.KV("type", "DamageToEnemy"),
+            GameLog.KV("amount", damage),
+            GameLog.KV("crit", isCrit)
+        ), GameLogVerbosity.Verbose);
         
         // Show floating text
         var fctManager = FloatingTextManager.Instance;
         if (fctManager == null)
         {
-            Debug.LogWarning("[CombatUI] FloatingTextManager.Instance is NULL - floating text won't show");
+            GameLog.Warn(
+                GameLogCategory.System,
+                "[CombatUI]",
+                GameLog.Join(
+                    "FloatingTextMissing",
+                    GameLog.KV("reason", "InstanceNull")
+                )
+            );
             return;
         }
         
         Transform enemyTransform = GetEnemyTransform(enemy);
         if (enemyTransform == null)
         {
-            Debug.LogWarning($"[CombatUI] Enemy transform is NULL for {enemy.Name}");
+            GameLog.Warn(
+                GameLogCategory.System,
+                "[CombatUI]",
+                GameLog.Join(
+                    "FloatingTextMissing",
+                    GameLog.KV("reason", "EnemyTransformNull"),
+                    GameLog.KV("enemy", enemy != null ? enemy.Name : "null")
+                )
+            );
             return;
         }
         
@@ -1168,7 +1206,12 @@ public class CombatUI : MonoBehaviour
 
     public void ShowDamageToPlayer(int damage)
     {
-        Debug.Log($"[CombatUI] Player took {damage} damage");
+        GameLog.System(GameLog.Join(
+            "FloatingText",
+            GameLog.KV("target", "Player"),
+            GameLog.KV("type", "DamageToPlayer"),
+            GameLog.KV("amount", damage)
+        ), GameLogVerbosity.Verbose);
         
         // Show floating text
         var fctManager = FloatingTextManager.Instance;
@@ -1180,7 +1223,12 @@ public class CombatUI : MonoBehaviour
     
     public void ShowHealToPlayer(int amount)
     {
-        Debug.Log($"[CombatUI] Player healed for {amount}");
+        GameLog.System(GameLog.Join(
+            "FloatingText",
+            GameLog.KV("target", "Player"),
+            GameLog.KV("type", "HealToPlayer"),
+            GameLog.KV("amount", amount)
+        ), GameLogVerbosity.Verbose);
         
         var fctManager = FloatingTextManager.Instance;
         if (fctManager != null && playerHealthBar != null)

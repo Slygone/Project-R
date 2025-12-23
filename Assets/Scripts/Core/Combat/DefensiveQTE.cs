@@ -210,8 +210,12 @@ public class DefensiveQTE : MonoBehaviour
         
         // Update debug overlay
         GameManager.SetLastQTEResult($"Def: {resultStr}");
-        
-        Debug.Log($"[DefensiveQTE] Result: {result} (position: {indicatorPosition:F2})");
+
+        GameLog.Combat(GameLog.Join(
+            "DefensiveQTEResult",
+            GameLog.KV("result", result),
+            GameLog.KV("pos", indicatorPosition.ToString("F2"))
+        ), GameLogVerbosity.Normal);
         
         // Delay before completing to show result
         Invoke(nameof(CompleteQTE), 0.5f);
