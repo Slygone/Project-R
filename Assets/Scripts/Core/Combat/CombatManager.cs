@@ -604,9 +604,6 @@ public class CombatManager : MonoBehaviour
         if (targetKilled)
         {
             Debug.Log($"[CombatManager] {target.Name} defeated!");
-            
-            // Handle kill effects
-            HandleKillEffects(skillLower, target, totalDamageDealt);
         }
 
         if (AllEnemiesDead())
@@ -617,6 +614,12 @@ public class CombatManager : MonoBehaviour
         
         // Apply skill cooldown and energy effects
         player.UseSkillAndApplyEffects(skillNumber - 1);
+
+        // Handle kill effects AFTER cooldown/energy application so overrides (e.g. Ambush) persist
+        if (targetKilled)
+        {
+            HandleKillEffects(skillLower, target, totalDamageDealt);
+        }
         
         // Track DirtyStab consecutive uses (handles 4-turn CD after 3rd use internally)
         if (skillLower == "dirtystab")
@@ -743,14 +746,20 @@ public class CombatManager : MonoBehaviour
         // Ambush - If kill: CD becomes 2 turns and refund 40% energy
         if (skillLower == "ambush")
         {
-            // Refund 40% energy
-            int refund = Mathf.RoundToInt(character.Skill3EnergyCost * 0.40f);
+            // Refund 40% of max energy
+            int refund = Mathf.RoundToInt(player.GetMaxEnergy() * 0.40f);
             player.GainEnergy(refund);
             
             // Set cooldown to 2 turns instead of normal cooldown
             player.SetSkillCooldown(2, 2);
             
             Debug.Log($"[CombatManager] Ambush kill! Refunded {refund} energy, CD reduced to 2 turns");
+
+            if (combatUI != null)
+            {
+                combatUI.UpdatePlayerEnergy(player);
+                combatUI.UpdateSkillButtons(player);
+            }
         }
         // DoubleUp - If target dies, next target hit for 150% damage
         else if (skillLower == "doubleup")
@@ -879,7 +888,6 @@ public class CombatManager : MonoBehaviour
         if (targetKilled)
         {
             Debug.Log($"[CombatManager] {target.Name} defeated!");
-            HandleKillEffects(skillLower, target, finalDamage);
         }
 
         if (AllEnemiesDead())
@@ -890,6 +898,12 @@ public class CombatManager : MonoBehaviour
         
         // Apply skill cooldown and energy effects (skillNumber is 1-indexed, array is 0-indexed)
         player.UseSkillAndApplyEffects(skillNumber - 1);
+
+        // Handle kill effects AFTER cooldown/energy application so overrides (e.g. Ambush) persist
+        if (targetKilled)
+        {
+            HandleKillEffects(skillLower, target, finalDamage);
+        }
         
         // Track DirtyStab
         if (skillLower == "dirtystab")
