@@ -19,6 +19,14 @@ public class PlayerController : MonoBehaviour
     void Update()
     {
         if (!canMove) return;
+        
+        // Safety gate: if CombatManager reports combat is active or ending, ignore movement
+        var combatManager = FindFirstObjectByType<CombatManager>();
+        if (combatManager != null && (combatManager.IsInCombat() || combatManager.IsEndingCombat()))
+        {
+            if (rb != null) rb.linearVelocity = new Vector3(0f, rb.linearVelocity.y, 0f);
+            return;
+        }
 
         float horizontal = 0f;
         float vertical = 0f;

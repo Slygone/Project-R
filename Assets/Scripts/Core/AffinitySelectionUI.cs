@@ -288,7 +288,12 @@ public class AffinitySelectionUI : MonoBehaviour
         var descObj = new GameObject("Description");
         descObj.transform.SetParent(btnObj.transform, false);
         var descText = descObj.AddComponent<TextMeshProUGUI>();
-        descText.text = $"Orb A: {pair.OrbA}\nOrb B: {pair.OrbB}";
+        
+        // Show element names with tier from saved progression
+        var progressA = MetaProgressionManager.Instance.GetElementProgress(pair.OrbA.ToString());
+        var progressB = MetaProgressionManager.Instance.GetElementProgress(pair.OrbB.ToString());
+        descText.text = $"{pair.OrbA} Tier {progressA.AscensionLevel}\n{pair.OrbB} Tier {progressB.AscensionLevel}";
+        
         descText.alignment = TextAlignmentOptions.Center;
         descText.fontSize = 14;
         descText.color = new Color(0.8f, 0.8f, 0.8f);

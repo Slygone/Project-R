@@ -30,6 +30,7 @@ public class MetaProgressionManager : MonoBehaviour
     private class SaveData
     {
         public List<CharacterProgressData> CharacterProgress = new List<CharacterProgressData>();
+        public List<ElementProgressData> ElementProgress = new List<ElementProgressData>();
     }
     
     private SaveData saveData = new SaveData();
@@ -91,6 +92,86 @@ public class MetaProgressionManager : MonoBehaviour
         Debug.Log($"[Meta] TalentSelected | characterId={characterId} name={characterName} tier={tierIndex} choice={choiceStr} perkId={perkId}");
     }
     
+    // ===== ELEMENT PROGRESSION =====
+    
+    /// <summary>
+    /// Get progress data for an element. Creates default progress if none exists.
+    /// </summary>
+    public ElementProgressData GetElementProgress(string elementName)
+    {
+        foreach (var p in saveData.ElementProgress)
+        {
+            if (p.ElementName == elementName)
+            {
+                return p;
+            }
+        }
+        
+        // Create new progress for this element
+        var newProgress = new ElementProgressData(elementName);
+        saveData.ElementProgress.Add(newProgress);
+        SaveProgress();
+        return newProgress;
+    }
+    
+    /// <summary>
+    /// Add XP to an element's ascension progress.
+    /// </summary>
+    public void AddElementXP(string elementName, int amount)
+    {
+        if (amount <= 0) return;
+        
+        var progress = GetElementProgress(elementName);
+        progress.AscensionXP += amount;
+        SaveProgress();
+        
+        Debug.Log($"[Meta] ElementAscensionXPGranted | element={elementName} gained={amount} totalXP={progress.AscensionXP} level={progress.AscensionLevel}");
+    }
+    
+    /// <summary>
+    /// Try to level up an element if XP threshold is met.
+    /// Returns true if level-up occurred.
+    /// </summary>
+    public bool TryLevelUpElement(string elementName)
+    {
+        var progress = GetElementProgress(elementName);
+        int maxLevel = DataCache.GetElementMaxLevel(elementName);
+        
+        if (progress.AscensionLevel >= maxLevel)
+            return false;
+        
+        int nextLevel = progress.AscensionLevel + 1;
+        int threshold = DataCache.GetElementXPThreshold(elementName, nextLevel);
+        
+        if (progress.AscensionXP >= threshold)
+        {
+            progress.AscensionLevel = nextLevel;
+            SaveProgress();
+            
+            Debug.Log($"[Meta] ElementAscensionLevelUp | element={elementName} newLevel={nextLevel} xp={progress.AscensionXP}");
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// Check if element can level up (has enough XP for next level).
+    /// </summary>
+    public bool CanLevelUpElement(string elementName)
+    {
+        var progress = GetElementProgress(elementName);
+        int maxLevel = DataCache.GetElementMaxLevel(elementName);
+        
+        if (progress.AscensionLevel >= maxLevel)
+            return false;
+        
+        int nextLevel = progress.AscensionLevel + 1;
+        int threshold = DataCache.GetElementXPThreshold(elementName, nextLevel);
+        
+        return progress.AscensionXP >= threshold;
+    }
+    
     /// <summary>
     /// Save all progress to PlayerPrefs.
     /// </summary>
@@ -116,7 +197,7 @@ public class MetaProgressionManager : MonoBehaviour
                 {
                     saveData = new SaveData();
                 }
-                Debug.Log($"[Meta] ProgressLoaded | characters={saveData.CharacterProgress.Count}");
+                Debug.Log($"[Meta] ProgressLoaded | characters={saveData.CharacterProgress.Count} elements={saveData.ElementProgress.Count}");
             }
             catch (Exception e)
             {
@@ -157,3 +238,4 @@ public class MetaProgressionManager : MonoBehaviour
         return false;
     }
 }
+

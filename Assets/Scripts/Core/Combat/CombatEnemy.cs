@@ -9,6 +9,7 @@ public class CombatEnemy
     public int BonusResistance;
     public Element Affinity;
     public bool IsBoss;
+    public bool IsElite;
     
     // Damage variance range (applied each attack)
     private const float VARIANCE_MIN = 0.90f;
@@ -29,6 +30,7 @@ public class CombatEnemy
         BaseResistance = data.GetBaseResistance(world);
         BonusResistance = data.BonusResistance;
         IsBoss = data.IsBoss;
+        IsElite = data.IsElite;
         
         if (data.IsBoss)
         {

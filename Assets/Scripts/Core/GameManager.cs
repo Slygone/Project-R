@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class GameManager : MonoBehaviour
@@ -22,6 +23,9 @@ public class GameManager : MonoBehaviour
     private static int runXP = 0;
     public static int RunXP => runXP;
     
+    // Elemental Ascension XP tracking - maps detonator element to XP earned during run
+    private static Dictionary<Element, int> runDetonatorXP = new Dictionary<Element, int>();
+    
     // Last QTE result for debug overlay
     private static string lastQTEResult = "None";
     public static string LastQTEResult => lastQTEResult;
@@ -30,6 +34,37 @@ public class GameManager : MonoBehaviour
     {
         runXP += amount;
         Debug.Log($"[GameManager] Gained {amount} XP. Total: {runXP}");
+    }
+    
+    /// <summary>
+    /// Add XP for a specific detonator element (for elemental ascension tracking).
+    /// </summary>
+    public static void AddRunXPForDetonator(int amount, Element detonator)
+    {
+        if (amount <= 0 || detonator == Element.None) return;
+        
+        if (!runDetonatorXP.ContainsKey(detonator))
+        {
+            runDetonatorXP[detonator] = 0;
+        }
+        runDetonatorXP[detonator] += amount;
+        
+        Debug.Log($"[GameManager] Detonator XP: {detonator} gained {amount}. Total for element: {runDetonatorXP[detonator]}");
+    }
+    
+    /// <summary>
+    /// Award all accumulated detonator XP to elements at end of run.
+    /// </summary>
+    public static void AwardElementXPFromRun()
+    {
+        foreach (var kvp in runDetonatorXP)
+        {
+            if (kvp.Value > 0)
+            {
+                MetaProgressionManager.Instance.AddElementXP(kvp.Key.ToString(), kvp.Value);
+            }
+        }
+        runDetonatorXP.Clear();
     }
 
     // Reroll API for AffinitySelectionUI
@@ -52,6 +87,7 @@ public class GameManager : MonoBehaviour
     public static void ResetRunXP()
     {
         runXP = 0;
+        runDetonatorXP.Clear();
     }
 
     void Start()
@@ -60,6 +96,7 @@ public class GameManager : MonoBehaviour
         currentWorld = 1;
         completedNodes = 0;
         runXP = 0;
+        runDetonatorXP.Clear();
         lastQTEResult = "None";
         pairRerollUsed = false;
         UpdateNodeCounter();
@@ -373,6 +410,9 @@ public class GameManager : MonoBehaviour
             var progress = MetaProgressionManager.Instance.GetProgress(currentRunCharacter.CharacterID);
             ascensionMessage = $"\n\n{currentRunCharacter.DisplayName} reached Ascension {progress.AscensionLevel}!";
         }
+        
+        // Award element XP from this run (meta progression)
+        AwardElementXPFromRun();
         
         var canvas = GameObject.Find("Canvas");
         if (canvas != null)

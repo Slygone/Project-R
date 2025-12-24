@@ -128,8 +128,9 @@ public class NewRunCharacterSelectUI : MonoBehaviour
             DataCache.LoadAll();
         }
         
-        ClearCharacterCards();
+        ClearDynamicContent();
         CreateCharacterCards();
+        CreateElementalAscensionSection();
         
         selectionPanel.SetActive(true);
         isActive = true;
@@ -141,12 +142,20 @@ public class NewRunCharacterSelectUI : MonoBehaviour
         isActive = false;
     }
     
-    private void ClearCharacterCards()
+    private void ClearDynamicContent()
     {
-        var container = selectionPanel.transform.Find("CharacterContainer");
+        // Clear character cards
+        var container = selectionPanel.transform.Find("CharacterScroll");
         if (container != null)
         {
             Destroy(container.gameObject);
+        }
+        
+        // Clear elemental ascension section
+        var elemSection = selectionPanel.transform.Find("ElementalAscensionSection");
+        if (elemSection != null)
+        {
+            Destroy(elemSection.gameObject);
         }
     }
     
@@ -356,5 +365,130 @@ public class NewRunCharacterSelectUI : MonoBehaviour
         onBackClicked?.Invoke();
     }
     
+    // ===== ELEMENTAL ASCENSION SECTION =====
+    
+    private void CreateElementalAscensionSection()
+    {
+        var section = new GameObject("ElementalAscensionSection");
+        section.transform.SetParent(selectionPanel.transform, false);
+        
+        var sectionRect = section.AddComponent<RectTransform>();
+        sectionRect.anchorMin = new Vector2(0.15f, 0.02f);
+        sectionRect.anchorMax = new Vector2(0.85f, 0.10f);
+        sectionRect.offsetMin = Vector2.zero;
+        sectionRect.offsetMax = Vector2.zero;
+        
+        // Section background
+        var sectionBg = section.AddComponent<Image>();
+        sectionBg.color = new Color(0.08f, 0.08f, 0.12f, 0.8f);
+        
+        // Section title
+        var titleObj = new GameObject("SectionTitle");
+        titleObj.transform.SetParent(section.transform, false);
+        var titleRect = titleObj.AddComponent<RectTransform>();
+        titleRect.anchorMin = new Vector2(0, 0.7f);
+        titleRect.anchorMax = new Vector2(1, 1);
+        titleRect.offsetMin = Vector2.zero;
+        titleRect.offsetMax = Vector2.zero;
+        var titleText = titleObj.AddComponent<TextMeshProUGUI>();
+        titleText.text = "ELEMENTAL ASCENSION";
+        titleText.fontSize = 14;
+        titleText.fontStyle = FontStyles.Bold;
+        titleText.alignment = TextAlignmentOptions.Center;
+        titleText.color = new Color(0.8f, 0.7f, 0.4f);
+        
+        // Element cards container
+        var cardsContainer = new GameObject("ElementCards");
+        cardsContainer.transform.SetParent(section.transform, false);
+        var cardsRect = cardsContainer.AddComponent<RectTransform>();
+        cardsRect.anchorMin = new Vector2(0.02f, 0.05f);
+        cardsRect.anchorMax = new Vector2(0.98f, 0.65f);
+        cardsRect.offsetMin = Vector2.zero;
+        cardsRect.offsetMax = Vector2.zero;
+        
+        var hLayout = cardsContainer.AddComponent<HorizontalLayoutGroup>();
+        hLayout.spacing = 10;
+        hLayout.childAlignment = TextAnchor.MiddleCenter;
+        hLayout.childControlWidth = true;
+        hLayout.childControlHeight = true;
+        hLayout.childForceExpandWidth = true;
+        
+        // Create element cards from CSV data
+        var elements = DataCache.GetAllElements();
+        foreach (var element in elements)
+        {
+            CreateElementCard(cardsContainer.transform, element);
+        }
+    }
+    
+    private void CreateElementCard(Transform parent, string elementName)
+    {
+        var progress = MetaProgressionManager.Instance.GetElementProgress(elementName);
+        int nextThreshold = DataCache.GetElementXPThreshold(elementName, progress.AscensionLevel + 1);
+        
+        var cardObj = new GameObject($"Element_{elementName}");
+        cardObj.transform.SetParent(parent, false);
+        
+        var cardBg = cardObj.AddComponent<Image>();
+        cardBg.color = GetElementBgColor(elementName);
+        
+        var btn = cardObj.AddComponent<Button>();
+        btn.targetGraphic = cardBg;
+        
+        string capturedElement = elementName;
+        btn.onClick.AddListener(() => OnElementCardClicked(capturedElement));
+        
+        // Element name and level text
+        var textObj = new GameObject("Text");
+        textObj.transform.SetParent(cardObj.transform, false);
+        var textRect = textObj.AddComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = new Vector2(3, 3);
+        textRect.offsetMax = new Vector2(-3, -3);
+        
+        var text = textObj.AddComponent<TextMeshProUGUI>();
+        text.text = $"<b>{elementName}</b>\nTier {progress.AscensionLevel}\n<size=9>{progress.AscensionXP}/{nextThreshold} XP</size>";
+        text.fontSize = 11;
+        text.alignment = TextAlignmentOptions.Center;
+        text.color = Color.white;
+    }
+    
+    private void OnElementCardClicked(string elementName)
+    {
+        Debug.Log($"[NewRunCharacterSelectUI] Element {elementName} clicked");
+        
+        // Find or create detail UI
+        var detailUI = FindFirstObjectByType<ElementAscensionDetailUI>();
+        if (detailUI == null)
+        {
+            var go = new GameObject("ElementAscensionDetailUI");
+            detailUI = go.AddComponent<ElementAscensionDetailUI>();
+        }
+        
+        selectionPanel.SetActive(false);
+        detailUI.Show(elementName, () => {
+            selectionPanel.SetActive(true);
+            // Refresh element cards to show updated XP/level
+            ClearDynamicContent();
+            CreateCharacterCards();
+            CreateElementalAscensionSection();
+        });
+    }
+    
+    private Color GetElementBgColor(string element)
+    {
+        return element.ToLower() switch
+        {
+            "fire" => new Color(0.4f, 0.15f, 0.1f, 0.9f),
+            "ice" => new Color(0.15f, 0.25f, 0.4f, 0.9f),
+            "water" => new Color(0.1f, 0.15f, 0.4f, 0.9f),
+            "wind" => new Color(0.15f, 0.35f, 0.15f, 0.9f),
+            "rock" => new Color(0.35f, 0.25f, 0.1f, 0.9f),
+            _ => new Color(0.2f, 0.2f, 0.2f, 0.9f)
+        };
+    }
+    
     public bool IsActive() => isActive;
 }
+

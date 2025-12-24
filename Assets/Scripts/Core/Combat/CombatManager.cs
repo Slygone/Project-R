@@ -12,6 +12,7 @@ public class CombatManager : MonoBehaviour
     private ReactionQTEPanel qtePanel;
     private bool isPlayerTurn = true;
     private bool combatActive = false;
+    private bool isEndingCombat = false;
     private NodeBase currentNode;
     private CombatType currentCombatType = CombatType.Normal;
     
@@ -67,6 +68,7 @@ public class CombatManager : MonoBehaviour
 
         combatActive = true;
         isPlayerTurn = true;
+        isEndingCombat = false;
 
         string bossNames = string.Join(" & ", enemies.ConvertAll(e => e.Name));
         GameLog.Combat(GameLog.Join(
@@ -127,6 +129,7 @@ public class CombatManager : MonoBehaviour
 
         combatActive = true;
         isPlayerTurn = true;
+        isEndingCombat = false;
         
         // Reset player combat state (energy to 0, cooldowns cleared)
         player.ResetCombatState();
@@ -513,6 +516,7 @@ public class CombatManager : MonoBehaviour
         if (!target.IsAlive())
         {
             GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
+            AwardDetonatorXPForKill(target);
         }
 
         if (AllEnemiesDead())
@@ -1113,6 +1117,7 @@ public class CombatManager : MonoBehaviour
         if (targetKilled)
         {
             GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
+            AwardDetonatorXPForKill(target);
         }
 
         // Apply skill cooldown and energy effects (skillNumber is 1-indexed, array is 0-indexed)
@@ -1469,6 +1474,16 @@ public class CombatManager : MonoBehaviour
     {
         pendingAttackers.Clear();
         
+        // If combat is ending, do not process turn advancement
+        if (isEndingCombat)
+        {
+            GameLog.Combat(GameLog.Join(
+                "TurnAdvanceBlocked",
+                GameLog.KV("state", "EndingCombat")
+            ), GameLogVerbosity.Verbose);
+            return;
+        }
+        
         if (!player.IsAlive())
         {
             EndCombat(false);
@@ -1516,13 +1531,16 @@ public class CombatManager : MonoBehaviour
 
     private void EndCombat(bool victory)
     {
+        // Idempotent: if already ending, skip
+        if (isEndingCombat) return;
+        isEndingCombat = true;
         combatActive = false;
-        // If combat ends right after player's action (victory on player turn),
-        // count the turn as completed so cooldowns tick once.
-        if (victory && isPlayerTurn && player != null)
-        {
-            player.TickCooldowns();
-        }
+        
+        GameLog.Combat(GameLog.Join(
+            "VictoryTriggered",
+            GameLog.KV("reason", "AllEnemiesDead"),
+            GameLog.KV("victory", victory)
+        ));
         GameLog.Combat(GameLog.Join(
             "CombatEnd",
             GameLog.KV("victory", victory),
@@ -1554,6 +1572,8 @@ public class CombatManager : MonoBehaviour
                 _ => 1
             };
             GameManager.AddRunXP(xpReward);
+            
+            // Note: Elemental Ascension XP is now awarded per-kill via AwardDetonatorXPForKill()
             
             // Gold reward still granted
             int goldReward = Random.Range(1, 11);
@@ -1618,6 +1638,36 @@ public class CombatManager : MonoBehaviour
 
     public bool IsCombatActive() => combatActive;
     public bool IsInCombat() => combatActive;
+    public bool IsEndingCombat() => isEndingCombat;
     public bool IsPlayerTurn() => isPlayerTurn;
     public List<CombatEnemy> GetEnemies() => enemies;
+    
+    /// <summary>
+    /// Awards Elemental Ascension XP to the detonator element when an enemy is killed via reaction.
+    /// XP amount is based on enemy type: Regular=1, Elite=3, Boss=5
+    /// </summary>
+    private void AwardDetonatorXPForKill(CombatEnemy killedEnemy)
+    {
+        if (pendingReactionDetonator == Element.None) return;
+        if (killedEnemy == null) return;
+        
+        int xpAmount = 1; // Regular enemy
+        if (killedEnemy.IsBoss)
+        {
+            xpAmount = 5;
+        }
+        else if (killedEnemy.IsElite)
+        {
+            xpAmount = 3;
+        }
+        
+        GameManager.AddRunXPForDetonator(xpAmount, pendingReactionDetonator);
+        GameLog.Combat(GameLog.Join(
+            "DetonatorXP",
+            GameLog.KV("element", pendingReactionDetonator),
+            GameLog.KV("xp", xpAmount),
+            GameLog.KV("enemy", killedEnemy.Name),
+            GameLog.KV("type", killedEnemy.IsBoss ? "Boss" : killedEnemy.IsElite ? "Elite" : "Regular")
+        ), GameLogVerbosity.Verbose);
+    }
 }

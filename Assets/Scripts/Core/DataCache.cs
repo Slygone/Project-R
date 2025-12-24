@@ -15,6 +15,7 @@ public static class DataCache
     public static Dictionary<string, float> QTEMultipliers { get; private set; }
     public static Dictionary<string, ReactionData> Reactions { get; private set; }
     public static Dictionary<string, List<ReactionEffectData>> ReactionEffects { get; private set; }
+    public static Dictionary<string, List<ElementalTierData>> ElementalTiers { get; private set; }
 
     public static bool IsLoaded { get; private set; }
 
@@ -29,9 +30,10 @@ public static class DataCache
         QTEMultipliers = LoadQTEMultipliers();
         Reactions = LoadReactions();
         ReactionEffects = LoadReactionEffects();
+        ElementalTiers = LoadElementalTiers();
 
         IsLoaded = true;
-        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEMultipliers.Count} QTE results, {Reactions.Count} reactions, {ReactionEffects.Count} reaction effect groups, player stats");
+        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEMultipliers.Count} QTE results, {Reactions.Count} reactions, {ReactionEffects.Count} reaction effect groups, {ElementalTiers.Count} element tier groups, player stats");
     }
 
     // Parse multiplier from formula like "Health *1.7" or "Damage * 2"
@@ -493,5 +495,104 @@ public static class DataCache
         if (firstElement == detonatorElement)
             return null;
         return $"{firstElement}_{detonatorElement}";
+    }
+    
+    // Load elemental tier data (XP thresholds and bonuses per element per level)
+    private static Dictionary<string, List<ElementalTierData>> LoadElementalTiers()
+    {
+        var result = new Dictionary<string, List<ElementalTierData>>();
+        
+        var asset = Resources.Load<TextAsset>("Data/elementalTier");
+        if (asset == null)
+        {
+            Debug.LogWarning("[DataCache] elementalTier.csv not found");
+            return result;
+        }
+        
+        var rows = CSVParser.Parse(asset.text);
+        foreach (var row in rows)
+        {
+            string element = CSVParser.ParseString(row, "Element");
+            if (string.IsNullOrEmpty(element)) continue;
+            
+            var tierData = new ElementalTierData
+            {
+                Element = element,
+                Level = CSVParser.ParseInt(row, "Level"),
+                XPRequiredToReachLevel = CSVParser.ParseInt(row, "XPRequiredToReachLevel"),
+                Bonus = CSVParser.ParseString(row, "Bonus")
+            };
+            
+            if (!result.ContainsKey(element))
+            {
+                result[element] = new List<ElementalTierData>();
+            }
+            result[element].Add(tierData);
+        }
+        
+        // Sort each element's tiers by level
+        foreach (var kvp in result)
+        {
+            kvp.Value.Sort((a, b) => a.Level.CompareTo(b.Level));
+        }
+        
+        return result;
+    }
+    
+    /// <summary>
+    /// Get the XP required to reach a specific level for an element.
+    /// </summary>
+    public static int GetElementXPThreshold(string element, int level)
+    {
+        if (ElementalTiers == null || !ElementalTiers.ContainsKey(element))
+            return int.MaxValue;
+        
+        var tiers = ElementalTiers[element];
+        foreach (var tier in tiers)
+        {
+            if (tier.Level == level)
+                return tier.XPRequiredToReachLevel;
+        }
+        return int.MaxValue;
+    }
+    
+    /// <summary>
+    /// Get the bonus text for a specific element level.
+    /// </summary>
+    public static string GetElementBonus(string element, int level)
+    {
+        if (ElementalTiers == null || !ElementalTiers.ContainsKey(element))
+            return "";
+        
+        var tiers = ElementalTiers[element];
+        foreach (var tier in tiers)
+        {
+            if (tier.Level == level)
+                return tier.Bonus;
+        }
+        return "";
+    }
+    
+    /// <summary>
+    /// Get the max level for an element from CSV data.
+    /// </summary>
+    public static int GetElementMaxLevel(string element)
+    {
+        if (ElementalTiers == null || !ElementalTiers.ContainsKey(element))
+            return 1;
+        
+        var tiers = ElementalTiers[element];
+        if (tiers.Count == 0) return 1;
+        return tiers[tiers.Count - 1].Level;
+    }
+    
+    /// <summary>
+    /// Get list of all elements from CSV data.
+    /// </summary>
+    public static List<string> GetAllElements()
+    {
+        if (ElementalTiers == null)
+            return new List<string>();
+        return new List<string>(ElementalTiers.Keys);
     }
 }
