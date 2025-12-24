@@ -12,6 +12,9 @@ public class GameManager : MonoBehaviour
     private bool elementPairChosen = false;
     private bool characterChosen = false;
     
+    // Track which character is used for the current run (for ascension award)
+    private CharacterData currentRunCharacter = null;
+    
     private static int currentWorld = 1;
     public static int CurrentWorld => currentWorld;
     
@@ -61,7 +64,76 @@ public class GameManager : MonoBehaviour
         pairRerollUsed = false;
         UpdateNodeCounter();
         
-        StartCharacterSelection();
+        // Start with Main Menu instead of jumping to character selection
+        ShowMainMenu();
+    }
+    
+    private void ShowMainMenu()
+    {
+        if (refs != null && refs.playerController != null)
+        {
+            refs.playerController.SetCanMove(false);
+        }
+        
+        if (refs != null && refs.mainMenuUI != null)
+        {
+            refs.mainMenuUI.Show(OnNewRunClicked);
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] MainMenuUI not found, starting character selection directly");
+            StartNewRunCharacterSelect();
+        }
+    }
+    
+    private void OnNewRunClicked()
+    {
+        StartNewRunCharacterSelect();
+    }
+    
+    private void StartNewRunCharacterSelect()
+    {
+        if (refs != null && refs.newRunCharacterSelectUI != null)
+        {
+            refs.newRunCharacterSelectUI.Show(OnCharacterCardClicked, ShowMainMenu);
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] NewRunCharacterSelectUI not found, using legacy selection");
+            StartCharacterSelection();
+        }
+    }
+    
+    private void OnCharacterCardClicked(CharacterData character)
+    {
+        // Show the loadout screen for this character
+        if (refs != null && refs.characterLoadoutUI != null)
+        {
+            refs.characterLoadoutUI.Show(character, () => OnStartRunFromLoadout(character), StartNewRunCharacterSelect);
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] CharacterLoadoutUI not found, proceeding directly");
+            OnStartRunFromLoadout(character);
+        }
+    }
+    
+    private void OnStartRunFromLoadout(CharacterData character)
+    {
+        // Store character for ascension award at end of run
+        currentRunCharacter = character;
+        characterChosen = true;
+        
+        // Apply character to player
+        if (refs != null && refs.player != null)
+        {
+            refs.player.SelectCharacter(character);
+        }
+        
+        Debug.Log($"[GameManager] Starting run with {character.DisplayName}");
+        
+        // Now show orb pair selection
+        StartAffinitySelection();
     }
     
     public int GetTotalNodesForCurrentWorld() => currentWorld == 1 ? WORLD1_NODES : WORLD2_NODES;
@@ -290,6 +362,18 @@ public class GameManager : MonoBehaviour
             refs.playerController.SetCanMove(false);
         }
         
+        // Award ascension level to the character used in this run
+        string ascensionMessage = "";
+        if (currentRunCharacter != null)
+        {
+            MetaProgressionManager.Instance.AwardAscension(
+                currentRunCharacter.CharacterID,
+                currentRunCharacter.DisplayName
+            );
+            var progress = MetaProgressionManager.Instance.GetProgress(currentRunCharacter.CharacterID);
+            ascensionMessage = $"\n\n{currentRunCharacter.DisplayName} reached Ascension {progress.AscensionLevel}!";
+        }
+        
         var canvas = GameObject.Find("Canvas");
         if (canvas != null)
         {
@@ -308,22 +392,22 @@ public class GameManager : MonoBehaviour
             var textObj = new GameObject("VictoryText");
             textObj.transform.SetParent(victoryPanel.transform, false);
             var textRect = textObj.AddComponent<UnityEngine.RectTransform>();
-            textRect.anchorMin = new Vector2(0.2f, 0.5f);
-            textRect.anchorMax = new Vector2(0.8f, 0.7f);
+            textRect.anchorMin = new Vector2(0.2f, 0.45f);
+            textRect.anchorMax = new Vector2(0.8f, 0.75f);
             textRect.offsetMin = Vector2.zero;
             textRect.offsetMax = Vector2.zero;
             var text = textObj.AddComponent<TMPro.TextMeshProUGUI>();
-            text.text = "CONGRATULATIONS!\nYou beat the run!";
+            text.text = $"CONGRATULATIONS!\nYou beat the run!{ascensionMessage}";
             text.alignment = TMPro.TextAlignmentOptions.Center;
-            text.fontSize = 48;
+            text.fontSize = 42;
             text.color = new Color(1f, 0.84f, 0f);
             
             // Restart button
             var btnObj = new GameObject("RestartButton");
             btnObj.transform.SetParent(victoryPanel.transform, false);
             var btnRect = btnObj.AddComponent<UnityEngine.RectTransform>();
-            btnRect.anchorMin = new Vector2(0.35f, 0.25f);
-            btnRect.anchorMax = new Vector2(0.65f, 0.35f);
+            btnRect.anchorMin = new Vector2(0.35f, 0.2f);
+            btnRect.anchorMax = new Vector2(0.65f, 0.3f);
             btnRect.offsetMin = Vector2.zero;
             btnRect.offsetMax = Vector2.zero;
             

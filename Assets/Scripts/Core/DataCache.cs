@@ -256,7 +256,16 @@ public static class DataCache
                 Skill3DamagePercent = ParseDamagePercent(CSVParser.ParseString(row, "Skill3_Damage")),
                 Skill3Effect = CSVParser.ParseString(row, "Skill3_Effect_1", "null"),
                 Skill3Cooldown = ParseCooldown(CSVParser.ParseString(row, "Skill3_Cooldown")),
-                Skill3EnergyCost = CSVParser.ParseInt(row, "Skill3_EnergyCost")
+                Skill3EnergyCost = CSVParser.ParseInt(row, "Skill3_EnergyCost"),
+                // Talent Perks (A/B options per tier)
+                Perk1a = CSVParser.ParseString(row, "Perk1a", ""),
+                Perk1b = CSVParser.ParseString(row, "Perk1b", ""),
+                Perk2a = CSVParser.ParseString(row, "Perk2a", ""),
+                Perk2b = CSVParser.ParseString(row, "Perk2b", ""),
+                Perk3a = CSVParser.ParseString(row, "Perk3a", ""),
+                Perk3b = CSVParser.ParseString(row, "Perk3b", ""),
+                Perk4a = CSVParser.ParseString(row, "Perk4a", ""),
+                Perk4b = CSVParser.ParseString(row, "Perk4b", "")
             });
         }
 

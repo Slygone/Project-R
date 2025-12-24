@@ -23,6 +23,11 @@ public class Referencer : MonoBehaviour
     public MysteryUI mysteryUI;
     public DefensiveQTE defensiveQTE;
     
+    // New Run flow UI components
+    public MainMenuUI mainMenuUI;
+    public NewRunCharacterSelectUI newRunCharacterSelectUI;
+    public CharacterLoadoutUI characterLoadoutUI;
+    
     public GameObject nodePopupPanel;
     public GameObject victoryPanel;
     public TextMeshProUGUI nodeCounterText;
@@ -141,6 +146,28 @@ public class Referencer : MonoBehaviour
         {
             var dqteObj = new GameObject("DefensiveQTE");
             defensiveQTE = dqteObj.AddComponent<DefensiveQTE>();
+        }
+        
+        // New Run flow UI components
+        mainMenuUI = FindFirstObjectByType<MainMenuUI>();
+        if (mainMenuUI == null)
+        {
+            var mmObj = new GameObject("MainMenuUI");
+            mainMenuUI = mmObj.AddComponent<MainMenuUI>();
+        }
+        
+        newRunCharacterSelectUI = FindFirstObjectByType<NewRunCharacterSelectUI>();
+        if (newRunCharacterSelectUI == null)
+        {
+            var nrcsObj = new GameObject("NewRunCharacterSelectUI");
+            newRunCharacterSelectUI = nrcsObj.AddComponent<NewRunCharacterSelectUI>();
+        }
+        
+        characterLoadoutUI = FindFirstObjectByType<CharacterLoadoutUI>();
+        if (characterLoadoutUI == null)
+        {
+            var clObj = new GameObject("CharacterLoadoutUI");
+            characterLoadoutUI = clObj.AddComponent<CharacterLoadoutUI>();
         }
 
         var mainCam = Camera.main;
