@@ -354,6 +354,12 @@ public static class ReactionEffectEngine
         {
             context.Target.ApplyStun(duration > 0 ? duration : 1);
         }
+        else if (statusLower == "freeze" || statusLower == "frozen")
+        {
+            // Freeze acts like a stun for 1 turn unless a longer duration is specified
+            int freezeDur = duration > 0 ? duration : 1;
+            context.Target.ApplyStun(freezeDur);
+        }
         else
         {
             GameLog.Warn(GameLogCategory.Status, "[Status]", $"ApplyUnknown | target={(context.Target != null ? context.Target.Name : "null")} | status={statusName}");

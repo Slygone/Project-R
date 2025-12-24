@@ -258,6 +258,11 @@ public class PlayerStatsUI : MonoBehaviour
             sb.AppendLine($"Affinity: <color={affinityColor}>{affinityName}</color>");
         }
         
+        // Health & Shield permanent stats
+        sb.AppendLine("<color=#ffffff><b>HEALTH</b></color>");
+        sb.AppendLine($"<color=#ff3333>Health:</color> {player.GetHealth()}/{player.GetMaxHealth()}");
+        sb.AppendLine($"<color=#4488ff>Shield:</color> {player.GetShield()}");
+        
         int affinityBonus = player.GetAffinityBonus();
         string dmgRangeLabel = character != null && !string.IsNullOrEmpty(character.DamageRangeLabel)
             ? character.DamageRangeLabel
@@ -419,6 +424,37 @@ public class PlayerStatsUI : MonoBehaviour
     {
         if (string.IsNullOrEmpty(skillName)) return "";
         
+        // Try to construct a description from the currently selected character CSV data
+        var refs = Object.FindFirstObjectByType<Referencer>();
+        var player = refs != null ? refs.player : null;
+        var character = player != null ? player.GetCharacter() : null;
+        if (character != null)
+        {
+            string s1 = character.Skill1?.ToLower();
+            string s2 = character.Skill2?.ToLower();
+            string s3 = character.Skill3?.ToLower();
+            string key = skillName.ToLower();
+            if (key == s1)
+            {
+                string effect = string.IsNullOrEmpty(character.Skill1Effect) ? "" : character.Skill1Effect;
+                float pct = character.Skill1DamagePercent;
+                return $"{effect}{(string.IsNullOrEmpty(effect) ? "" : "\n")}Damage: {pct}%";
+            }
+            if (key == s2)
+            {
+                string effect = string.IsNullOrEmpty(character.Skill2Effect) ? "" : character.Skill2Effect;
+                float pct = character.Skill2DamagePercent;
+                return $"{effect}{(string.IsNullOrEmpty(effect) ? "" : "\n")}Damage: {pct}%";
+            }
+            if (key == s3)
+            {
+                string effect = string.IsNullOrEmpty(character.Skill3Effect) ? "" : character.Skill3Effect;
+                float pct = character.Skill3DamagePercent;
+                return $"{effect}{(string.IsNullOrEmpty(effect) ? "" : "\n")}Damage: {pct}%";
+            }
+        }
+        
+        // Fallback legacy strings
         switch (skillName.ToLower())
         {
             case "slash": return "Basic sword strike (100% damage)";

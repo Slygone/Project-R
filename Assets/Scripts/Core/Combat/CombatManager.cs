@@ -494,13 +494,19 @@ public class CombatManager : MonoBehaviour
             GameLog.KV("hpAfter", hpAfter)
         ));
 
-        // Apply reaction effects from CSV data
+        // Apply reaction effects from CSV data (track shield gain for floating text)
+        int shieldBeforeReact = player.GetShield();
         ReactionEffectEngine.ApplyPostHitEffects(pendingReactionId, player, target, damage, attackElement);
 
         if (combatUI != null)
         {
             combatUI.ShowDamageToEnemy(target, damage, isCrit);
             combatUI.UpdateEnemyHealth(target);
+            int shieldAfterReact = player.GetShield();
+            if (shieldAfterReact > shieldBeforeReact)
+            {
+                combatUI.ShowShieldToPlayer(shieldAfterReact - shieldBeforeReact, FloatingTextType.ShieldGain);
+            }
             combatUI.UpdatePlayerHealth(player); // Update in case of shield effects
         }
 
@@ -772,14 +778,14 @@ public class CombatManager : MonoBehaviour
             GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
         }
 
+        // Apply skill cooldown and energy effects BEFORE possible early return
+        player.UseSkillAndApplyEffects(skillNumber - 1);
+
         if (AllEnemiesDead())
         {
             EndCombat(true);
             return;
         }
-        
-        // Apply skill cooldown and energy effects
-        player.UseSkillAndApplyEffects(skillNumber - 1);
 
         // Handle kill effects AFTER cooldown/energy application so overrides (e.g. Ambush) persist
         if (targetKilled)
@@ -1089,11 +1095,17 @@ public class CombatManager : MonoBehaviour
             GameLog.KV("target", target != null ? target.Name : "null")
         ), GameLogVerbosity.Minimal);
 
-        // Apply reaction effects from CSV data
+        // Apply reaction effects from CSV data (track shield gain for floating text)
+        int shieldBeforeReact2 = player.GetShield();
         ReactionEffectEngine.ApplyPostHitEffects(pendingReactionId, player, target, finalDamage, attackElement);
         
         if (combatUI != null)
         {
+            int shieldAfterReact2 = player.GetShield();
+            if (shieldAfterReact2 > shieldBeforeReact2)
+            {
+                combatUI.ShowShieldToPlayer(shieldAfterReact2 - shieldBeforeReact2, FloatingTextType.ShieldGain);
+            }
             combatUI.UpdatePlayerHealth(player); // Update in case of shield effects
         }
 
@@ -1103,14 +1115,14 @@ public class CombatManager : MonoBehaviour
             GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
         }
 
+        // Apply skill cooldown and energy effects (skillNumber is 1-indexed, array is 0-indexed)
+        player.UseSkillAndApplyEffects(skillNumber - 1);
+
         if (AllEnemiesDead())
         {
             EndCombat(true);
             return;
         }
-        
-        // Apply skill cooldown and energy effects (skillNumber is 1-indexed, array is 0-indexed)
-        player.UseSkillAndApplyEffects(skillNumber - 1);
 
         // Handle kill effects AFTER cooldown/energy application so overrides (e.g. Ambush) persist
         if (targetKilled)
@@ -1505,6 +1517,12 @@ public class CombatManager : MonoBehaviour
     private void EndCombat(bool victory)
     {
         combatActive = false;
+        // If combat ends right after player's action (victory on player turn),
+        // count the turn as completed so cooldowns tick once.
+        if (victory && isPlayerTurn && player != null)
+        {
+            player.TickCooldowns();
+        }
         GameLog.Combat(GameLog.Join(
             "CombatEnd",
             GameLog.KV("victory", victory),
