@@ -7,8 +7,7 @@ public class GameManager : MonoBehaviour
     private int completedNodes = 0;
     // Pair selection reroll: 1 use per run
     private static bool pairRerollUsed = false;
-    private const int WORLD1_NODES = 20;
-    private const int WORLD2_NODES = 25;
+    private const int MAX_WORLD = 5;
     private bool affinityChosen = false;
     private bool elementPairChosen = false;
     private bool characterChosen = false;
@@ -173,7 +172,7 @@ public class GameManager : MonoBehaviour
         StartAffinitySelection();
     }
     
-    public int GetTotalNodesForCurrentWorld() => currentWorld == 1 ? WORLD1_NODES : WORLD2_NODES;
+    public int GetTotalNodesForCurrentWorld() => DataCache.GetWorldEncounter(currentWorld).NodeCount;
 
     private void StartAffinitySelection()
     {
@@ -289,7 +288,7 @@ public class GameManager : MonoBehaviour
     private void UpdateNodeCounter()
     {
         int totalNodes = GetTotalNodesForCurrentWorld();
-        string worldText = currentWorld == 1 ? "World 1" : "World 2";
+        string worldText = $"World {currentWorld}";
         if (refs != null && refs.nodeCounterText != null)
         {
             refs.nodeCounterText.text = $"{worldText}: {completedNodes}/{totalNodes}";
@@ -320,14 +319,14 @@ public class GameManager : MonoBehaviour
     {
         if (victory)
         {
-            if (currentWorld == 1)
+            if (currentWorld < MAX_WORLD)
             {
-                Debug.Log("[GameManager] World 1 BOSS DEFEATED! Transitioning to World 2...");
-                TransitionToWorld2();
+                Debug.Log($"[GameManager] World {currentWorld} BOSS DEFEATED! Transitioning to World {currentWorld + 1}...");
+                TransitionToNextWorld();
             }
             else
             {
-                Debug.Log("[GameManager] World 2 BOSS DEFEATED! RUN COMPLETE!");
+                Debug.Log($"[GameManager] World {MAX_WORLD} BOSS DEFEATED! RUN COMPLETE!");
                 ShowRunComplete();
             }
         }
@@ -338,9 +337,9 @@ public class GameManager : MonoBehaviour
         }
     }
     
-    private void TransitionToWorld2()
+    private void TransitionToNextWorld()
     {
-        currentWorld = 2;
+        currentWorld++;
         completedNodes = 0;
         
         // Reset potion bonuses but keep relic/rest upgrades
@@ -352,11 +351,11 @@ public class GameManager : MonoBehaviour
         // Clear existing nodes
         ClearAllNodes();
         
-        // Spawn new nodes for World 2
+        // Spawn new nodes for the next world
         var nodeSpawner = FindFirstObjectByType<NodeSpawner>();
         if (nodeSpawner != null)
         {
-            nodeSpawner.SpawnNodesForWorld(2);
+            nodeSpawner.SpawnNodesForWorld(currentWorld);
         }
         
         // Reset player position
@@ -367,7 +366,7 @@ public class GameManager : MonoBehaviour
         }
         
         UpdateNodeCounter();
-        Debug.Log("[GameManager] World 2 started!");
+        Debug.Log($"[GameManager] World {currentWorld} started!");
     }
     
     private void ClearAllNodes()
@@ -479,6 +478,12 @@ public class GameManager : MonoBehaviour
             UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
     }
 
+    public void OnPlayerDefeated()
+    {
+        Debug.Log("[GameManager] Player defeated in combat");
+        ShowDefeat();
+    }
+    
     private void ShowDefeat()
     {
         Debug.Log("[GameManager] Showing defeat screen");
@@ -506,15 +511,61 @@ public class GameManager : MonoBehaviour
             var textObj = new GameObject("DefeatText");
             textObj.transform.SetParent(defeatPanel.transform, false);
             var textRect = textObj.AddComponent<UnityEngine.RectTransform>();
-            textRect.anchorMin = new Vector2(0.2f, 0.4f);
-            textRect.anchorMax = new Vector2(0.8f, 0.6f);
+            textRect.anchorMin = new Vector2(0.2f, 0.5f);
+            textRect.anchorMax = new Vector2(0.8f, 0.7f);
             textRect.offsetMin = Vector2.zero;
             textRect.offsetMax = Vector2.zero;
             var text = textObj.AddComponent<TMPro.TextMeshProUGUI>();
-            text.text = "DEFEATED\nThe boss was too powerful...";
+            text.text = "YOU LOST";
             text.alignment = TMPro.TextAlignmentOptions.Center;
-            text.fontSize = 48;
+            text.fontSize = 64;
             text.color = Color.red;
+            
+            // Continue button
+            var btnObj = new GameObject("ContinueButton");
+            btnObj.transform.SetParent(defeatPanel.transform, false);
+            var btnRect = btnObj.AddComponent<UnityEngine.RectTransform>();
+            btnRect.anchorMin = new Vector2(0.35f, 0.25f);
+            btnRect.anchorMax = new Vector2(0.65f, 0.35f);
+            btnRect.offsetMin = Vector2.zero;
+            btnRect.offsetMax = Vector2.zero;
+            
+            var btnImage = btnObj.AddComponent<UnityEngine.UI.Image>();
+            btnImage.color = new Color(0.6f, 0.1f, 0.1f);
+            
+            var btn = btnObj.AddComponent<UnityEngine.UI.Button>();
+            btn.targetGraphic = btnImage;
+            btn.onClick.AddListener(ReturnToCharacterSelect);
+            
+            var btnTextObj = new GameObject("ButtonText");
+            btnTextObj.transform.SetParent(btnObj.transform, false);
+            var btnTextRect = btnTextObj.AddComponent<UnityEngine.RectTransform>();
+            btnTextRect.anchorMin = Vector2.zero;
+            btnTextRect.anchorMax = Vector2.one;
+            btnTextRect.offsetMin = Vector2.zero;
+            btnTextRect.offsetMax = Vector2.zero;
+            var btnText = btnTextObj.AddComponent<TMPro.TextMeshProUGUI>();
+            btnText.text = "CONTINUE";
+            btnText.alignment = TMPro.TextAlignmentOptions.Center;
+            btnText.fontSize = 28;
+            btnText.color = Color.white;
         }
+    }
+    
+    private void ReturnToCharacterSelect()
+    {
+        // Reset run state
+        currentWorld = 1;
+        completedNodes = 0;
+        pairRerollUsed = false;
+        affinityChosen = false;
+        elementPairChosen = false;
+        characterChosen = false;
+        currentRunCharacter = null;
+        ResetRunXP();
+        
+        // Reload the scene to restart fresh
+        UnityEngine.SceneManagement.SceneManager.LoadScene(
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
     }
 }

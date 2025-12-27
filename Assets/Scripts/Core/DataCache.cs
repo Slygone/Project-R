@@ -16,6 +16,7 @@ public static class DataCache
     public static Dictionary<string, ReactionData> Reactions { get; private set; }
     public static Dictionary<string, List<ReactionEffectData>> ReactionEffects { get; private set; }
     public static Dictionary<string, List<ElementalTierData>> ElementalTiers { get; private set; }
+    public static Dictionary<int, WorldEncounterData> WorldEncounters { get; private set; }
 
     public static bool IsLoaded { get; private set; }
 
@@ -31,9 +32,10 @@ public static class DataCache
         Reactions = LoadReactions();
         ReactionEffects = LoadReactionEffects();
         ElementalTiers = LoadElementalTiers();
+        WorldEncounters = LoadWorldEncounters();
 
         IsLoaded = true;
-        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEMultipliers.Count} QTE results, {Reactions.Count} reactions, {ReactionEffects.Count} reaction effect groups, {ElementalTiers.Count} element tier groups, player stats");
+        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEMultipliers.Count} QTE results, {Reactions.Count} reactions, {ReactionEffects.Count} reaction effect groups, {ElementalTiers.Count} element tier groups, {WorldEncounters.Count} world encounters, player stats");
     }
 
     // Parse multiplier from formula like "Health *1.7" or "Damage * 2"
@@ -182,7 +184,16 @@ public static class DataCache
                 BonusResistance = CSVParser.ParseInt(row, "BonusRessistance"),
                 World2HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World2HealthModifer", "1")),
                 World2DamageMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World2DamageModifer", "1")),
-                World2BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World2BaseResistanceModifier", "0"))
+                World2BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World2BaseResistanceModifier", "0")),
+                World3HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World3HealthModifier", "1")),
+                World3DamageMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World3DamageModifier", "1")),
+                World3BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World3BaseResistanceModifier", "0")),
+                World4HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World4HealthModifier", "1")),
+                World4DamageMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World4DamageModifier", "1")),
+                World4BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World4BaseResistanceModifier", "0")),
+                World5HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World5HealthModifier", "1")),
+                World5DamageMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World5DamageModifier", "1")),
+                World5BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World5BaseResistanceModifier", "0"))
             };
             
             list.Add(enemy);
@@ -594,5 +605,75 @@ public static class DataCache
         if (ElementalTiers == null)
             return new List<string>();
         return new List<string>(ElementalTiers.Keys);
+    }
+    
+    private static Dictionary<int, WorldEncounterData> LoadWorldEncounters()
+    {
+        var dict = new Dictionary<int, WorldEncounterData>();
+        
+        var csv = Resources.Load<TextAsset>("Data/worldEncounter");
+        if (csv == null)
+        {
+            Debug.LogWarning("[DataCache] worldEncounter.csv not found, using defaults");
+            // Provide defaults for 5 worlds
+            for (int w = 1; w <= 5; w++)
+            {
+                dict[w] = new WorldEncounterData
+                {
+                    World = w,
+                    NodeCount = 10 + (w - 1) * 5, // 10, 15, 20, 25, 30
+                    RegularEnemyMin = w,
+                    RegularEnemyMax = w + 2,
+                    EliteEnemyMin = w >= 2 ? 2 : 1,
+                    EliteEnemyMax = w >= 2 ? 2 : 1,
+                    BossEnemyMin = w >= 2 ? 2 : 1,
+                    BossEnemyMax = w >= 2 ? 2 : 1
+                };
+            }
+            return dict;
+        }
+        
+        var rows = CSVParser.Parse(csv.text);
+        foreach (var row in rows)
+        {
+            int world = CSVParser.ParseInt(row, "World");
+            if (world <= 0) continue;
+            
+            dict[world] = new WorldEncounterData
+            {
+                World = world,
+                NodeCount = CSVParser.ParseInt(row, "NodeCount", 10 + (world - 1) * 5),
+                RegularEnemyMin = CSVParser.ParseInt(row, "RegularEnemyMin", 1),
+                RegularEnemyMax = CSVParser.ParseInt(row, "RegularEnemyMax", 3),
+                EliteEnemyMin = CSVParser.ParseInt(row, "EliteEnemyMin", 1),
+                EliteEnemyMax = CSVParser.ParseInt(row, "EliteEnemyMax", 1),
+                BossEnemyMin = CSVParser.ParseInt(row, "BossEnemyMin", 1),
+                BossEnemyMax = CSVParser.ParseInt(row, "BossEnemyMax", 1)
+            };
+        }
+        
+        return dict;
+    }
+    
+    /// <summary>
+    /// Get world encounter data for a specific world. Returns defaults if not found.
+    /// </summary>
+    public static WorldEncounterData GetWorldEncounter(int world)
+    {
+        if (WorldEncounters != null && WorldEncounters.ContainsKey(world))
+            return WorldEncounters[world];
+        
+        // Return defaults
+        return new WorldEncounterData
+        {
+            World = world,
+            NodeCount = 10 + (world - 1) * 5, // 10, 15, 20, 25, 30
+            RegularEnemyMin = world,
+            RegularEnemyMax = world + 2,
+            EliteEnemyMin = world >= 2 ? 2 : 1,
+            EliteEnemyMax = world >= 2 ? 2 : 1,
+            BossEnemyMin = world >= 2 ? 2 : 1,
+            BossEnemyMax = world >= 2 ? 2 : 1
+        };
     }
 }

@@ -29,15 +29,15 @@ public class CombatManager : MonoBehaviour
     public void StartCombat(CombatNode node, Player playerRef)
     {
         currentCombatType = CombatType.Normal;
-        StartCombatInternal(node, playerRef, DataCache.RegularEnemies, Random.Range(1, 4));
+        var encounter = DataCache.GetWorldEncounter(GameManager.CurrentWorld);
+        StartCombatInternal(node, playerRef, DataCache.RegularEnemies, encounter.GetRegularEnemyCount());
     }
 
     public void StartEliteCombat(NodeBase node, Player playerRef)
     {
         currentCombatType = CombatType.Elite;
-        // World 2 spawns 2 elites instead of 1
-        int eliteCount = GameManager.CurrentWorld >= 2 ? 2 : 1;
-        StartCombatInternal(node, playerRef, DataCache.EliteEnemies, eliteCount);
+        var encounter = DataCache.GetWorldEncounter(GameManager.CurrentWorld);
+        StartCombatInternal(node, playerRef, DataCache.EliteEnemies, encounter.GetEliteEnemyCount());
     }
 
     public void StartBossCombat(Player playerRef, System.Action<bool> onBossComplete)
@@ -55,7 +55,8 @@ public class CombatManager : MonoBehaviour
         enemies.Clear();
 
         int world = GameManager.CurrentWorld;
-        int bossCount = world >= 2 ? 2 : 1;
+        var encounter = DataCache.GetWorldEncounter(world);
+        int bossCount = encounter.GetBossEnemyCount();
         
         if (DataCache.BossEnemies.Count > 0)
         {
@@ -82,7 +83,7 @@ public class CombatManager : MonoBehaviour
         var pcBoss = FindFirstObjectByType<PlayerController>();
         if (pcBoss != null) pcBoss.SetCanMove(false);
 
-        string title = world >= 2 ? "FINAL BOSS FIGHT!" : "BOSS FIGHT!";
+        string title = world >= 5 ? "FINAL BOSS FIGHT!" : "BOSS FIGHT!";
         if (combatUI != null)
         {
             combatUI.ShowCombat(enemies, player, title);
@@ -1536,6 +1537,14 @@ public class CombatManager : MonoBehaviour
         isEndingCombat = true;
         combatActive = false;
         
+        // If combat ends on player's turn (victory by killing last enemy),
+        // the turn is considered completed - tick cooldowns so skills progress
+        if (victory && isPlayerTurn && player != null)
+        {
+            player.TickCooldowns();
+            GameLog.Combat("CooldownTickOnVictory", GameLogVerbosity.Verbose);
+        }
+        
         GameLog.Combat(GameLog.Join(
             "VictoryTriggered",
             GameLog.KV("reason", "AllEnemiesDead"),
@@ -1614,6 +1623,13 @@ public class CombatManager : MonoBehaviour
                 combatUI.HideCombat();
             }
             GameLog.Combat("PlayerDefeated");
+            
+            // Notify GameManager of player defeat
+            var gameManager = FindFirstObjectByType<GameManager>();
+            if (gameManager != null)
+            {
+                gameManager.OnPlayerDefeated();
+            }
         }
     }
 

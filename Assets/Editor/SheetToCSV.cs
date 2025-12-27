@@ -30,6 +30,9 @@ public static class SheetToCSV
     private const string CharacterGid = "2103587809";
     private static readonly string DefaultCharacterCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={CharacterGid}";
 
+    private const string WorldEncounterGid = "616390507";
+    private static readonly string DefaultWorldEncounterCsvUrl = $"https://docs.google.com/spreadsheets/d/{SpreadsheetId}/export?format=csv&gid={WorldEncounterGid}";
+
     private const string ResourcesDir = "Assets/Resources/Data";
     private const string EnemyCsvPath = ResourcesDir + "/enemy.csv";
     private const string RestCsvPath = ResourcesDir + "/rest.csv";
@@ -38,6 +41,7 @@ public static class SheetToCSV
     private const string ElementalReactionsCsvPath = ResourcesDir + "/elementalReactions.csv";
     private const string ElementalReactionEffectsCsvPath = ResourcesDir + "/elementalReactionEffects.csv";
     private const string CharacterCsvPath = ResourcesDir + "/character.csv";
+    private const string WorldEncounterCsvPath = ResourcesDir + "/worldEncounter.csv";
 
     [MenuItem("Tools/Data/Update All CSVs")]
     public static void UpdateAllCsvs()
@@ -51,6 +55,7 @@ public static class SheetToCSV
             (ElementalReactionsCsvPath, DefaultElementalReactionsCsvUrl),
             (ElementalReactionEffectsCsvPath, DefaultElementalReactionEffectsCsvUrl),
             (CharacterCsvPath, DefaultCharacterCsvUrl),
+            (WorldEncounterCsvPath, DefaultWorldEncounterCsvUrl),
         };
         int total = jobs.Count;
         bool anyError = false;
