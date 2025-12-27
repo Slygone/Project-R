@@ -621,13 +621,14 @@ public static class DataCache
                 dict[w] = new WorldEncounterData
                 {
                     World = w,
-                    NodeCount = 10 + (w - 1) * 5, // 10, 15, 20, 25, 30
-                    RegularEnemyMin = w,
-                    RegularEnemyMax = w + 2,
-                    EliteEnemyMin = w >= 2 ? 2 : 1,
-                    EliteEnemyMax = w >= 2 ? 2 : 1,
-                    BossEnemyMin = w >= 2 ? 2 : 1,
-                    BossEnemyMax = w >= 2 ? 2 : 1
+                    NodeCount = 10 + (w - 1) * 2,
+                    CombatNodeCount = 20,
+                    RestNodeCount = 5,
+                    ShopNodeCount = 3,
+                    EliteNodeCount = 10,
+                    RegularEnemy = w,
+                    EliteEnemy = w,
+                    BossEnemy = w
                 };
             }
             return dict;
@@ -642,13 +643,14 @@ public static class DataCache
             dict[world] = new WorldEncounterData
             {
                 World = world,
-                NodeCount = CSVParser.ParseInt(row, "NodeCount", 10 + (world - 1) * 5),
-                RegularEnemyMin = CSVParser.ParseInt(row, "RegularEnemyMin", 1),
-                RegularEnemyMax = CSVParser.ParseInt(row, "RegularEnemyMax", 3),
-                EliteEnemyMin = CSVParser.ParseInt(row, "EliteEnemyMin", 1),
-                EliteEnemyMax = CSVParser.ParseInt(row, "EliteEnemyMax", 1),
-                BossEnemyMin = CSVParser.ParseInt(row, "BossEnemyMin", 1),
-                BossEnemyMax = CSVParser.ParseInt(row, "BossEnemyMax", 1)
+                NodeCount = CSVParser.ParseInt(row, "NodeCount", 10),
+                CombatNodeCount = CSVParser.ParseInt(row, "CombatNodeCount", 20),
+                RestNodeCount = CSVParser.ParseInt(row, "RestNodeCount", 5),
+                ShopNodeCount = CSVParser.ParseInt(row, "ShopNodeCount", 3),
+                EliteNodeCount = CSVParser.ParseInt(row, "EliteNodeCount", 10),
+                RegularEnemy = CSVParser.ParseInt(row, "RegularEnemy", 1),
+                EliteEnemy = CSVParser.ParseInt(row, "EliteEnemy", 1),
+                BossEnemy = CSVParser.ParseInt(row, "BossEnemy", 1)
             };
         }
         
@@ -667,13 +669,14 @@ public static class DataCache
         return new WorldEncounterData
         {
             World = world,
-            NodeCount = 10 + (world - 1) * 5, // 10, 15, 20, 25, 30
-            RegularEnemyMin = world,
-            RegularEnemyMax = world + 2,
-            EliteEnemyMin = world >= 2 ? 2 : 1,
-            EliteEnemyMax = world >= 2 ? 2 : 1,
-            BossEnemyMin = world >= 2 ? 2 : 1,
-            BossEnemyMax = world >= 2 ? 2 : 1
+            NodeCount = 10 + (world - 1) * 2,
+            CombatNodeCount = 20,
+            RestNodeCount = 5,
+            ShopNodeCount = 3,
+            EliteNodeCount = 10,
+            RegularEnemy = world,
+            EliteEnemy = world,
+            BossEnemy = world
         };
     }
 }

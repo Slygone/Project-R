@@ -18,24 +18,12 @@ public class NodeSpawner : MonoBehaviour
     {
         spawnedPositions.Clear();
         
-        int shopCount, combatCount, restCount, mysteryCount;
+        var encounterData = DataCache.GetWorldEncounter(world);
         
-        if (world == 1)
-        {
-            // World 1: 20 nodes total
-            shopCount = 2;
-            combatCount = 10;
-            restCount = 3;
-            mysteryCount = 5;
-        }
-        else
-        {
-            // World 2: 25 nodes total
-            shopCount = 2;
-            combatCount = 13;
-            restCount = 4;
-            mysteryCount = 6;
-        }
+        int shopCount = encounterData.ShopNodeCount;
+        int combatCount = encounterData.CombatNodeCount;
+        int restCount = encounterData.RestNodeCount;
+        int eliteCount = encounterData.EliteNodeCount;
 
         for (int i = 0; i < shopCount; i++)
             SpawnNode<ShopNode>();
@@ -46,10 +34,10 @@ public class NodeSpawner : MonoBehaviour
         for (int i = 0; i < restCount; i++)
             SpawnNode<RestNode>();
         
-        for (int i = 0; i < mysteryCount; i++)
+        for (int i = 0; i < eliteCount; i++)
             SpawnNode<MysteryNode>();
             
-        Debug.Log($"[NodeSpawner] Spawned nodes for World {world}: {shopCount} shops, {combatCount} combats, {restCount} rests, {mysteryCount} mysteries");
+        Debug.Log($"[NodeSpawner] Spawned nodes for World {world}: {shopCount} shops, {combatCount} combats, {restCount} rests, {eliteCount} elites (mystery)");
     }
 
     private void SpawnNode<T>() where T : NodeBase

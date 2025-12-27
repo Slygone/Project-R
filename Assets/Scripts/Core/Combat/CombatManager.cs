@@ -30,14 +30,14 @@ public class CombatManager : MonoBehaviour
     {
         currentCombatType = CombatType.Normal;
         var encounter = DataCache.GetWorldEncounter(GameManager.CurrentWorld);
-        StartCombatInternal(node, playerRef, DataCache.RegularEnemies, encounter.GetRegularEnemyCount());
+        StartCombatInternal(node, playerRef, DataCache.RegularEnemies, encounter.RegularEnemy);
     }
 
     public void StartEliteCombat(NodeBase node, Player playerRef)
     {
         currentCombatType = CombatType.Elite;
         var encounter = DataCache.GetWorldEncounter(GameManager.CurrentWorld);
-        StartCombatInternal(node, playerRef, DataCache.EliteEnemies, encounter.GetEliteEnemyCount());
+        StartCombatInternal(node, playerRef, DataCache.EliteEnemies, encounter.EliteEnemy);
     }
 
     public void StartBossCombat(Player playerRef, System.Action<bool> onBossComplete)
@@ -56,7 +56,7 @@ public class CombatManager : MonoBehaviour
 
         int world = GameManager.CurrentWorld;
         var encounter = DataCache.GetWorldEncounter(world);
-        int bossCount = encounter.GetBossEnemyCount();
+        int bossCount = encounter.BossEnemy;
         
         if (DataCache.BossEnemies.Count > 0)
         {

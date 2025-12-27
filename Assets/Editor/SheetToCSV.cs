@@ -41,7 +41,7 @@ public static class SheetToCSV
     private const string ElementalReactionsCsvPath = ResourcesDir + "/elementalReactions.csv";
     private const string ElementalReactionEffectsCsvPath = ResourcesDir + "/elementalReactionEffects.csv";
     private const string CharacterCsvPath = ResourcesDir + "/character.csv";
-    private const string WorldEncounterCsvPath = ResourcesDir + "/worldEncounter.csv";
+    private const string WorldEncounterCsvPath = ResourcesDir + "/worldEncounterComposition.csv";
 
     [MenuItem("Tools/Data/Update All CSVs")]
     public static void UpdateAllCsvs()
