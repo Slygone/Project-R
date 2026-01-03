@@ -136,14 +136,16 @@ public class CombatUI : MonoBehaviour
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
 
-        // Semi-transparent dark overlay (less opaque than before for gameplay visibility)
+        // Fully opaque dark background to hide free-roam elements during combat
         var bg = panel.AddComponent<Image>();
-        bg.color = new Color(0.05f, 0.05f, 0.1f, 0.75f);
+        bg.color = new Color(0.05f, 0.05f, 0.1f, 1f);
 
         // Create UI sections
         CreateTopBar(panel.transform);
+        CreatePotionContainer(panel.transform);
         CreateEnemyContainer(panel.transform);
         CreateBottomActionBar(panel.transform);
+        CreatePlayerHealthBar(panel.transform);
 
         return panel;
     }
@@ -185,7 +187,7 @@ public class CombatUI : MonoBehaviour
         playerNameText.fontStyle = FontStyles.Bold;
         playerNameText.color = new Color(0.9f, 0.85f, 0.7f);
         var nameLayout = nameObj.AddComponent<LayoutElement>();
-        nameLayout.preferredWidth = 180;
+        nameLayout.preferredWidth = 140;
 
         // HP display (heart icon + HP)
         var hpObj = new GameObject("HPDisplay");
@@ -202,11 +204,12 @@ public class CombatUI : MonoBehaviour
         var goldObj = new GameObject("GoldDisplay");
         goldObj.transform.SetParent(leftSection.transform, false);
         playerGoldText = goldObj.AddComponent<TextMeshProUGUI>();
-        playerGoldText.text = "<color=#ffcc00>⚙</color> 100";
+        playerGoldText.text = "<color=#ffcc00>G</color> 100";
         playerGoldText.fontSize = 18;
         playerGoldText.color = Color.white;
         var goldLayout = goldObj.AddComponent<LayoutElement>();
         goldLayout.preferredWidth = 80;
+
 
         // Center section: Floor indicator
         var centerSection = new GameObject("CenterSection");
@@ -243,7 +246,7 @@ public class CombatUI : MonoBehaviour
         // Keep combatTitleText reference for special titles (Boss Fight, etc.)
         combatTitleText = floorText;
 
-        // Right section: Potions and settings (placeholder for now)
+        // Right section: Relics display
         var rightSection = new GameObject("RightSection");
         rightSection.transform.SetParent(topBar.transform, false);
         var rightRect = rightSection.AddComponent<RectTransform>();
@@ -252,8 +255,30 @@ public class CombatUI : MonoBehaviour
         rightRect.offsetMin = Vector2.zero;
         rightRect.offsetMax = Vector2.zero;
         
-        // Potions will be added here later
-        CreatePotionContainer(rightSection.transform);
+        // Relics panel
+        CreateRelicsPanel(rightSection.transform);
+    }
+    
+    private void CreateRelicsPanel(Transform parent)
+    {
+        relicsPanel = new GameObject("RelicsPanel");
+        relicsPanel.transform.SetParent(parent, false);
+        var panelRect = relicsPanel.AddComponent<RectTransform>();
+        panelRect.anchorMin = Vector2.zero;
+        panelRect.anchorMax = Vector2.one;
+        panelRect.offsetMin = new Vector2(5, 2);
+        panelRect.offsetMax = new Vector2(-5, -2);
+        
+        var layout = relicsPanel.AddComponent<HorizontalLayoutGroup>();
+        layout.spacing = 5;
+        layout.childAlignment = TextAnchor.MiddleRight;
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+        layout.padding = new RectOffset(5, 5, 2, 2);
+        
+        // Placeholder relic slots will be populated by RefreshRelicsDisplay
     }
 
     private void CreatePlayerHealthBar(Transform parent)
@@ -544,23 +569,26 @@ public class CombatUI : MonoBehaviour
         potionContainer = new GameObject("PotionContainer");
         potionContainer.transform.SetParent(parent, false);
         var containerRect = potionContainer.AddComponent<RectTransform>();
-        containerRect.anchorMin = new Vector2(0.05f, 0.24f);
-        containerRect.anchorMax = new Vector2(0.40f, 0.32f);
+        // Place below the top bar stats, left side - avoid clipping with floor text
+        containerRect.anchorMin = new Vector2(0.01f, 0.88f);
+        containerRect.anchorMax = new Vector2(0.12f, 0.93f);
         containerRect.offsetMin = Vector2.zero;
         containerRect.offsetMax = Vector2.zero;
 
         var layout = potionContainer.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 5;
-        layout.childControlWidth = true;
-        layout.childControlHeight = true;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = true;
-        layout.padding = new RectOffset(5, 5, 5, 5);
+        layout.spacing = 4;
+        layout.childControlWidth = false;
+        layout.childControlHeight = false;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = false;
+        layout.childAlignment = TextAnchor.MiddleLeft;
+        layout.padding = new RectOffset(2, 2, 1, 1);
 
+        // Subtle dark background to visually frame the potion slots (low alpha so circles don't look squared)
         var bg = potionContainer.AddComponent<Image>();
-        bg.color = new Color(0.1f, 0.15f, 0.2f, 0.8f);
+        bg.color = new Color(0.08f, 0.08f, 0.12f, 0.3f);
         
-        CreatePotionTooltip(parent);
+        CreatePotionTooltip(potionContainer.transform);
     }
 
     private void CreatePotionTooltip(Transform parent)
@@ -568,10 +596,12 @@ public class CombatUI : MonoBehaviour
         potionTooltipPanel = new GameObject("PotionTooltip");
         potionTooltipPanel.transform.SetParent(parent, false);
         var rect = potionTooltipPanel.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.05f, 0.34f);
-        rect.anchorMax = new Vector2(0.40f, 0.43f);
-        rect.offsetMin = Vector2.zero;
-        rect.offsetMax = Vector2.zero;
+        // Position below the potion container (relative to its parent)
+        rect.anchorMin = new Vector2(0, 0);
+        rect.anchorMax = new Vector2(0, 0);
+        rect.pivot = new Vector2(0, 1);
+        rect.sizeDelta = new Vector2(220, 60);
+        rect.anchoredPosition = new Vector2(0, -65);
 
         var bg = potionTooltipPanel.AddComponent<Image>();
         bg.color = new Color(0.1f, 0.1f, 0.15f, 0.95f);
@@ -622,7 +652,17 @@ public class CombatUI : MonoBehaviour
         var btnObj = new GameObject($"Potion_{index}");
         btnObj.transform.SetParent(potionContainer.transform, false);
 
+        // Make it circular with compact fixed size
+        var layoutElem = btnObj.AddComponent<LayoutElement>();
+        layoutElem.preferredWidth = 24;
+        layoutElem.preferredHeight = 24;
+        layoutElem.minWidth = 24;
+        layoutElem.minHeight = 24;
+
         var btnImage = btnObj.AddComponent<Image>();
+        btnImage.sprite = CreateCircleSprite();
+        btnImage.type = Image.Type.Simple;
+        btnImage.preserveAspect = true;
         
         if (potion != null)
         {
@@ -646,8 +686,20 @@ public class CombatUI : MonoBehaviour
         }
         else
         {
-            btnImage.color = new Color(0.15f, 0.15f, 0.2f, 0.5f);
+            // Empty slot - dark circle
+            btnImage.color = new Color(0.25f, 0.25f, 0.3f, 0.6f);
             potionButtons.Add(null);
+            
+            // Add hover for empty slots too
+            var eventTrigger = btnObj.AddComponent<EventTrigger>();
+            var pointerEnter = new EventTrigger.Entry { eventID = EventTriggerType.PointerEnter };
+            int slotNum = index + 1;
+            pointerEnter.callback.AddListener((data) => ShowEmptyPotionTooltip(slotNum));
+            eventTrigger.triggers.Add(pointerEnter);
+            
+            var pointerExit = new EventTrigger.Entry { eventID = EventTriggerType.PointerExit };
+            pointerExit.callback.AddListener((data) => HidePotionTooltip());
+            eventTrigger.triggers.Add(pointerExit);
         }
 
         var textObj = new GameObject("Text");
@@ -668,11 +720,73 @@ public class CombatUI : MonoBehaviour
         else
         {
             text.text = $"{index + 1}";
-            text.color = new Color(0.4f, 0.4f, 0.4f);
+            text.color = new Color(0.5f, 0.5f, 0.5f);
         }
         text.alignment = TextAlignmentOptions.Center;
-        text.fontSize = 11;
+        text.fontSize = 10;
         potionTexts.Add(text);
+    }
+    
+    private void ShowEmptyPotionTooltip(int slotNum)
+    {
+        if (potionTooltipPanel != null && potionTooltipText != null)
+        {
+            potionTooltipText.text = $"<b>Empty Potion Slot {slotNum}</b>\nVisit a shop to purchase potions.";
+            potionTooltipPanel.SetActive(true);
+        }
+    }
+    
+    private void RefreshRelicsDisplay(Player player)
+    {
+        if (relicsPanel == null) return;
+        
+        // Clear existing relic icons
+        for (int i = relicsPanel.transform.childCount - 1; i >= 0; i--)
+        {
+            Destroy(relicsPanel.transform.GetChild(i).gameObject);
+        }
+        
+        // Get player's relics
+        var relics = player.GetRelics();
+        
+        foreach (var relic in relics)
+        {
+            CreateRelicIcon(relic);
+        }
+    }
+    
+    private void CreateRelicIcon(RelicData relic)
+    {
+        var iconObj = new GameObject($"Relic_{relic.Id}");
+        iconObj.transform.SetParent(relicsPanel.transform, false);
+        
+        // Fixed size circular icon
+        var layoutElem = iconObj.AddComponent<LayoutElement>();
+        layoutElem.preferredWidth = 24;
+        layoutElem.preferredHeight = 24;
+        layoutElem.minWidth = 24;
+        layoutElem.minHeight = 24;
+        
+        var iconImage = iconObj.AddComponent<Image>();
+        // Use rarity color as placeholder
+        iconImage.color = GetRelicRarityColor(relic.Rarity);
+        
+        // Add tooltip
+        var tooltip = iconObj.AddComponent<TooltipTrigger>();
+        tooltip.SetTooltip($"<b>{relic.DisplayName}</b>\n<i>{relic.Rarity}</i>\n{relic.Description}");
+    }
+    
+    private Color GetRelicRarityColor(string rarity)
+    {
+        switch (rarity?.ToLower())
+        {
+            case "common": return new Color(0.5f, 0.5f, 0.5f);
+            case "uncommon": return new Color(0.3f, 0.6f, 0.3f);
+            case "rare": return new Color(0.3f, 0.4f, 0.7f);
+            case "epic": return new Color(0.6f, 0.3f, 0.6f);
+            case "legendary": return new Color(0.8f, 0.6f, 0.2f);
+            default: return new Color(0.4f, 0.4f, 0.4f);
+        }
     }
 
     private string GetPotionLabel(PotionData potion)
@@ -701,6 +815,47 @@ public class CombatUI : MonoBehaviour
         if (stat.Contains("crit damage"))
             return new Color(0.35f, 0.2f, 0.35f);
         return new Color(0.25f, 0.3f, 0.25f);
+    }
+    
+    private static Sprite cachedCircleSprite;
+    private Sprite CreateCircleSprite()
+    {
+        if (cachedCircleSprite != null) return cachedCircleSprite;
+        
+        int size = 24;
+        var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
+        float radius = size / 2f;
+        float centerX = size / 2f;
+        float centerY = size / 2f;
+        
+        for (int y = 0; y < size; y++)
+        {
+            for (int x = 0; x < size; x++)
+            {
+                float dx = x - centerX;
+                float dy = y - centerY;
+                float dist = Mathf.Sqrt(dx * dx + dy * dy);
+                
+                if (dist <= radius - 1)
+                {
+                    texture.SetPixel(x, y, Color.white);
+                }
+                else if (dist <= radius)
+                {
+                    // Anti-aliased edge
+                    float alpha = radius - dist;
+                    texture.SetPixel(x, y, new Color(1, 1, 1, alpha));
+                }
+                else
+                {
+                    texture.SetPixel(x, y, Color.clear);
+                }
+            }
+        }
+        
+        texture.Apply();
+        cachedCircleSprite = Sprite.Create(texture, new Rect(0, 0, size, size), new Vector2(0.5f, 0.5f), 100);
+        return cachedCircleSprite;
     }
 
     private void ShowPotionTooltip(PotionData potion)
@@ -1225,6 +1380,7 @@ public class CombatUI : MonoBehaviour
         UpdatePlayerHealth(player);
         UpdateEnergyDisplay(player);
         RefreshPotionButtons(player);
+        RefreshRelicsDisplay(player);
         combatPanel.SetActive(true);
         GameLog.System(GameLog.Join(
             "CombatUIShow",
@@ -1360,7 +1516,8 @@ public class CombatUI : MonoBehaviour
     
     public void UpdatePlayerEnergy(Player player)
     {
-        // Energy is shown on Skill 3 button, so just update skill buttons
+        // Update both the energy orb display and skill buttons
+        UpdateEnergyDisplay(player);
         UpdateSkillButtons(player);
     }
 
@@ -1562,7 +1719,7 @@ public class CombatUI : MonoBehaviour
         // Update gold display
         if (playerGoldText != null)
         {
-            playerGoldText.text = $"<color=#ffcc00>⚙</color> {player.GetGold()}";
+            playerGoldText.text = $"<color=#ffcc00>G</color> {player.GetGold()}";
         }
     }
     

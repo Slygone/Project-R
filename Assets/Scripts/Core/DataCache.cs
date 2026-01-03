@@ -202,42 +202,97 @@ public static class DataCache
 
     private static List<PotionData> LoadPotions()
     {
-        var csv = Resources.Load<TextAsset>("Data/potion");
-        var rows = CSVParser.Parse(csv.text);
+        var json = Resources.Load<TextAsset>("Data/potions");
+        if (json == null)
+        {
+            Debug.LogError("[DataCache] potions.json not found");
+            return new List<PotionData>();
+        }
+        
+        var wrapper = JsonUtility.FromJson<PotionListWrapper>(json.text);
         var list = new List<PotionData>();
-
-        foreach (var row in rows)
+        
+        foreach (var p in wrapper.potions)
         {
             list.Add(new PotionData
             {
-                DisplayName = CSVParser.ParseString(row, "DisplayName"),
-                PotionID = CSVParser.ParseInt(row, "PotionID"),
-                StatAffected = CSVParser.ParseString(row, "Stat Affected"),
-                Amount = CSVParser.ParseInt(row, "Amount")
+                Id = p.id,
+                DisplayName = p.displayName,
+                PotionID = p.potionID,
+                StatAffected = p.statAffected,
+                Amount = p.amount,
+                Rarity = p.rarity,
+                Description = p.description
             });
         }
-
+        
         return list;
     }
 
     private static List<RelicData> LoadRelics()
     {
-        var csv = Resources.Load<TextAsset>("Data/relic");
-        var rows = CSVParser.Parse(csv.text);
+        var json = Resources.Load<TextAsset>("Data/relics");
+        if (json == null)
+        {
+            Debug.LogError("[DataCache] relics.json not found");
+            return new List<RelicData>();
+        }
+        
+        var wrapper = JsonUtility.FromJson<RelicListWrapper>(json.text);
         var list = new List<RelicData>();
-
-        foreach (var row in rows)
+        
+        foreach (var r in wrapper.relics)
         {
             list.Add(new RelicData
             {
-                DisplayName = CSVParser.ParseString(row, "DisplayName"),
-                RelicID = CSVParser.ParseInt(row, "RelicID"),
-                StatAffected = CSVParser.ParseString(row, "Stat Affected"),
-                Amount = CSVParser.ParseInt(row, "Amount")
+                Id = r.id,
+                DisplayName = r.displayName,
+                RelicID = r.relicID,
+                StatAffected = r.statAffected,
+                Amount = r.amount,
+                Rarity = r.rarity,
+                Description = r.description
             });
         }
-
+        
         return list;
+    }
+    
+    // JSON wrapper classes for potions and relics
+    [System.Serializable]
+    private class PotionListWrapper
+    {
+        public PotionJsonData[] potions;
+    }
+    
+    [System.Serializable]
+    private class PotionJsonData
+    {
+        public string id;
+        public string displayName;
+        public int potionID;
+        public string statAffected;
+        public int amount;
+        public string rarity;
+        public string description;
+    }
+    
+    [System.Serializable]
+    private class RelicListWrapper
+    {
+        public RelicJsonData[] relics;
+    }
+    
+    [System.Serializable]
+    private class RelicJsonData
+    {
+        public string id;
+        public string displayName;
+        public int relicID;
+        public string statAffected;
+        public int amount;
+        public string rarity;
+        public string description;
     }
 
     private static PlayerData LoadPlayerStats()
