@@ -57,6 +57,19 @@ public class CombatUI : MonoBehaviour
     
     private GameObject potionTooltipPanel;
     private TextMeshProUGUI potionTooltipText;
+    
+    // New UI components for Slay the Spire style layout
+    private TextMeshProUGUI playerNameText;
+    private TextMeshProUGUI playerGoldText;
+    private TextMeshProUGUI floorText;
+    private TextMeshProUGUI floorSubtitleText;
+    private TextMeshProUGUI energyText;
+    private GameObject energyCircle;
+    private Button endTurnButton;
+    private GameObject topBar;
+    private GameObject bottomBar;
+    private GameObject relicsPanel;
+    private Player currentPlayer;
 
     void Awake()
     {
@@ -123,69 +136,141 @@ public class CombatUI : MonoBehaviour
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
 
+        // Semi-transparent dark overlay (less opaque than before for gameplay visibility)
         var bg = panel.AddComponent<Image>();
-        bg.color = new Color(0, 0, 0, 0.85f);
+        bg.color = new Color(0.05f, 0.05f, 0.1f, 0.75f);
 
-        var titleObj = new GameObject("CombatTitle");
-        titleObj.transform.SetParent(panel.transform, false);
-        var titleRect = titleObj.AddComponent<RectTransform>();
-        titleRect.anchorMin = new Vector2(0.3f, 0.88f);
-        titleRect.anchorMax = new Vector2(0.7f, 0.95f);
-        titleRect.offsetMin = Vector2.zero;
-        titleRect.offsetMax = Vector2.zero;
-        combatTitleText = titleObj.AddComponent<TextMeshProUGUI>();
-        combatTitleText.text = "COMBAT";
-        combatTitleText.alignment = TextAlignmentOptions.Center;
-        combatTitleText.fontSize = 28;
-        combatTitleText.color = Color.white;
-
-        CreatePlayerHealthBar(panel.transform);
+        // Create UI sections
+        CreateTopBar(panel.transform);
         CreateEnemyContainer(panel.transform);
-        CreateSkillButtons(panel.transform);
+        CreateBottomActionBar(panel.transform);
 
         return panel;
+    }
+    
+    private void CreateTopBar(Transform parent)
+    {
+        // Top bar container
+        topBar = new GameObject("TopBar");
+        topBar.transform.SetParent(parent, false);
+        var topBarRect = topBar.AddComponent<RectTransform>();
+        topBarRect.anchorMin = new Vector2(0, 0.92f);
+        topBarRect.anchorMax = new Vector2(1, 1);
+        topBarRect.offsetMin = new Vector2(15, 0);
+        topBarRect.offsetMax = new Vector2(-15, -8);
+
+        // Left section: Player info
+        var leftSection = new GameObject("LeftSection");
+        leftSection.transform.SetParent(topBar.transform, false);
+        var leftRect = leftSection.AddComponent<RectTransform>();
+        leftRect.anchorMin = new Vector2(0, 0);
+        leftRect.anchorMax = new Vector2(0.35f, 1);
+        leftRect.offsetMin = Vector2.zero;
+        leftRect.offsetMax = Vector2.zero;
+
+        var leftLayout = leftSection.AddComponent<HorizontalLayoutGroup>();
+        leftLayout.spacing = 20;
+        leftLayout.childAlignment = TextAnchor.MiddleLeft;
+        leftLayout.childControlWidth = false;
+        leftLayout.childControlHeight = true;
+        leftLayout.childForceExpandWidth = false;
+        leftLayout.padding = new RectOffset(10, 0, 0, 0);
+
+        // Player name
+        var nameObj = new GameObject("PlayerName");
+        nameObj.transform.SetParent(leftSection.transform, false);
+        playerNameText = nameObj.AddComponent<TextMeshProUGUI>();
+        playerNameText.text = "THE WARRIOR";
+        playerNameText.fontSize = 22;
+        playerNameText.fontStyle = FontStyles.Bold;
+        playerNameText.color = new Color(0.9f, 0.85f, 0.7f);
+        var nameLayout = nameObj.AddComponent<LayoutElement>();
+        nameLayout.preferredWidth = 180;
+
+        // HP display (heart icon + HP)
+        var hpObj = new GameObject("HPDisplay");
+        hpObj.transform.SetParent(leftSection.transform, false);
+        var hpText = hpObj.AddComponent<TextMeshProUGUI>();
+        hpText.text = "<color=#cc3333>♥</color> 72/80";
+        hpText.fontSize = 18;
+        hpText.color = Color.white;
+        playerHealthText = hpText;
+        var hpLayout = hpObj.AddComponent<LayoutElement>();
+        hpLayout.preferredWidth = 90;
+
+        // Gold display
+        var goldObj = new GameObject("GoldDisplay");
+        goldObj.transform.SetParent(leftSection.transform, false);
+        playerGoldText = goldObj.AddComponent<TextMeshProUGUI>();
+        playerGoldText.text = "<color=#ffcc00>⚙</color> 100";
+        playerGoldText.fontSize = 18;
+        playerGoldText.color = Color.white;
+        var goldLayout = goldObj.AddComponent<LayoutElement>();
+        goldLayout.preferredWidth = 80;
+
+        // Center section: Floor indicator
+        var centerSection = new GameObject("CenterSection");
+        centerSection.transform.SetParent(topBar.transform, false);
+        var centerRect = centerSection.AddComponent<RectTransform>();
+        centerRect.anchorMin = new Vector2(0.35f, 0);
+        centerRect.anchorMax = new Vector2(0.65f, 1);
+        centerRect.offsetMin = Vector2.zero;
+        centerRect.offsetMax = Vector2.zero;
+
+        var centerLayout = centerSection.AddComponent<VerticalLayoutGroup>();
+        centerLayout.childAlignment = TextAnchor.MiddleCenter;
+        centerLayout.childControlWidth = true;
+        centerLayout.childControlHeight = true;
+        centerLayout.spacing = -2;
+
+        var floorObj = new GameObject("FloorText");
+        floorObj.transform.SetParent(centerSection.transform, false);
+        floorText = floorObj.AddComponent<TextMeshProUGUI>();
+        floorText.text = "FLOOR 1";
+        floorText.fontSize = 24;
+        floorText.fontStyle = FontStyles.Bold;
+        floorText.alignment = TextAlignmentOptions.Center;
+        floorText.color = Color.white;
+
+        var subtitleObj = new GameObject("FloorSubtitle");
+        subtitleObj.transform.SetParent(centerSection.transform, false);
+        floorSubtitleText = subtitleObj.AddComponent<TextMeshProUGUI>();
+        floorSubtitleText.text = "";
+        floorSubtitleText.fontSize = 12;
+        floorSubtitleText.alignment = TextAlignmentOptions.Center;
+        floorSubtitleText.color = new Color(0.7f, 0.7f, 0.7f);
+        
+        // Keep combatTitleText reference for special titles (Boss Fight, etc.)
+        combatTitleText = floorText;
+
+        // Right section: Potions and settings (placeholder for now)
+        var rightSection = new GameObject("RightSection");
+        rightSection.transform.SetParent(topBar.transform, false);
+        var rightRect = rightSection.AddComponent<RectTransform>();
+        rightRect.anchorMin = new Vector2(0.65f, 0);
+        rightRect.anchorMax = new Vector2(1, 1);
+        rightRect.offsetMin = Vector2.zero;
+        rightRect.offsetMax = Vector2.zero;
+        
+        // Potions will be added here later
+        CreatePotionContainer(rightSection.transform);
     }
 
     private void CreatePlayerHealthBar(Transform parent)
     {
-        var container = new GameObject("PlayerHealth");
+        // HP is now displayed in the top bar, but we still need a reference for floating text
+        var container = new GameObject("PlayerHealthRef");
         container.transform.SetParent(parent, false);
 
         var rect = container.AddComponent<RectTransform>();
-        // Raise HP bar to avoid any overlap with the skill bar
-        rect.anchorMin = new Vector2(0.1f, 0.16f);
-        rect.anchorMax = new Vector2(0.4f, 0.20f);
+        rect.anchorMin = new Vector2(0.02f, 0.92f);
+        rect.anchorMax = new Vector2(0.15f, 0.98f);
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
 
-        var bgImage = container.AddComponent<Image>();
-        bgImage.color = new Color(0.2f, 0.2f, 0.2f, 1f);
-
-        var fill = new GameObject("Fill");
-        fill.transform.SetParent(container.transform, false);
-
-        var fillRect = fill.AddComponent<RectTransform>();
-        fillRect.anchorMin = Vector2.zero;
-        fillRect.anchorMax = Vector2.one;
-        fillRect.offsetMin = new Vector2(2, 2);
-        fillRect.offsetMax = new Vector2(-2, -2);
-
-        playerHealthFill = fill.AddComponent<Image>();
-        playerHealthFill.color = Color.green;
-
-        var textObj = new GameObject("Text");
-        textObj.transform.SetParent(container.transform, false);
-
-        var textRect = textObj.AddComponent<RectTransform>();
-        textRect.anchorMin = Vector2.zero;
-        textRect.anchorMax = Vector2.one;
-        textRect.offsetMin = Vector2.zero;
-        textRect.offsetMax = Vector2.zero;
-
-        playerHealthText = textObj.AddComponent<TextMeshProUGUI>();
-        playerHealthText.alignment = TextAlignmentOptions.Center;
-        playerHealthText.fontSize = 18;
-        playerHealthText.color = Color.white;
+        // Hidden fill for compatibility
+        playerHealthFill = container.AddComponent<Image>();
+        playerHealthFill.color = Color.clear;
 
         playerHealthBar = container;
     }
@@ -196,13 +281,14 @@ public class CombatUI : MonoBehaviour
         container.transform.SetParent(parent, false);
 
         var rect = container.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.1f, 0.4f);
-        rect.anchorMax = new Vector2(0.9f, 0.85f);
+        // Positioned in center area, leaving room for top bar and bottom action bar
+        rect.anchorMin = new Vector2(0.1f, 0.25f);
+        rect.anchorMax = new Vector2(0.9f, 0.88f);
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
 
         var layout = container.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 20;
+        layout.spacing = 30;
         layout.childAlignment = TextAnchor.MiddleCenter;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
@@ -212,35 +298,245 @@ public class CombatUI : MonoBehaviour
         enemyContainer = container.transform;
     }
 
+    private void CreateBottomActionBar(Transform parent)
+    {
+        // Bottom bar container with rounded dark background
+        bottomBar = new GameObject("BottomBar");
+        bottomBar.transform.SetParent(parent, false);
+        var bottomRect = bottomBar.AddComponent<RectTransform>();
+        bottomRect.anchorMin = new Vector2(0.05f, 0.02f);
+        bottomRect.anchorMax = new Vector2(0.95f, 0.20f);
+        bottomRect.offsetMin = Vector2.zero;
+        bottomRect.offsetMax = Vector2.zero;
+
+        var bottomBg = bottomBar.AddComponent<Image>();
+        bottomBg.color = new Color(0.12f, 0.10f, 0.08f, 0.95f);
+
+        // Energy Circle (left side)
+        CreateEnergyCircle(bottomBar.transform);
+
+        // Skill Cards Container (center)
+        var skillsContainer = new GameObject("SkillsContainer");
+        skillsContainer.transform.SetParent(bottomBar.transform, false);
+        actionButtonContainer = skillsContainer;
+        var skillsRect = skillsContainer.AddComponent<RectTransform>();
+        skillsRect.anchorMin = new Vector2(0.12f, 0.1f);
+        skillsRect.anchorMax = new Vector2(0.78f, 0.9f);
+        skillsRect.offsetMin = Vector2.zero;
+        skillsRect.offsetMax = Vector2.zero;
+
+        // Dark rounded background for skill cards
+        var skillsBg = skillsContainer.AddComponent<Image>();
+        skillsBg.color = new Color(0.08f, 0.07f, 0.06f, 0.9f);
+
+        var skillsLayout = skillsContainer.AddComponent<HorizontalLayoutGroup>();
+        skillsLayout.spacing = 8;
+        skillsLayout.padding = new RectOffset(10, 10, 8, 8);
+        skillsLayout.childAlignment = TextAnchor.MiddleCenter;
+        skillsLayout.childControlWidth = true;
+        skillsLayout.childControlHeight = true;
+        skillsLayout.childForceExpandWidth = true;
+        skillsLayout.childForceExpandHeight = true;
+
+        // Create skill cards with hotkey indicators
+        skill1Button = CreateSkillCard(skillsContainer.transform, "Skill1", "1", new Color(0.6f, 0.2f, 0.2f, 1f), OnSkill1Clicked, out skill1Text, out skill1Tooltip);
+        skill2Button = CreateSkillCard(skillsContainer.transform, "Skill2", "2", new Color(0.2f, 0.4f, 0.7f, 1f), OnSkill2Clicked, out skill2Text, out skill2Tooltip);
+        skill3Button = CreateSkillCard(skillsContainer.transform, "Skill3", "3", new Color(0.5f, 0.4f, 0.3f, 1f), OnSkill3Clicked, out skill3Text, out skill3Tooltip);
+        skill4Button = CreateSkillCard(skillsContainer.transform, "Skill4", "Q", new Color(0.3f, 0.3f, 0.4f, 1f), OnSkill4Clicked, out skill4Text, out skill4Tooltip);
+        skill5Button = CreateSkillCard(skillsContainer.transform, "Skill5", "R", new Color(0.7f, 0.5f, 0.2f, 1f), OnSkill5Clicked, out skill5Text, out skill5Tooltip);
+
+        // Back button (hidden by default, shown during targeting)
+        backButton = CreateSkillCard(skillsContainer.transform, "Back", "ESC", new Color(0.4f, 0.4f, 0.4f, 1f), OnBackClicked, out _, out _);
+        backButton.gameObject.SetActive(false);
+
+        // End Turn Button (right side)
+        CreateEndTurnButton(bottomBar.transform);
+    }
+
+    private void CreateEnergyCircle(Transform parent)
+    {
+        energyCircle = new GameObject("EnergyCircle");
+        energyCircle.transform.SetParent(parent, false);
+        var circleRect = energyCircle.AddComponent<RectTransform>();
+        circleRect.anchorMin = new Vector2(0.01f, 0.15f);
+        circleRect.anchorMax = new Vector2(0.11f, 0.85f);
+        circleRect.offsetMin = Vector2.zero;
+        circleRect.offsetMax = Vector2.zero;
+
+        // Background circle
+        var circleBg = energyCircle.AddComponent<Image>();
+        circleBg.color = new Color(0.15f, 0.25f, 0.4f, 1f);
+
+        // Energy number
+        var energyNumObj = new GameObject("EnergyNumber");
+        energyNumObj.transform.SetParent(energyCircle.transform, false);
+        var energyNumRect = energyNumObj.AddComponent<RectTransform>();
+        energyNumRect.anchorMin = new Vector2(0, 0.3f);
+        energyNumRect.anchorMax = new Vector2(1, 0.9f);
+        energyNumRect.offsetMin = Vector2.zero;
+        energyNumRect.offsetMax = Vector2.zero;
+
+        energyText = energyNumObj.AddComponent<TextMeshProUGUI>();
+        energyText.text = "0";
+        energyText.fontSize = 36;
+        energyText.fontStyle = FontStyles.Bold;
+        energyText.alignment = TextAlignmentOptions.Center;
+        energyText.color = new Color(0.4f, 0.7f, 1f);
+
+        // "ENERGY" label
+        var labelObj = new GameObject("EnergyLabel");
+        labelObj.transform.SetParent(energyCircle.transform, false);
+        var labelRect = labelObj.AddComponent<RectTransform>();
+        labelRect.anchorMin = new Vector2(0, 0);
+        labelRect.anchorMax = new Vector2(1, 0.3f);
+        labelRect.offsetMin = Vector2.zero;
+        labelRect.offsetMax = Vector2.zero;
+
+        var labelText = labelObj.AddComponent<TextMeshProUGUI>();
+        labelText.text = "ENERGY";
+        labelText.fontSize = 10;
+        labelText.alignment = TextAlignmentOptions.Center;
+        labelText.color = new Color(0.6f, 0.8f, 1f);
+    }
+
+    private void CreateEndTurnButton(Transform parent)
+    {
+        var endTurnObj = new GameObject("EndTurnButton");
+        endTurnObj.transform.SetParent(parent, false);
+        var btnRect = endTurnObj.AddComponent<RectTransform>();
+        btnRect.anchorMin = new Vector2(0.80f, 0.1f);
+        btnRect.anchorMax = new Vector2(0.98f, 0.9f);
+        btnRect.offsetMin = Vector2.zero;
+        btnRect.offsetMax = Vector2.zero;
+
+        var btnBg = endTurnObj.AddComponent<Image>();
+        btnBg.color = new Color(0.85f, 0.55f, 0.15f, 1f);
+
+        endTurnButton = endTurnObj.AddComponent<Button>();
+        endTurnButton.targetGraphic = btnBg;
+        endTurnButton.onClick.AddListener(OnEndTurnClicked);
+
+        // "END" text
+        var endTextObj = new GameObject("EndText");
+        endTextObj.transform.SetParent(endTurnObj.transform, false);
+        var endTextRect = endTextObj.AddComponent<RectTransform>();
+        endTextRect.anchorMin = new Vector2(0, 0.55f);
+        endTextRect.anchorMax = new Vector2(1, 0.9f);
+        endTextRect.offsetMin = Vector2.zero;
+        endTextRect.offsetMax = Vector2.zero;
+
+        var endText = endTextObj.AddComponent<TextMeshProUGUI>();
+        endText.text = "END";
+        endText.fontSize = 14;
+        endText.alignment = TextAlignmentOptions.Center;
+        endText.color = Color.white;
+
+        // "TURN" text
+        var turnTextObj = new GameObject("TurnText");
+        turnTextObj.transform.SetParent(endTurnObj.transform, false);
+        var turnTextRect = turnTextObj.AddComponent<RectTransform>();
+        turnTextRect.anchorMin = new Vector2(0, 0.15f);
+        turnTextRect.anchorMax = new Vector2(1, 0.55f);
+        turnTextRect.offsetMin = Vector2.zero;
+        turnTextRect.offsetMax = Vector2.zero;
+
+        var turnText = turnTextObj.AddComponent<TextMeshProUGUI>();
+        turnText.text = "TURN";
+        turnText.fontSize = 20;
+        turnText.fontStyle = FontStyles.Bold;
+        turnText.alignment = TextAlignmentOptions.Center;
+        turnText.color = Color.white;
+    }
+
+    private Button CreateSkillCard(Transform parent, string name, string hotkey, Color bgColor, UnityEngine.Events.UnityAction onClick, out TextMeshProUGUI textComponent, out TooltipTrigger tooltip)
+    {
+        var cardObj = new GameObject(name);
+        cardObj.transform.SetParent(parent, false);
+
+        var cardBg = cardObj.AddComponent<Image>();
+        cardBg.color = bgColor;
+
+        var btn = cardObj.AddComponent<Button>();
+        btn.targetGraphic = cardBg;
+        btn.onClick.AddListener(onClick);
+
+        tooltip = cardObj.AddComponent<TooltipTrigger>();
+
+        // Hotkey indicator (top-left corner)
+        var hotkeyObj = new GameObject("Hotkey");
+        hotkeyObj.transform.SetParent(cardObj.transform, false);
+        var hotkeyRect = hotkeyObj.AddComponent<RectTransform>();
+        hotkeyRect.anchorMin = new Vector2(0, 0.75f);
+        hotkeyRect.anchorMax = new Vector2(0.35f, 1);
+        hotkeyRect.offsetMin = Vector2.zero;
+        hotkeyRect.offsetMax = Vector2.zero;
+
+        var hotkeyBg = hotkeyObj.AddComponent<Image>();
+        hotkeyBg.color = new Color(0.1f, 0.1f, 0.1f, 0.8f);
+
+        var hotkeyTextObj = new GameObject("HotkeyText");
+        hotkeyTextObj.transform.SetParent(hotkeyObj.transform, false);
+        var hotkeyTextRect = hotkeyTextObj.AddComponent<RectTransform>();
+        hotkeyTextRect.anchorMin = Vector2.zero;
+        hotkeyTextRect.anchorMax = Vector2.one;
+        hotkeyTextRect.offsetMin = Vector2.zero;
+        hotkeyTextRect.offsetMax = Vector2.zero;
+
+        var hotkeyText = hotkeyTextObj.AddComponent<TextMeshProUGUI>();
+        hotkeyText.text = hotkey;
+        hotkeyText.fontSize = 12;
+        hotkeyText.alignment = TextAlignmentOptions.Center;
+        hotkeyText.color = Color.white;
+
+        // Skill name text (center)
+        var nameObj = new GameObject("Text");
+        nameObj.transform.SetParent(cardObj.transform, false);
+        var nameRect = nameObj.AddComponent<RectTransform>();
+        nameRect.anchorMin = new Vector2(0, 0.25f);
+        nameRect.anchorMax = new Vector2(1, 0.75f);
+        nameRect.offsetMin = new Vector2(2, 0);
+        nameRect.offsetMax = new Vector2(-2, 0);
+
+        textComponent = nameObj.AddComponent<TextMeshProUGUI>();
+        textComponent.text = name;
+        textComponent.fontSize = 11;
+        textComponent.alignment = TextAlignmentOptions.Center;
+        textComponent.color = Color.white;
+        textComponent.enableWordWrapping = false;
+        textComponent.overflowMode = TextOverflowModes.Ellipsis;
+
+        // Energy cost (bottom)
+        var costObj = new GameObject("Cost");
+        costObj.transform.SetParent(cardObj.transform, false);
+        var costRect = costObj.AddComponent<RectTransform>();
+        costRect.anchorMin = new Vector2(0, 0);
+        costRect.anchorMax = new Vector2(1, 0.25f);
+        costRect.offsetMin = Vector2.zero;
+        costRect.offsetMax = Vector2.zero;
+
+        var costText = costObj.AddComponent<TextMeshProUGUI>();
+        costText.text = "1 EN";
+        costText.fontSize = 10;
+        costText.alignment = TextAlignmentOptions.Center;
+        costText.color = new Color(0.7f, 0.9f, 1f);
+
+        return btn;
+    }
+
+    private void OnEndTurnClicked()
+    {
+        // End turn is currently automatic after each action
+        // This button can be used to skip remaining actions if multi-action turns are implemented
+        if (combatManager != null)
+        {
+            combatManager.EndPlayerTurn();
+        }
+    }
+
     private void CreateSkillButtons(Transform parent)
     {
-        var container = new GameObject("ActionButtons");
-        container.transform.SetParent(parent, false);
-        actionButtonContainer = container;
-        var containerRect = container.AddComponent<RectTransform>();
-        containerRect.anchorMin = new Vector2(0.10f, 0.03f);
-        containerRect.anchorMax = new Vector2(0.90f, 0.13f);
-        containerRect.offsetMin = Vector2.zero;
-        containerRect.offsetMax = Vector2.zero;
-
-        var layout = container.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 6;
-        layout.childControlWidth = true;
-        layout.childControlHeight = true;
-        layout.childForceExpandWidth = true;
-        layout.childForceExpandHeight = true;
-
-        // 5 skill buttons (no attack button)
-        skill1Button = CreateActionButton(container.transform, "Skill1", "Skill 1", new Color(0.2f, 0.5f, 0.7f, 1f), OnSkill1Clicked, out skill1Text, out skill1Tooltip);
-        skill2Button = CreateActionButton(container.transform, "Skill2", "Skill 2", new Color(0.2f, 0.5f, 0.7f, 1f), OnSkill2Clicked, out skill2Text, out skill2Tooltip);
-        skill3Button = CreateActionButton(container.transform, "Skill3", "Skill 3", new Color(0.2f, 0.5f, 0.7f, 1f), OnSkill3Clicked, out skill3Text, out skill3Tooltip);
-        skill4Button = CreateActionButton(container.transform, "Skill4", "Skill 4", new Color(0.2f, 0.5f, 0.7f, 1f), OnSkill4Clicked, out skill4Text, out skill4Tooltip);
-        skill5Button = CreateActionButton(container.transform, "Skill5", "Ultimate", new Color(0.7f, 0.4f, 0.2f, 1f), OnSkill5Clicked, out skill5Text, out skill5Tooltip);
-        
-        backButton = CreateActionButton(container.transform, "Back", "BACK", new Color(0.5f, 0.5f, 0.5f, 1f), OnBackClicked, out _, out _);
-        backButton.gameObject.SetActive(false);
-        
-        CreatePotionContainer(parent);
+        // Legacy method - now handled by CreateBottomActionBar
+        // Kept for compatibility but does nothing
     }
 
     private void CreatePotionContainer(Transform parent)
@@ -878,6 +1174,7 @@ public class CombatUI : MonoBehaviour
         }
 
         currentEnemies = new List<CombatEnemy>(enemies);
+        currentPlayer = player;
         isTargeting = false;
         
         ClearEnemySlots();
@@ -887,14 +1184,46 @@ public class CombatUI : MonoBehaviour
             CreateEnemySlot(enemy);
         }
 
-        if (combatTitleText != null)
+        // Update top bar - Player name, HP, Gold
+        var character = player.GetCharacter();
+        if (playerNameText != null && character != null)
         {
-            combatTitleText.text = title ?? "COMBAT";
-            combatTitleText.color = string.IsNullOrEmpty(title) ? Color.white : new Color(1f, 0.5f, 0.2f);
+            playerNameText.text = character.DisplayName.ToUpper();
+        }
+        
+        // Update floor display
+        if (floorText != null)
+        {
+            if (title != null && title.Contains("BOSS"))
+            {
+                floorText.text = title;
+                floorText.color = new Color(1f, 0.5f, 0.2f);
+                if (floorSubtitleText != null)
+                {
+                    floorSubtitleText.text = "";
+                }
+            }
+            else
+            {
+                // Calculate floor number based on world and nodes completed
+                var gameManager = FindFirstObjectByType<GameManager>();
+                int world = GameManager.CurrentWorld;
+                int nodesPerWorld = gameManager != null ? gameManager.GetTotalNodesForCurrentWorld() : 5;
+                int floorNumber = (world - 1) * nodesPerWorld + 1;
+                floorText.text = $"FLOOR {floorNumber}";
+                floorText.color = Color.white;
+                
+                // Show subtitle for boss approaching
+                if (floorSubtitleText != null)
+                {
+                    floorSubtitleText.text = title ?? "";
+                }
+            }
         }
 
         UpdateSkillButtons(player);
         UpdatePlayerHealth(player);
+        UpdateEnergyDisplay(player);
         RefreshPotionButtons(player);
         combatPanel.SetActive(true);
         GameLog.System(GameLog.Join(
@@ -1213,19 +1542,36 @@ public class CombatUI : MonoBehaviour
     public void UpdatePlayerHealth(Player player)
     {
         float healthPercent = (float)player.GetHealth() / player.GetMaxHealth();
-        playerHealthFill.fillAmount = healthPercent;
         
-        // Display shield if player has any
+        // Update hidden fill for compatibility (used by floating text positioning)
+        if (playerHealthFill != null)
+        {
+            playerHealthFill.fillAmount = healthPercent;
+        }
+        
+        // Display HP in top bar format with heart icon
         int shield = player.GetShield();
         string shieldText = shield > 0 ? $" <color=#44aaff>[+{shield}]</color>" : "";
-        playerHealthText.text = $"HP: {player.GetHealth()}/{player.GetMaxHealth()}{shieldText}";
-
-        if (healthPercent > 0.5f)
-            playerHealthFill.color = Color.green;
-        else if (healthPercent > 0.25f)
-            playerHealthFill.color = Color.yellow;
-        else
-            playerHealthFill.color = Color.red;
+        
+        if (playerHealthText != null)
+        {
+            string hpColor = healthPercent > 0.5f ? "#55ff55" : (healthPercent > 0.25f ? "#ffff55" : "#ff5555");
+            playerHealthText.text = $"<color=#cc3333>♥</color> <color={hpColor}>{player.GetHealth()}/{player.GetMaxHealth()}</color>{shieldText}";
+        }
+        
+        // Update gold display
+        if (playerGoldText != null)
+        {
+            playerGoldText.text = $"<color=#ffcc00>⚙</color> {player.GetGold()}";
+        }
+    }
+    
+    public void UpdateEnergyDisplay(Player player)
+    {
+        if (energyText != null)
+        {
+            energyText.text = player.GetEnergy().ToString();
+        }
     }
 
     public void ShowDamageToEnemy(CombatEnemy enemy, int damage, bool isCrit = false)

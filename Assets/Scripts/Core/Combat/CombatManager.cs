@@ -165,6 +165,19 @@ public class CombatManager : MonoBehaviour
             OnPlayerAttackTarget(target);
         }
     }
+    
+    /// <summary>
+    /// End the player's turn manually (called by End Turn button).
+    /// </summary>
+    public void EndPlayerTurn()
+    {
+        if (!combatActive || !isPlayerTurn) return;
+        
+        GameLog.Combat(GameLog.Join("EndTurnClicked"));
+        
+        isPlayerTurn = false;
+        StartCoroutine(DelayedEnemyTurn());
+    }
 
     public void OnPlayerAttackTarget(CombatEnemy target)
     {
