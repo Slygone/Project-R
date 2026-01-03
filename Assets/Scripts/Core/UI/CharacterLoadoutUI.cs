@@ -272,7 +272,7 @@ public class CharacterLoadoutUI : MonoBehaviour
         vLayout.childForceExpandWidth = true;
         vLayout.childForceExpandHeight = false;
         
-        // Add skills
+        // Add skills (1-4 gain energy, 5 is ultimate that costs energy)
         AddSkillRow(contentArea.transform, currentCharacter.Skill1, 
             $"{currentCharacter.Skill1DamagePercent}% | CD:{currentCharacter.Skill1Cooldown} | +{currentCharacter.Skill1EnergyGain}E",
             currentCharacter.Skill1Effect);
@@ -281,9 +281,17 @@ public class CharacterLoadoutUI : MonoBehaviour
             $"{currentCharacter.Skill2DamagePercent}% | CD:{currentCharacter.Skill2Cooldown} | +{currentCharacter.Skill2EnergyGain}E",
             currentCharacter.Skill2Effect);
         
-        AddSkillRow(contentArea.transform, currentCharacter.Skill3 + " (ULT)",
-            $"{currentCharacter.Skill3DamagePercent}% | CD:{currentCharacter.Skill3Cooldown} | -{currentCharacter.Skill3EnergyCost}E",
+        AddSkillRow(contentArea.transform, currentCharacter.Skill3,
+            $"{currentCharacter.Skill3DamagePercent}% | CD:{currentCharacter.Skill3Cooldown} | +{currentCharacter.Skill3EnergyGain}E",
             currentCharacter.Skill3Effect);
+        
+        AddSkillRow(contentArea.transform, currentCharacter.Skill4,
+            $"{currentCharacter.Skill4DamagePercent}% | CD:{currentCharacter.Skill4Cooldown} | +{currentCharacter.Skill4EnergyGain}E",
+            currentCharacter.Skill4Effect);
+        
+        AddSkillRow(contentArea.transform, currentCharacter.Skill5 + " (ULT)",
+            $"{currentCharacter.Skill5DamagePercent}% | CD:{currentCharacter.Skill5Cooldown} | -{currentCharacter.Skill5EnergyCost}E",
+            currentCharacter.Skill5Effect);
     }
     
     private void AddSkillRow(Transform parent, string skillName, string stats, string effect)

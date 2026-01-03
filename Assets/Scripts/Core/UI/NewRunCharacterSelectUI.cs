@@ -5,7 +5,7 @@ using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
-/// New Run character selection UI showing ALL characters from CSV.
+/// New Run character selection UI showing ALL characters from JSON.
 /// Displays character cards with ascension level and yellow "UP" badge.
 /// </summary>
 public class NewRunCharacterSelectUI : MonoBehaviour

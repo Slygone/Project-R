@@ -570,14 +570,14 @@ public class CombatManager : MonoBehaviour
             return;
         }
         
-        // Check energy for Skill 3
-        if (skillNumber == 3 && !player.CanUseSkill3())
+        // Check energy for Skill 5 (Ultimate)
+        if (skillNumber == 5 && !player.CanUseUltimate())
         {
             GameLog.Combat(GameLog.Join(
                 "SkillBlocked",
                 GameLog.KV("skill", skillNumber),
                 GameLog.KV("reason", "energy"),
-                GameLog.KV("need", player.GetSkill3EnergyCost()),
+                GameLog.KV("need", player.GetUltimateEnergyCost()),
                 GameLog.KV("have", player.GetEnergy())
             ), GameLogVerbosity.Verbose);
             return;
@@ -626,6 +626,16 @@ public class CombatManager : MonoBehaviour
                 skillName = character.Skill3;
                 skillDamagePercent = character.Skill3DamagePercent;
                 skillEffect = character.Skill3Effect;
+                break;
+            case 4:
+                skillName = character.Skill4;
+                skillDamagePercent = character.Skill4DamagePercent;
+                skillEffect = character.Skill4Effect;
+                break;
+            case 5:
+                skillName = character.Skill5;
+                skillDamagePercent = character.Skill5DamagePercent;
+                skillEffect = character.Skill5Effect;
                 break;
             default:
                 skillName = "Unknown";
@@ -1016,6 +1026,16 @@ public class CombatManager : MonoBehaviour
                 skillName = character.Skill3;
                 skillDamagePercent = character.Skill3DamagePercent;
                 skillEffect = character.Skill3Effect;
+                break;
+            case 4:
+                skillName = character.Skill4;
+                skillDamagePercent = character.Skill4DamagePercent;
+                skillEffect = character.Skill4Effect;
+                break;
+            case 5:
+                skillName = character.Skill5;
+                skillDamagePercent = character.Skill5DamagePercent;
+                skillEffect = character.Skill5Effect;
                 break;
             default:
                 skillName = "Unknown";

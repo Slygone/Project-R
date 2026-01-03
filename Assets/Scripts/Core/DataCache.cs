@@ -22,9 +22,11 @@ public static class DataCache
 
     public static void LoadAll()
     {
+        GameDataLoader.LoadAll();
+        
         Enemies = LoadEnemies();
         RestOptions = LoadRestOptions();
-        Characters = LoadCharacters();
+        Characters = LoadCharactersFromJson();
         Potions = LoadPotions();
         Relics = LoadRelics();
         PlayerStats = LoadPlayerStats();
@@ -115,47 +117,6 @@ public static class DataCache
         return (0, 0);
     }
     
-    // Parse cooldown from strings like "1 Turn", "2 Turns", "4 Turns" -> returns integer
-    private static int ParseCooldown(string cooldownStr)
-    {
-        if (string.IsNullOrEmpty(cooldownStr)) return 0;
-        
-        // Extract the first number from the string
-        string numPart = "";
-        foreach (char c in cooldownStr)
-        {
-            if (char.IsDigit(c))
-                numPart += c;
-            else if (numPart.Length > 0)
-                break; // Stop after we've collected digits
-        }
-        
-        if (int.TryParse(numPart, out int result))
-            return result;
-        
-        return 0;
-    }
-    
-    // Parse damage percent from strings like "125% of base damage", "150%" -> returns float (e.g., 125)
-    private static float ParseDamagePercent(string damageStr)
-    {
-        if (string.IsNullOrEmpty(damageStr)) return 100f;
-        
-        // Extract the first number from the string
-        string numPart = "";
-        foreach (char c in damageStr)
-        {
-            if (char.IsDigit(c) || c == '.')
-                numPart += c;
-            else if (numPart.Length > 0)
-                break; // Stop after we've collected digits
-        }
-        
-        if (float.TryParse(numPart, out float result))
-            return result;
-        
-        return 100f; // Default to 100% if parsing fails
-    }
 
     private static List<EnemyData> LoadEnemies()
     {
@@ -226,62 +187,16 @@ public static class DataCache
         return list;
     }
 
-    private static List<CharacterData> LoadCharacters()
+    private static List<CharacterData> LoadCharactersFromJson()
     {
-        var csv = Resources.Load<TextAsset>("Data/character");
-        var rows = CSVParser.Parse(csv.text);
+        var definitions = GameDataLoader.GetAllCharacters();
         var list = new List<CharacterData>();
-
-        foreach (var row in rows)
+        
+        foreach (var def in definitions)
         {
-            // Parse damage range from CSV (e.g., "14-16") and use average as base damage
-            string damageRangeLabel = CSVParser.ParseString(row, "DamageRange");
-            var damageRange = ParseDamageRange(damageRangeLabel);
-            int baseDamage = (damageRange.min + damageRange.max) / 2;
-            
-            list.Add(new CharacterData
-            {
-                DisplayName = CSVParser.ParseString(row, "DisplayName"),
-                CharacterID = CSVParser.ParseInt(row, "CharacterID"),
-                MaxHealth = CSVParser.ParseInt(row, "MaxHealth"),
-                Damage = baseDamage, // Base damage - variance applied at attack time
-                DamageRangeLabel = damageRangeLabel,
-                Gold = CSVParser.ParseInt(row, "Gold"),
-                MaxEnergy = CSVParser.ParseInt(row, "MaxEnergy"),
-                CritChance = CSVParser.ParseFloat(row, "CritChance"),
-                CritDamage = CSVParser.ParseFloat(row, "CritDamage"),
-                BaseResistance = CSVParser.ParseInt(row, "BaseRessistance"),
-                BonusResistance = CSVParser.ParseInt(row, "BonusRessistance"),
-                // Skill 1 (supports new header Skill1_Name)
-                Skill1 = CSVParser.ParseString(row, "Skill1_Name", CSVParser.ParseString(row, "Skill1", "")),
-                Skill1DamagePercent = ParseDamagePercent(CSVParser.ParseString(row, "Skill1_Damage")),
-                Skill1Effect = CSVParser.ParseString(row, "Skill1_Effect_1", "null"),
-                Skill1Cooldown = ParseCooldown(CSVParser.ParseString(row, "Skill1_Cooldown")),
-                Skill1EnergyGain = CSVParser.ParseInt(row, "Skill1_EnergyGain"),
-                // Skill 2 (supports new header Skill2_Name)
-                Skill2 = CSVParser.ParseString(row, "Skill2_Name", CSVParser.ParseString(row, "Skill2", "")),
-                Skill2DamagePercent = ParseDamagePercent(CSVParser.ParseString(row, "Skill2_Damage")),
-                Skill2Effect = CSVParser.ParseString(row, "Skill2_Effect_1", "null"),
-                Skill2Cooldown = ParseCooldown(CSVParser.ParseString(row, "Skill2_Cooldown")),
-                Skill2EnergyGain = CSVParser.ParseInt(row, "Skill2_EnergyGain"),
-                // Skill 3 (supports new header Skill3_Name)
-                Skill3 = CSVParser.ParseString(row, "Skill3_Name", CSVParser.ParseString(row, "Skill3", "")),
-                Skill3DamagePercent = ParseDamagePercent(CSVParser.ParseString(row, "Skill3_Damage")),
-                Skill3Effect = CSVParser.ParseString(row, "Skill3_Effect_1", "null"),
-                Skill3Cooldown = ParseCooldown(CSVParser.ParseString(row, "Skill3_Cooldown")),
-                Skill3EnergyCost = CSVParser.ParseInt(row, "Skill3_EnergyCost"),
-                // Talent Perks (A/B options per tier)
-                Perk1a = CSVParser.ParseString(row, "Perk1a", ""),
-                Perk1b = CSVParser.ParseString(row, "Perk1b", ""),
-                Perk2a = CSVParser.ParseString(row, "Perk2a", ""),
-                Perk2b = CSVParser.ParseString(row, "Perk2b", ""),
-                Perk3a = CSVParser.ParseString(row, "Perk3a", ""),
-                Perk3b = CSVParser.ParseString(row, "Perk3b", ""),
-                Perk4a = CSVParser.ParseString(row, "Perk4a", ""),
-                Perk4b = CSVParser.ParseString(row, "Perk4b", "")
-            });
+            list.Add(GameDataLoader.ToCharacterData(def));
         }
-
+        
         return list;
     }
 

@@ -424,7 +424,28 @@ public class PlayerStatsUI : MonoBehaviour
     {
         if (string.IsNullOrEmpty(skillName)) return "";
         
-        // Try to construct a description from the currently selected character CSV data
+        // Try JSON skill lookup first
+        string skillId = $"skill_{skillName.ToLower()}";
+        var skillDef = GameDataLoader.GetSkill(skillId);
+        if (skillDef != null)
+        {
+            float damagePercent = 100f;
+            if (skillDef.executions != null)
+            {
+                foreach (var exec in skillDef.executions)
+                {
+                    if (exec.effectId == "eff_deal_damage" && exec.@params?.scaling != null)
+                    {
+                        damagePercent = exec.@params.scaling.multiplier * 100f;
+                        break;
+                    }
+                }
+            }
+            string desc = skillDef.description ?? "";
+            return $"{desc}{(string.IsNullOrEmpty(desc) ? "" : "\n")}Damage: {damagePercent}%";
+        }
+        
+        // Try character data as secondary source
         var refs = Object.FindFirstObjectByType<Referencer>();
         var player = refs != null ? refs.player : null;
         var character = player != null ? player.GetCharacter() : null;
@@ -454,25 +475,6 @@ public class PlayerStatsUI : MonoBehaviour
             }
         }
         
-        // Fallback legacy strings
-        switch (skillName.ToLower())
-        {
-            case "slash": return "Basic sword strike (100% damage)";
-            case "riposte": return "Defensive counter (80% damage)";
-            case "bladestorm": return "Whirlwind attack (150% damage + 50% to all)";
-            case "bolt": return "Quick magic projectile (90% damage)";
-            case "ray": return "Focused beam (120% damage)";
-            case "meteor": return "Devastating impact (200% damage)";
-            case "aimedshot": return "Precise shot (130% damage)";
-            case "tripleshot": return "Hit all enemies (50% damage each)";
-            case "doubleup": return "Two arrows, one target (200% damage)";
-            case "dirtystab": return "Underhanded strike (110% damage)";
-            case "cheapshot": return "Quick jab (70% damage)";
-            case "ambush": return "Strike from shadows (180% damage)";
-            case "shock": return "Electric jolt (90% damage)";
-            case "judgement": return "Divine strike (140% damage)";
-            case "holynova": return "Holy explosion (120% damage to all)";
-            default: return "Unknown skill";
-        }
+        return "Unknown skill";
     }
 }

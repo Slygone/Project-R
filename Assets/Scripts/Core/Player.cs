@@ -31,8 +31,8 @@ public class Player : MonoBehaviour
     private ElementalOrbSystem orbSystem = new ElementalOrbSystem();
     private bool hasElementPair = false;
     
-    // Skill cooldown tracking (index 0 = Skill1, 1 = Skill2, 2 = Skill3)
-    private int[] skillCooldowns = new int[3];
+    // Skill cooldown tracking (index 0-3 = Skill1-4, index 4 = Skill5/Ultimate)
+    private int[] skillCooldowns = new int[5];
     private int combatTurnCount = 0;
     
     // Status effects (Shield, Block)
@@ -497,10 +497,8 @@ public class Player : MonoBehaviour
         // Sync resistances from character CSV data
         baseResistance = character.BaseResistance;
         bonusResistance = character.BonusResistance;
-        // Reset cooldowns
-        skillCooldowns[0] = 0;
-        skillCooldowns[1] = 0;
-        skillCooldowns[2] = 0;
+        // Reset cooldowns for all 5 skills
+        for (int i = 0; i < 5; i++) skillCooldowns[i] = 0;
         GameLog.System(GameLog.Join(
             "CharacterSelect",
             GameLog.KV("name", character.DisplayName),
@@ -511,11 +509,11 @@ public class Player : MonoBehaviour
     
     // ========== SKILL COOLDOWN & ENERGY SYSTEM ==========
     
-    public int GetSkillCooldown(int skillIndex) => skillIndex >= 0 && skillIndex < 3 ? skillCooldowns[skillIndex] : 0;
+    public int GetSkillCooldown(int skillIndex) => skillIndex >= 0 && skillIndex < 5 ? skillCooldowns[skillIndex] : 0;
     
     public void SetSkillCooldown(int skillIndex, int cooldown)
     {
-        if (skillIndex >= 0 && skillIndex < 3)
+        if (skillIndex >= 0 && skillIndex < 5)
         {
             skillCooldowns[skillIndex] = cooldown;
             GameLog.System(GameLog.Join(
@@ -528,19 +526,19 @@ public class Player : MonoBehaviour
     
     public bool IsSkillOnCooldown(int skillIndex) => GetSkillCooldown(skillIndex) > 0;
     
-    public bool CanUseSkill3()
+    public bool CanUseUltimate()
     {
         if (selectedCharacter == null) return false;
-        return energy >= selectedCharacter.Skill3EnergyCost && !IsSkillOnCooldown(2);
+        return energy >= selectedCharacter.Skill5EnergyCost && !IsSkillOnCooldown(4);
     }
     
-    public int GetSkill3EnergyCost() => selectedCharacter != null ? selectedCharacter.Skill3EnergyCost : 0;
+    public int GetUltimateEnergyCost() => selectedCharacter != null ? selectedCharacter.Skill5EnergyCost : 0;
     
     public void UseSkillAndApplyEffects(int skillIndex)
     {
         if (selectedCharacter == null) return;
         
-        // Apply cooldown based on skill
+        // Apply cooldown based on skill (skills 1-4 gain energy, skill 5 costs energy)
         switch (skillIndex)
         {
             case 0: // Skill 1
@@ -569,13 +567,37 @@ public class Player : MonoBehaviour
                 break;
             case 2: // Skill 3
                 skillCooldowns[2] = selectedCharacter.Skill3Cooldown;
-                SpendEnergy(selectedCharacter.Skill3EnergyCost);
+                GainEnergy(selectedCharacter.Skill3EnergyGain);
                 GameLog.Combat(GameLog.Join(
                     "SkillUse",
                     GameLog.KV("who", "Player"),
                     GameLog.KV("skill", 3),
                     GameLog.KV("cd", skillCooldowns[2]),
-                    GameLog.KV("energySpend", selectedCharacter.Skill3EnergyCost),
+                    GameLog.KV("energyGain", selectedCharacter.Skill3EnergyGain),
+                    GameLog.KV("energy", $"{energy}/{maxEnergy}")
+                ), GameLogVerbosity.Verbose);
+                break;
+            case 3: // Skill 4
+                skillCooldowns[3] = selectedCharacter.Skill4Cooldown;
+                GainEnergy(selectedCharacter.Skill4EnergyGain);
+                GameLog.Combat(GameLog.Join(
+                    "SkillUse",
+                    GameLog.KV("who", "Player"),
+                    GameLog.KV("skill", 4),
+                    GameLog.KV("cd", skillCooldowns[3]),
+                    GameLog.KV("energyGain", selectedCharacter.Skill4EnergyGain),
+                    GameLog.KV("energy", $"{energy}/{maxEnergy}")
+                ), GameLogVerbosity.Verbose);
+                break;
+            case 4: // Skill 5 (Ultimate)
+                skillCooldowns[4] = selectedCharacter.Skill5Cooldown;
+                SpendEnergy(selectedCharacter.Skill5EnergyCost);
+                GameLog.Combat(GameLog.Join(
+                    "SkillUse",
+                    GameLog.KV("who", "Player"),
+                    GameLog.KV("skill", 5),
+                    GameLog.KV("cd", skillCooldowns[4]),
+                    GameLog.KV("energySpend", selectedCharacter.Skill5EnergyCost),
                     GameLog.KV("energy", $"{energy}/{maxEnergy}")
                 ), GameLogVerbosity.Verbose);
                 break;
@@ -596,7 +618,7 @@ public class Player : MonoBehaviour
     // Called at start of player's turn to tick down cooldowns
     public void TickCooldowns()
     {
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 5; i++)
         {
             if (skillCooldowns[i] > 0)
             {
@@ -609,7 +631,9 @@ public class Player : MonoBehaviour
             GameLog.KV("turn", combatTurnCount),
             GameLog.KV("s1", skillCooldowns[0]),
             GameLog.KV("s2", skillCooldowns[1]),
-            GameLog.KV("s3", skillCooldowns[2])
+            GameLog.KV("s3", skillCooldowns[2]),
+            GameLog.KV("s4", skillCooldowns[3]),
+            GameLog.KV("s5", skillCooldowns[4])
         ), GameLogVerbosity.Verbose);
     }
     
@@ -626,7 +650,9 @@ public class Player : MonoBehaviour
             GameLog.KV("shield", GetShield()),
             GameLog.KV("s1", skillCooldowns[0]),
             GameLog.KV("s2", skillCooldowns[1]),
-            GameLog.KV("s3", skillCooldowns[2])
+            GameLog.KV("s3", skillCooldowns[2]),
+            GameLog.KV("s4", skillCooldowns[3]),
+            GameLog.KV("s5", skillCooldowns[4])
         ), GameLogVerbosity.Verbose);
     }
     

@@ -4,7 +4,7 @@ public class CharacterData
     public int CharacterID;
     public int MaxHealth;
     public int Damage; // Base damage value
-    public string DamageRangeLabel; // Raw CSV DamageRange for UI display
+    public string DamageRangeLabel; // Raw DamageRange for UI display
     public int Gold;
     public int MaxEnergy;
     public float CritChance;
@@ -31,7 +31,21 @@ public class CharacterData
     public float Skill3DamagePercent;
     public string Skill3Effect;
     public int Skill3Cooldown;
-    public int Skill3EnergyCost;
+    public int Skill3EnergyGain;
+    
+    // Skill 4
+    public string Skill4;
+    public float Skill4DamagePercent;
+    public string Skill4Effect;
+    public int Skill4Cooldown;
+    public int Skill4EnergyGain;
+    
+    // Skill 5 (Ultimate - uses energy instead of gaining)
+    public string Skill5;
+    public float Skill5DamagePercent;
+    public string Skill5Effect;
+    public int Skill5Cooldown;
+    public int Skill5EnergyCost;
     
     // Talent Perks (4 tiers, A/B options each) - loaded from CSV
     public string Perk1a;
