@@ -105,4 +105,15 @@ public static class CSVParser
     {
         return float.Parse(row[key], System.Globalization.CultureInfo.InvariantCulture);
     }
+    
+    public static float ParseFloat(Dictionary<string, string> row, string key, float defaultValue)
+    {
+        if (row.TryGetValue(key, out var value) && 
+            float.TryParse(value, System.Globalization.NumberStyles.Float, 
+                System.Globalization.CultureInfo.InvariantCulture, out var result))
+        {
+            return result;
+        }
+        return defaultValue;
+    }
 }

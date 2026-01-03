@@ -66,7 +66,14 @@ public class ReactionQTEPanel : MonoBehaviour
         var canvas = GameObject.Find("Canvas");
         if (canvas == null)
         {
-            Debug.LogError("[ReactionQTEPanel] Canvas not found");
+            GameLog.Error(
+                GameLogCategory.System,
+                "[ReactionQTEPanel]",
+                GameLog.Join(
+                    "SetupFail",
+                    GameLog.KV("reason", "CanvasNotFound")
+                )
+            );
             return;
         }
 
@@ -212,7 +219,10 @@ public class ReactionQTEPanel : MonoBehaviour
         waitingForInput = true;
         showingResult = false;
 
-        Debug.Log($"[ReactionQTEPanel] QTE started for {reactionName}");
+        GameLog.Reaction(GameLog.Join(
+            "QTEStart",
+            GameLog.KV("reaction", reactionName)
+        ), GameLogVerbosity.Normal);
     }
 
     private void UpdateMarker()
@@ -274,7 +284,12 @@ public class ReactionQTEPanel : MonoBehaviour
         resultTimer = resultDisplayTime;
 
         float multiplier = ReactionQTE.GetQteMultiplier(pendingResult);
-        Debug.Log($"[ReactionQTEPanel] QTE Result: {pendingResult} (x{multiplier:F1}) at position {markerPosition:F3}");
+        GameLog.Reaction(GameLog.Join(
+            "QTEResult",
+            GameLog.KV("result", pendingResult),
+            GameLog.KV("mult", multiplier.ToString("F2")),
+            GameLog.KV("pos", markerPosition.ToString("F3"))
+        ), GameLogVerbosity.Normal);
     }
 
     private void CompleteQTE()

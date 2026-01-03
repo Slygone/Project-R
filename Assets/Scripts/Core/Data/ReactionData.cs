@@ -1,7 +1,6 @@
 public class ReactionData
 {
-    public string ElementA { get; set; }
-    public string ElementB { get; set; }
-    public string ReactionName { get; set; }
-    public float Multiplier { get; set; }
+    public string ReactionId { get; set; }
+    public string Name { get; set; }
+    public float DamageMultiplier { get; set; }
 }

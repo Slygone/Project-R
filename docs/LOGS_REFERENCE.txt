@@ -1,0 +1,120 @@
+LOG REFERENCE
+
+This document lists the primary Debug.Log outputs, their meaning, and when they fire. Use it to quickly filter logs while debugging and to standardize future log messages.
+
+Legend
+- Tag: The prefix inside square brackets (e.g., [CombatLog])
+- When: The event/state that triggers the log
+- Fields: Key variables included in the message
+- Example: Representative log line (placeholders in <>).
+
+
+1) [CombatLog] EnemyAttack
+- When: Each enemy attack after damage is rolled and resistance applied, just before showing QTE.
+- Fields: Attacker, Element, Rolled, ResistTotal, ResistBonusFrom, Final
+- Example: [CombatLog] EnemyAttack | Attacker=<Goblin> | Element=<Fire> | Rolled=<12> | ResistTotal=<30>% | ResistBonusFrom=<A> | Final=<8>
+- Source: CombatManager.ProcessNextEnemyAttack()
+
+2) [CombatManager] <enemy line>
+- When: Enemy attack summary with element and rolled vs final damage, human-readable.
+- Fields: Name, Element, Final, Rolled, Range
+- Example: [CombatManager] Goblin (Fire) attacks for 8 damage (rolled: 12, range: 10-14)
+- Source: CombatManager.ProcessNextEnemyAttack()
+
+3) [CombatLog] DefensiveQTE
+- When: After a Defensive QTE completes and healing is applied.
+- Fields: Attacker, QTE, Healed
+- Example: [CombatLog] DefensiveQTE | Attacker=<Goblin> | QTE=<Good> | Healed=<4>
+- Source: CombatManager.OnDefensiveQTEComplete()
+
+4) [DefensiveQTE] Result
+- When: Player presses to resolve the Defensive QTE. Shows zone hit.
+- Fields: Result, position
+- Example: [DefensiveQTE] Result: Perfect (position: 0.50)
+- Source: DefensiveQTE.ResolveQTE()
+
+5) [CombatLog] ReactionQTEComplete
+- When: Elemental Reaction QTE (offensive) resolves to determine QTEMultiplier. No healing.
+- Fields: Result, QTEMultiplier
+- Example: [CombatLog] ReactionQTEComplete | Result=<Good> | QTEMultiplier=<1.2>x
+- Source: CombatManager.OnQTEComplete()
+
+6) [CombatLog] PlayerAttack
+- When: Player performs a basic attack (no reaction flow), after resistance applied.
+- Fields: Element, InfusedFrom, RolledDmg, FinalDmg, Crit, Reaction, Resist, Target
+- Example: [CombatLog] PlayerAttack | Element=<Water> | InfusedFrom=<A> | RolledDmg=<15> | FinalDmg=<12> | Crit=<False> | Reaction=<1.0>x | Resist=<20>% | Target=<Goblin>
+- Source: CombatManager.ExecuteAttack()
+
+7) [CombatLog] PlayerAttackReaction
+- When: Player attack with an Elemental Reaction and QTE, after all multipliers and resistance.
+- Fields: Reaction, DirectBase, QTEMult, Crit, CritMult, ReactionBonus, FinalDamage, Element, InfusedFrom, Resist, Target
+- Example: [CombatLog] PlayerAttackReaction | Reaction=<Steam> | DirectBase=<22> | QTEMult=<1.2>x | Crit=<True> | CritMult=<1.5>x | ReactionBonus=<5> | FinalDamage=<28> | Element=<Water> | InfusedFrom=<A> | Resist=<10>% | Target=<Goblin>
+- Source: CombatManager.ExecuteAttackWithReaction()
+
+8) [CombatLog] PlayerSkill
+- When: Player uses a skill without reaction QTE.
+- Fields: Skill, Element, InfusedFrom, Damage, Crit, Reaction, Resist, Target
+- Example: [CombatLog] PlayerSkill | Skill=<Bolt> | Element=<Fire> | InfusedFrom=<B> | Damage=<18> | Crit=<False> | Reaction=<1.0>x | Resist=<15>% | Target=<Goblin>
+- Source: CombatManager.ExecuteSkill()
+
+9) [CombatLog] PlayerSkillReaction
+- When: Player uses a skill and triggers Reaction QTE (for multiplier) and reaction bonus is added.
+- Fields: Skill, Reaction, DirectBase, QTEMult, Crit, CritMult, ReactionBonus, FinalDamage, Element, InfusedFrom, Resist, Target
+- Example: [CombatLog] PlayerSkillReaction | Skill=<Ray> | Reaction=<Steam> | DirectBase=<24> | QTEMult=<1.1>x | Crit=<False> | CritMult=<1.0>x | ReactionBonus=<3> | FinalDamage=<27> | Element=<Water> | InfusedFrom=<B> | Resist=<5>% | Target=<Archer>
+- Source: CombatManager.ExecuteSkillWithReaction()
+
+10) [CombatManager] REACTION ATTACK / REACTION SKILL
+- When: Human-readable summaries for reaction attacks/skills.
+- Fields: Reaction name and elements, damage, target, QTE result
+- Example: [CombatManager] REACTION ATTACK! Steam (Water+Fire) -> 28 damage to Goblin [QTE: Good]
+- Source: CombatManager.ExecuteAttackWithReaction(), ExecuteSkillWithReaction()
+
+11) [CombatUI] ShowDamageToEnemy / ShowDamageToPlayer
+- When: UI feedback shows damage numbers and updates bars.
+- Fields: Target name, amount, crit
+- Example: [CombatUI] Enemy Goblin took 12 damage (CRIT!)
+- Source: CombatUI.ShowDamageToEnemy(), ShowDamageToPlayer()
+
+12) [Player] Took/Healed/Thresholds
+- When: Player HP changes, thresholds (wounds) update, rest or stat changes.
+- Fields: Amount, Health, MaxRecoverable, Wounds, threshold level
+- Examples:
+  - [Player] Took 10 damage. Health: 90/130 (MaxRecoverable: 100, Wounds: 1)
+  - [Player] Healed 6. Health: 96/130 (Max recoverable: 100, Wounds: 1)
+  - [Player] Wounds cleared! Can now heal to 130
+  - [Player] Full rest: healed 52 HP, wounds cleared. Health: 130/130 (MaxRecoverable: 130)
+- Source: Player.TakeDamage(), Heal(), ClearWounds(), FullRest()
+
+13) [RestUI]
+- When: Rest site actions (heal, ascend, upgrades).
+- Fields: Heal amount, upgrade type/amount, XP spent
+- Examples:
+  - [RestUI] Player used full rest: 40% heal + wounds cleared
+  - [RestUI] Bought +2 Damage for 3 XP (1/4)
+- Source: RestUI.OnHealClicked(), On<X>UpgradeClicked()
+
+14) [DataCache]
+- When: Game data loads from CSVs.
+- Fields: Counts of loaded datasets
+- Example: [DataCache] Loaded: 16 enemies, 5 characters, ...
+- Source: DataCache.LoadAll()
+
+15) [GameManager]
+- When: Global state changes, QTE result debug overlay, XP changes.
+- Examples:
+  - [GameManager] Set LastQTEResult: Reaction: Good
+  - [GameManager] Run XP +3 (Elite)
+- Source: GameManager helpers used across systems
+
+
+Filtering Tips
+- To see only combat summaries: filter for [CombatManager]
+- To export data logs for balancing: filter for [CombatLog]
+- To debug wound/threshold behavior: filter for [Player]
+- To watch QTE flow: filter for [DefensiveQTE] and [CombatLog] DefensiveQTE
+
+Proposed Structure Guidelines (for future edits)
+- Always include a stable tag: [CombatLog], [CombatManager], [Player], etc.
+- Use pipe-separated key=value or key fields (e.g., KeyA=<valueA>). Keep ordering consistent per message type.
+- Avoid free prose in [CombatLog] lines; prefer parsable fields.
+- Ensure every log has an unambiguous lifecycle point (When) in this file.

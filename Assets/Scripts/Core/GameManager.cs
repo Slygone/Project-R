@@ -1,29 +1,178 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class GameManager : MonoBehaviour
 {
     private Referencer refs;
     private int completedNodes = 0;
-    private const int WORLD1_NODES = 20;
-    private const int WORLD2_NODES = 25;
+    // Pair selection reroll: 1 use per run
+    private static bool pairRerollUsed = false;
+    private const int MAX_WORLD = 5;
     private bool affinityChosen = false;
     private bool elementPairChosen = false;
     private bool characterChosen = false;
     
+    // Track which character is used for the current run (for ascension award)
+    private CharacterData currentRunCharacter = null;
+    
     private static int currentWorld = 1;
     public static int CurrentWorld => currentWorld;
+    
+    // XP System (Phase 1 prep)
+    private static int runXP = 0;
+    public static int RunXP => runXP;
+    
+    // Elemental Ascension XP tracking - maps detonator element to XP earned during run
+    private static Dictionary<Element, int> runDetonatorXP = new Dictionary<Element, int>();
+    
+    // Last QTE result for debug overlay
+    private static string lastQTEResult = "None";
+    public static string LastQTEResult => lastQTEResult;
+    
+    public static void AddRunXP(int amount)
+    {
+        runXP += amount;
+        Debug.Log($"[GameManager] Gained {amount} XP. Total: {runXP}");
+    }
+    
+    /// <summary>
+    /// Add XP for a specific detonator element (for elemental ascension tracking).
+    /// </summary>
+    public static void AddRunXPForDetonator(int amount, Element detonator)
+    {
+        if (amount <= 0 || detonator == Element.None) return;
+        
+        if (!runDetonatorXP.ContainsKey(detonator))
+        {
+            runDetonatorXP[detonator] = 0;
+        }
+        runDetonatorXP[detonator] += amount;
+        
+        Debug.Log($"[GameManager] Detonator XP: {detonator} gained {amount}. Total for element: {runDetonatorXP[detonator]}");
+    }
+    
+    /// <summary>
+    /// Award all accumulated detonator XP to elements at end of run.
+    /// </summary>
+    public static void AwardElementXPFromRun()
+    {
+        foreach (var kvp in runDetonatorXP)
+        {
+            if (kvp.Value > 0)
+            {
+                MetaProgressionManager.Instance.AddElementXP(kvp.Key.ToString(), kvp.Value);
+            }
+        }
+        runDetonatorXP.Clear();
+    }
+
+    // Reroll API for AffinitySelectionUI
+    public static bool IsPairRerollAvailable()
+    {
+        return !pairRerollUsed;
+    }
+
+    public static void UsePairReroll()
+    {
+        pairRerollUsed = true;
+        Debug.Log("[GameManager] Pair reroll used for this run");
+    }
+    
+    public static void SetLastQTEResult(string result)
+    {
+        lastQTEResult = result;
+    }
+    
+    public static void ResetRunXP()
+    {
+        runXP = 0;
+        runDetonatorXP.Clear();
+    }
 
     void Start()
     {
         refs = FindFirstObjectByType<Referencer>();
         currentWorld = 1;
         completedNodes = 0;
+        runXP = 0;
+        runDetonatorXP.Clear();
+        lastQTEResult = "None";
+        pairRerollUsed = false;
         UpdateNodeCounter();
         
-        StartCharacterSelection();
+        // Start with Main Menu instead of jumping to character selection
+        ShowMainMenu();
     }
     
-    public int GetTotalNodesForCurrentWorld() => currentWorld == 1 ? WORLD1_NODES : WORLD2_NODES;
+    private void ShowMainMenu()
+    {
+        if (refs != null && refs.playerController != null)
+        {
+            refs.playerController.SetCanMove(false);
+        }
+        
+        if (refs != null && refs.mainMenuUI != null)
+        {
+            refs.mainMenuUI.Show(OnNewRunClicked);
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] MainMenuUI not found, starting character selection directly");
+            StartNewRunCharacterSelect();
+        }
+    }
+    
+    private void OnNewRunClicked()
+    {
+        StartNewRunCharacterSelect();
+    }
+    
+    private void StartNewRunCharacterSelect()
+    {
+        if (refs != null && refs.newRunCharacterSelectUI != null)
+        {
+            refs.newRunCharacterSelectUI.Show(OnCharacterCardClicked, ShowMainMenu);
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] NewRunCharacterSelectUI not found, using legacy selection");
+            StartCharacterSelection();
+        }
+    }
+    
+    private void OnCharacterCardClicked(CharacterData character)
+    {
+        // Show the loadout screen for this character
+        if (refs != null && refs.characterLoadoutUI != null)
+        {
+            refs.characterLoadoutUI.Show(character, () => OnStartRunFromLoadout(character), StartNewRunCharacterSelect);
+        }
+        else
+        {
+            Debug.LogWarning("[GameManager] CharacterLoadoutUI not found, proceeding directly");
+            OnStartRunFromLoadout(character);
+        }
+    }
+    
+    private void OnStartRunFromLoadout(CharacterData character)
+    {
+        // Store character for ascension award at end of run
+        currentRunCharacter = character;
+        characterChosen = true;
+        
+        // Apply character to player
+        if (refs != null && refs.player != null)
+        {
+            refs.player.SelectCharacter(character);
+        }
+        
+        Debug.Log($"[GameManager] Starting run with {character.DisplayName}");
+        
+        // Now show orb pair selection
+        StartAffinitySelection();
+    }
+    
+    public int GetTotalNodesForCurrentWorld() => DataCache.GetWorldEncounter(currentWorld).NodeCount;
 
     private void StartAffinitySelection()
     {
@@ -139,7 +288,7 @@ public class GameManager : MonoBehaviour
     private void UpdateNodeCounter()
     {
         int totalNodes = GetTotalNodesForCurrentWorld();
-        string worldText = currentWorld == 1 ? "World 1" : "World 2";
+        string worldText = $"World {currentWorld}";
         if (refs != null && refs.nodeCounterText != null)
         {
             refs.nodeCounterText.text = $"{worldText}: {completedNodes}/{totalNodes}";
@@ -170,14 +319,14 @@ public class GameManager : MonoBehaviour
     {
         if (victory)
         {
-            if (currentWorld == 1)
+            if (currentWorld < MAX_WORLD)
             {
-                Debug.Log("[GameManager] World 1 BOSS DEFEATED! Transitioning to World 2...");
-                TransitionToWorld2();
+                Debug.Log($"[GameManager] World {currentWorld} BOSS DEFEATED! Transitioning to World {currentWorld + 1}...");
+                TransitionToNextWorld();
             }
             else
             {
-                Debug.Log("[GameManager] World 2 BOSS DEFEATED! RUN COMPLETE!");
+                Debug.Log($"[GameManager] World {MAX_WORLD} BOSS DEFEATED! RUN COMPLETE!");
                 ShowRunComplete();
             }
         }
@@ -188,9 +337,9 @@ public class GameManager : MonoBehaviour
         }
     }
     
-    private void TransitionToWorld2()
+    private void TransitionToNextWorld()
     {
-        currentWorld = 2;
+        currentWorld++;
         completedNodes = 0;
         
         // Reset potion bonuses but keep relic/rest upgrades
@@ -202,11 +351,11 @@ public class GameManager : MonoBehaviour
         // Clear existing nodes
         ClearAllNodes();
         
-        // Spawn new nodes for World 2
+        // Spawn new nodes for the next world
         var nodeSpawner = FindFirstObjectByType<NodeSpawner>();
         if (nodeSpawner != null)
         {
-            nodeSpawner.SpawnNodesForWorld(2);
+            nodeSpawner.SpawnNodesForWorld(currentWorld);
         }
         
         // Reset player position
@@ -217,7 +366,7 @@ public class GameManager : MonoBehaviour
         }
         
         UpdateNodeCounter();
-        Debug.Log("[GameManager] World 2 started!");
+        Debug.Log($"[GameManager] World {currentWorld} started!");
     }
     
     private void ClearAllNodes()
@@ -249,6 +398,21 @@ public class GameManager : MonoBehaviour
             refs.playerController.SetCanMove(false);
         }
         
+        // Award ascension level to the character used in this run
+        string ascensionMessage = "";
+        if (currentRunCharacter != null)
+        {
+            MetaProgressionManager.Instance.AwardAscension(
+                currentRunCharacter.CharacterID,
+                currentRunCharacter.DisplayName
+            );
+            var progress = MetaProgressionManager.Instance.GetProgress(currentRunCharacter.CharacterID);
+            ascensionMessage = $"\n\n{currentRunCharacter.DisplayName} reached Ascension {progress.AscensionLevel}!";
+        }
+        
+        // Award element XP from this run (meta progression)
+        AwardElementXPFromRun();
+        
         var canvas = GameObject.Find("Canvas");
         if (canvas != null)
         {
@@ -267,22 +431,22 @@ public class GameManager : MonoBehaviour
             var textObj = new GameObject("VictoryText");
             textObj.transform.SetParent(victoryPanel.transform, false);
             var textRect = textObj.AddComponent<UnityEngine.RectTransform>();
-            textRect.anchorMin = new Vector2(0.2f, 0.5f);
-            textRect.anchorMax = new Vector2(0.8f, 0.7f);
+            textRect.anchorMin = new Vector2(0.2f, 0.45f);
+            textRect.anchorMax = new Vector2(0.8f, 0.75f);
             textRect.offsetMin = Vector2.zero;
             textRect.offsetMax = Vector2.zero;
             var text = textObj.AddComponent<TMPro.TextMeshProUGUI>();
-            text.text = "CONGRATULATIONS!\nYou beat the run!";
+            text.text = $"CONGRATULATIONS!\nYou beat the run!{ascensionMessage}";
             text.alignment = TMPro.TextAlignmentOptions.Center;
-            text.fontSize = 48;
+            text.fontSize = 42;
             text.color = new Color(1f, 0.84f, 0f);
             
             // Restart button
             var btnObj = new GameObject("RestartButton");
             btnObj.transform.SetParent(victoryPanel.transform, false);
             var btnRect = btnObj.AddComponent<UnityEngine.RectTransform>();
-            btnRect.anchorMin = new Vector2(0.35f, 0.25f);
-            btnRect.anchorMax = new Vector2(0.65f, 0.35f);
+            btnRect.anchorMin = new Vector2(0.35f, 0.2f);
+            btnRect.anchorMax = new Vector2(0.65f, 0.3f);
             btnRect.offsetMin = Vector2.zero;
             btnRect.offsetMax = Vector2.zero;
             
@@ -314,6 +478,12 @@ public class GameManager : MonoBehaviour
             UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
     }
 
+    public void OnPlayerDefeated()
+    {
+        Debug.Log("[GameManager] Player defeated in combat");
+        ShowDefeat();
+    }
+    
     private void ShowDefeat()
     {
         Debug.Log("[GameManager] Showing defeat screen");
@@ -341,15 +511,61 @@ public class GameManager : MonoBehaviour
             var textObj = new GameObject("DefeatText");
             textObj.transform.SetParent(defeatPanel.transform, false);
             var textRect = textObj.AddComponent<UnityEngine.RectTransform>();
-            textRect.anchorMin = new Vector2(0.2f, 0.4f);
-            textRect.anchorMax = new Vector2(0.8f, 0.6f);
+            textRect.anchorMin = new Vector2(0.2f, 0.5f);
+            textRect.anchorMax = new Vector2(0.8f, 0.7f);
             textRect.offsetMin = Vector2.zero;
             textRect.offsetMax = Vector2.zero;
             var text = textObj.AddComponent<TMPro.TextMeshProUGUI>();
-            text.text = "DEFEATED\nThe boss was too powerful...";
+            text.text = "YOU LOST";
             text.alignment = TMPro.TextAlignmentOptions.Center;
-            text.fontSize = 48;
+            text.fontSize = 64;
             text.color = Color.red;
+            
+            // Continue button
+            var btnObj = new GameObject("ContinueButton");
+            btnObj.transform.SetParent(defeatPanel.transform, false);
+            var btnRect = btnObj.AddComponent<UnityEngine.RectTransform>();
+            btnRect.anchorMin = new Vector2(0.35f, 0.25f);
+            btnRect.anchorMax = new Vector2(0.65f, 0.35f);
+            btnRect.offsetMin = Vector2.zero;
+            btnRect.offsetMax = Vector2.zero;
+            
+            var btnImage = btnObj.AddComponent<UnityEngine.UI.Image>();
+            btnImage.color = new Color(0.6f, 0.1f, 0.1f);
+            
+            var btn = btnObj.AddComponent<UnityEngine.UI.Button>();
+            btn.targetGraphic = btnImage;
+            btn.onClick.AddListener(ReturnToCharacterSelect);
+            
+            var btnTextObj = new GameObject("ButtonText");
+            btnTextObj.transform.SetParent(btnObj.transform, false);
+            var btnTextRect = btnTextObj.AddComponent<UnityEngine.RectTransform>();
+            btnTextRect.anchorMin = Vector2.zero;
+            btnTextRect.anchorMax = Vector2.one;
+            btnTextRect.offsetMin = Vector2.zero;
+            btnTextRect.offsetMax = Vector2.zero;
+            var btnText = btnTextObj.AddComponent<TMPro.TextMeshProUGUI>();
+            btnText.text = "CONTINUE";
+            btnText.alignment = TMPro.TextAlignmentOptions.Center;
+            btnText.fontSize = 28;
+            btnText.color = Color.white;
         }
+    }
+    
+    private void ReturnToCharacterSelect()
+    {
+        // Reset run state
+        currentWorld = 1;
+        completedNodes = 0;
+        pairRerollUsed = false;
+        affinityChosen = false;
+        elementPairChosen = false;
+        characterChosen = false;
+        currentRunCharacter = null;
+        ResetRunXP();
+        
+        // Reload the scene to restart fresh
+        UnityEngine.SceneManagement.SceneManager.LoadScene(
+            UnityEngine.SceneManagement.SceneManager.GetActiveScene().name);
     }
 }

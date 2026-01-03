@@ -3,12 +3,20 @@ public class CombatEnemy
     public string Name;
     public int Health;
     public int MaxHealth;
-    public int Damage;
+    public int Damage; // Base damage value
     public int EnemyID;
     public int BaseResistance;
     public int BonusResistance;
     public Element Affinity;
     public bool IsBoss;
+    public bool IsElite;
+    
+    // Damage variance range (applied each attack)
+    private const float VARIANCE_MIN = 0.90f;
+    private const float VARIANCE_MAX = 1.10f;
+    
+    // Status effects (DoT, Stun)
+    private StatusEffectManager statusEffects = new StatusEffectManager();
 
     public CombatEnemy(EnemyData data) : this(data, 1) { }
     
@@ -22,6 +30,7 @@ public class CombatEnemy
         BaseResistance = data.GetBaseResistance(world);
         BonusResistance = data.BonusResistance;
         IsBoss = data.IsBoss;
+        IsElite = data.IsElite;
         
         if (data.IsBoss)
         {
@@ -31,6 +40,13 @@ public class CombatEnemy
         {
             Affinity = GetRandomElement();
         }
+    }
+    
+    // Roll damage with variance (0.90-1.10) applied each attack
+    public int RollDamageWithVariance()
+    {
+        float variance = UnityEngine.Random.Range(VARIANCE_MIN, VARIANCE_MAX);
+        return UnityEngine.Mathf.RoundToInt(Damage * variance);
     }
 
     private Element GetRandomElement()
@@ -66,4 +82,102 @@ public class CombatEnemy
     }
 
     public bool IsAlive() => Health > 0;
+    
+    // ========== STATUS EFFECTS ==========
+    
+    public bool IsStunned => statusEffects.IsStunned;
+    
+    public void ApplyStun(int duration)
+    {
+        statusEffects.AddEffect(new StatusEffect(StatusEffectType.Stun, duration, 0, "Stun"));
+        GameLog.Status(GameLog.Join(
+            "Apply",
+            GameLog.KV("target", Name),
+            GameLog.KV("type", "Stun"),
+            GameLog.KV("value", 1),
+            GameLog.KV("dur", duration)
+        ), GameLogVerbosity.Minimal);
+    }
+    
+    public void ApplyDoT(int damagePerTurn, int duration, string source)
+    {
+        statusEffects.AddEffect(new StatusEffect(StatusEffectType.DoT, duration, damagePerTurn, source));
+        GameLog.Status(GameLog.Join(
+            "Apply",
+            GameLog.KV("target", Name),
+            GameLog.KV("type", "DoT"),
+            GameLog.KV("value", damagePerTurn),
+            GameLog.KV("dur", duration),
+            GameLog.KV("source", source)
+        ), GameLogVerbosity.Minimal);
+    }
+    
+    /// <summary>
+    /// Check if enemy is stunned and consume the stun turn.
+    /// Call at START of enemy turn BEFORE any actions.
+    /// Returns true if stunned (should skip turn), false if not stunned.
+    /// </summary>
+    public bool CheckAndConsumeStun()
+    {
+        bool wasStunned = statusEffects.CheckAndConsumeStun();
+        return wasStunned;
+    }
+    
+    /// <summary>
+    /// Tick DoT effects and apply damage.
+    /// Call AFTER stun check - DoT still ticks even when stunned.
+    /// Returns total DoT damage dealt.
+    /// </summary>
+    public int TickDoTEffects()
+    {
+        int dotDamage = statusEffects.TickDoTEffects();
+        if (dotDamage > 0)
+        {
+            TakeDamage(dotDamage);
+        }
+        return dotDamage;
+    }
+    
+    // Legacy method - kept for compatibility
+    public int TickStatusEffects()
+    {
+        return TickDoTEffects();
+    }
+    
+    public System.Collections.Generic.List<StatusEffect> GetStatusEffects() => statusEffects.GetAllEffects();
+    
+    // Tick all DoTs instantly without consuming duration (for reaction effects)
+    public int TickDoTEffectsInstant()
+    {
+        int dotDamage = statusEffects.TickDoTEffectsInstant();
+        if (dotDamage > 0)
+        {
+            TakeDamage(dotDamage);
+        }
+        return dotDamage;
+    }
+    
+    // Apply temporary resistance modifier to all elements
+    public void ApplyTempResistAll(int deltaPct, int duration)
+    {
+        statusEffects.AddTempResist("All", deltaPct, duration);
+    }
+    
+    // Apply temporary resistance modifier to a specific element
+    public void ApplyTempResist(Element element, int deltaPct, int duration)
+    {
+        statusEffects.AddTempResist(element.ToString(), deltaPct, duration);
+    }
+    
+    // Get total temp resist for an element (includes "All" effects)
+    public int GetTempResist(Element element)
+    {
+        return statusEffects.GetTempResist(element.ToString());
+    }
+    
+    // Tick temp resist durations at end of turn
+    public void TickTempResists()
+    {
+        statusEffects.TickTempResists();
+    }
 }

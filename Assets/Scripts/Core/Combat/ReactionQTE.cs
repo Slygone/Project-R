@@ -15,16 +15,23 @@ public static class ReactionQTE
         return DataCache.GetQTEMultiplier(result);
     }
 
-    public static float GetReactionMultiplier(Element a, Element b)
+    // New directional lookup by ReactionId
+    public static float GetReactionMultiplier(string reactionId)
     {
-        var (_, multiplier) = DataCache.GetReaction(a, b);
-        return multiplier;
+        var reactionDef = DataCache.GetReactionDef(reactionId);
+        return reactionDef.DamageMultiplier;
     }
 
-    public static string GetReactionName(Element a, Element b)
+    public static string GetReactionName(string reactionId)
     {
-        var (name, _) = DataCache.GetReaction(a, b);
-        return name;
+        var reactionDef = DataCache.GetReactionDef(reactionId);
+        return reactionDef.Name;
+    }
+    
+    // Build ReactionId from first element and detonator
+    public static string BuildReactionId(Element firstElement, Element detonatorElement)
+    {
+        return DataCache.BuildReactionId(firstElement, detonatorElement);
     }
 
     public static int ComputeFinalDamage(int baseDamage, int elementalBonus, float reactionMultiplier, float critMultiplier, float qteMultiplier)

@@ -933,6 +933,19 @@ MonoBehaviour:
   playerController: {fileID: 0}
   player: {fileID: 0}
   ui: {fileID: 0}
+  combatManager: {fileID: 0}
+  combatUI: {fileID: 0}
+  playerStatsUI: {fileID: 0}
+  affinitySelectionUI: {fileID: 0}
+  characterSelectionUI: {fileID: 0}
+  tooltipUI: {fileID: 0}
+  shopUI: {fileID: 0}
+  potionUI: {fileID: 0}
+  restUI: {fileID: 0}
+  infusionUI: {fileID: 0}
+  reactionQTEPanel: {fileID: 0}
+  mysteryUI: {fileID: 0}
+  defensiveQTE: {fileID: 0}
   nodePopupPanel: {fileID: 0}
   victoryPanel: {fileID: 0}
   nodeCounterText: {fileID: 0}
@@ -1411,6 +1424,57 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1321422680
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1321422682}
+  - component: {fileID: 1321422681}
+  m_Layer: 0
+  m_Name: FloatingTextManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1321422681
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1321422680}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9241ff577628347349ad6246080b358b, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::FloatingTextManager
+  config: {fileID: 11400000, guid: 88d4ba5037ecc4e1ca07c637ea318f43, type: 2}
+  floatingTextPrefab: {fileID: 0}
+  floatingTextCanvas: {fileID: 0}
+--- !u!224 &1321422682
+RectTransform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1321422680}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_AnchorMin: {x: 0.5, y: 0.5}
+  m_AnchorMax: {x: 0.5, y: 0.5}
+  m_AnchoredPosition: {x: 0.5, y: 1.35}
+  m_SizeDelta: {x: 100, y: 100}
+  m_Pivot: {x: 0.5, y: 0.5}
 --- !u!1 &1342342977
 GameObject:
   m_ObjectHideFlags: 0
@@ -1788,3 +1852,4 @@ SceneRoots:
   - {fileID: 879650336}
   - {fileID: 1768978671}
   - {fileID: 1905090741}
+  - {fileID: 1321422682}

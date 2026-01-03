@@ -11,26 +11,31 @@ public class CombatUI : MonoBehaviour
     private GameObject playerHealthBar;
     private TextMeshProUGUI playerHealthText;
     private Image playerHealthFill;
-    private Button attackButton;
     private Button skill1Button;
     private Button skill2Button;
     private Button skill3Button;
+    private Button skill4Button;
+    private Button skill5Button;
     private TextMeshProUGUI skill1Text;
     private TextMeshProUGUI skill2Text;
     private TextMeshProUGUI skill3Text;
+    private TextMeshProUGUI skill4Text;
+    private TextMeshProUGUI skill5Text;
     private TooltipTrigger skill1Tooltip;
     private TooltipTrigger skill2Tooltip;
     private TooltipTrigger skill3Tooltip;
+    private TooltipTrigger skill4Tooltip;
+    private TooltipTrigger skill5Tooltip;
     private Transform enemyContainer;
     private Dictionary<CombatEnemy, EnemyUISlot> enemySlots = new Dictionary<CombatEnemy, EnemyUISlot>();
     private CombatManager combatManager;
     
     private TextMeshProUGUI lootGoldText;
-    private TextMeshProUGUI lootRelicText;
+    private TextMeshProUGUI lootXPText;
     private TextMeshProUGUI lootTitleText;
     private Button collectLootButton;
     private int pendingGold;
-    private RelicData pendingRelic;
+    private int pendingXP;
     private Player pendingPlayer;
     private NodeBase pendingNode;
     private TextMeshProUGUI combatTitleText;
@@ -89,7 +94,14 @@ public class CombatUI : MonoBehaviour
         var canvas = GameObject.Find("Canvas");
         if (canvas == null)
         {
-            Debug.LogError("[CombatUI] Canvas not found");
+            GameLog.Error(
+                GameLogCategory.System,
+                "[CombatUI]",
+                GameLog.Join(
+                    "SetupFail",
+                    GameLog.KV("reason", "CanvasNotFound")
+                )
+            );
             return;
         }
 
@@ -129,7 +141,7 @@ public class CombatUI : MonoBehaviour
 
         CreatePlayerHealthBar(panel.transform);
         CreateEnemyContainer(panel.transform);
-        CreateAttackButton(panel.transform);
+        CreateSkillButtons(panel.transform);
 
         return panel;
     }
@@ -140,8 +152,9 @@ public class CombatUI : MonoBehaviour
         container.transform.SetParent(parent, false);
 
         var rect = container.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.1f, 0.1f);
-        rect.anchorMax = new Vector2(0.4f, 0.15f);
+        // Raise HP bar to avoid any overlap with the skill bar
+        rect.anchorMin = new Vector2(0.1f, 0.16f);
+        rect.anchorMax = new Vector2(0.4f, 0.20f);
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
 
@@ -199,28 +212,30 @@ public class CombatUI : MonoBehaviour
         enemyContainer = container.transform;
     }
 
-    private void CreateAttackButton(Transform parent)
+    private void CreateSkillButtons(Transform parent)
     {
         var container = new GameObject("ActionButtons");
         container.transform.SetParent(parent, false);
         actionButtonContainer = container;
         var containerRect = container.AddComponent<RectTransform>();
-        containerRect.anchorMin = new Vector2(0.45f, 0.05f);
-        containerRect.anchorMax = new Vector2(0.95f, 0.22f);
+        containerRect.anchorMin = new Vector2(0.10f, 0.03f);
+        containerRect.anchorMax = new Vector2(0.90f, 0.13f);
         containerRect.offsetMin = Vector2.zero;
         containerRect.offsetMax = Vector2.zero;
 
         var layout = container.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 8;
+        layout.spacing = 6;
         layout.childControlWidth = true;
         layout.childControlHeight = true;
         layout.childForceExpandWidth = true;
         layout.childForceExpandHeight = true;
 
-        attackButton = CreateActionButton(container.transform, "Attack", "ATTACK", new Color(0.8f, 0.2f, 0.2f, 1f), OnAttackClicked, out _, out _);
+        // 5 skill buttons (no attack button)
         skill1Button = CreateActionButton(container.transform, "Skill1", "Skill 1", new Color(0.2f, 0.5f, 0.7f, 1f), OnSkill1Clicked, out skill1Text, out skill1Tooltip);
         skill2Button = CreateActionButton(container.transform, "Skill2", "Skill 2", new Color(0.2f, 0.5f, 0.7f, 1f), OnSkill2Clicked, out skill2Text, out skill2Tooltip);
         skill3Button = CreateActionButton(container.transform, "Skill3", "Skill 3", new Color(0.2f, 0.5f, 0.7f, 1f), OnSkill3Clicked, out skill3Text, out skill3Tooltip);
+        skill4Button = CreateActionButton(container.transform, "Skill4", "Skill 4", new Color(0.2f, 0.5f, 0.7f, 1f), OnSkill4Clicked, out skill4Text, out skill4Tooltip);
+        skill5Button = CreateActionButton(container.transform, "Skill5", "Ultimate", new Color(0.7f, 0.4f, 0.2f, 1f), OnSkill5Clicked, out skill5Text, out skill5Tooltip);
         
         backButton = CreateActionButton(container.transform, "Back", "BACK", new Color(0.5f, 0.5f, 0.5f, 1f), OnBackClicked, out _, out _);
         backButton.gameObject.SetActive(false);
@@ -233,8 +248,8 @@ public class CombatUI : MonoBehaviour
         potionContainer = new GameObject("PotionContainer");
         potionContainer.transform.SetParent(parent, false);
         var containerRect = potionContainer.AddComponent<RectTransform>();
-        containerRect.anchorMin = new Vector2(0.05f, 0.16f);
-        containerRect.anchorMax = new Vector2(0.40f, 0.26f);
+        containerRect.anchorMin = new Vector2(0.05f, 0.24f);
+        containerRect.anchorMax = new Vector2(0.40f, 0.32f);
         containerRect.offsetMin = Vector2.zero;
         containerRect.offsetMax = Vector2.zero;
 
@@ -257,8 +272,8 @@ public class CombatUI : MonoBehaviour
         potionTooltipPanel = new GameObject("PotionTooltip");
         potionTooltipPanel.transform.SetParent(parent, false);
         var rect = potionTooltipPanel.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.05f, 0.27f);
-        rect.anchorMax = new Vector2(0.40f, 0.38f);
+        rect.anchorMin = new Vector2(0.05f, 0.34f);
+        rect.anchorMax = new Vector2(0.40f, 0.43f);
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
 
@@ -472,10 +487,11 @@ public class CombatUI : MonoBehaviour
         
         selectedTargetIndex = 0;
         
-        attackButton.gameObject.SetActive(false);
         skill1Button.gameObject.SetActive(false);
         skill2Button.gameObject.SetActive(false);
         skill3Button.gameObject.SetActive(false);
+        skill4Button.gameObject.SetActive(false);
+        skill5Button.gameObject.SetActive(false);
         backButton.gameObject.SetActive(true);
         
         var backText = backButton.GetComponentInChildren<TextMeshProUGUI>();
@@ -560,11 +576,6 @@ public class CombatUI : MonoBehaviour
         return btn;
     }
 
-    private void OnAttackClicked()
-    {
-        EnterTargetingMode(0, false);
-    }
-
     private void OnSkill1Clicked()
     {
         bool isAoE = IsSkillAoE(1);
@@ -581,6 +592,18 @@ public class CombatUI : MonoBehaviour
     {
         bool isAoE = IsSkillAoE(3);
         EnterTargetingMode(3, isAoE);
+    }
+
+    private void OnSkill4Clicked()
+    {
+        bool isAoE = IsSkillAoE(4);
+        EnterTargetingMode(4, isAoE);
+    }
+
+    private void OnSkill5Clicked()
+    {
+        bool isAoE = IsSkillAoE(5);
+        EnterTargetingMode(5, isAoE);
     }
 
     private void OnBackClicked()
@@ -612,11 +635,25 @@ public class CombatUI : MonoBehaviour
             1 => character.Skill1,
             2 => character.Skill2,
             3 => character.Skill3,
+            4 => character.Skill4,
+            5 => character.Skill5,
             _ => ""
         };
         
-        string lower = skillName.ToLower();
-        return lower == "bladestorm" || lower == "tripleshot" || lower == "holynova";
+        // Check if skill targets AllEnemies by looking up the skill definition
+        string skillId = $"skill_{skillName.ToLower()}";
+        var skillDef = GameDataLoader.GetSkill(skillId);
+        if (skillDef?.executions != null)
+        {
+            foreach (var exec in skillDef.executions)
+            {
+                if (exec.target?.selector == "AllEnemies" && exec.effectId == "eff_deal_damage")
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private void EnterTargetingMode(int skillNumber, bool isAoE)
@@ -634,10 +671,11 @@ public class CombatUI : MonoBehaviour
         
         selectedTargetIndex = 0;
         
-        attackButton.gameObject.SetActive(false);
         skill1Button.gameObject.SetActive(false);
         skill2Button.gameObject.SetActive(false);
         skill3Button.gameObject.SetActive(false);
+        skill4Button.gameObject.SetActive(false);
+        skill5Button.gameObject.SetActive(false);
         backButton.gameObject.SetActive(true);
         
         foreach (var btn in potionButtons)
@@ -654,10 +692,11 @@ public class CombatUI : MonoBehaviour
         selectedSkillNumber = 0;
         isAoESkill = false;
         
-        attackButton.gameObject.SetActive(true);
         skill1Button.gameObject.SetActive(true);
         skill2Button.gameObject.SetActive(true);
         skill3Button.gameObject.SetActive(true);
+        skill4Button.gameObject.SetActive(true);
+        skill5Button.gameObject.SetActive(true);
         backButton.gameObject.SetActive(false);
         
         foreach (var btn in potionButtons)
@@ -827,7 +866,14 @@ public class CombatUI : MonoBehaviour
     {
         if (combatPanel == null)
         {
-            Debug.LogError("[CombatUI] combatPanel is null - SetupUI may have failed");
+            GameLog.Error(
+                GameLogCategory.System,
+                "[CombatUI]",
+                GameLog.Join(
+                    "ShowCombatFail",
+                    GameLog.KV("reason", "CombatPanelNull")
+                )
+            );
             SetupUI();
         }
 
@@ -851,7 +897,11 @@ public class CombatUI : MonoBehaviour
         UpdatePlayerHealth(player);
         RefreshPotionButtons(player);
         combatPanel.SetActive(true);
-        Debug.Log($"[CombatUI] Combat panel shown with {enemies.Count} enemies");
+        GameLog.System(GameLog.Join(
+            "CombatUIShow",
+            GameLog.KV("enemies", enemies.Count),
+            GameLog.KV("title", title ?? "COMBAT")
+        ), GameLogVerbosity.Verbose);
         SetPlayerTurn(true);
         isPotionTargeting = false;
         selectedPotionIndex = -1;
@@ -860,29 +910,129 @@ public class CombatUI : MonoBehaviour
         if (backButton != null) backButton.gameObject.SetActive(false);
     }
 
-    private void UpdateSkillButtons(Player player)
+    public void UpdateSkillButtons(Player player)
     {
         var character = player.GetCharacter();
         if (character != null)
         {
-            if (skill1Text != null) skill1Text.text = character.Skill1;
-            if (skill2Text != null) skill2Text.text = character.Skill2;
-            if (skill3Text != null) skill3Text.text = character.Skill3;
+            int currentEnergy = player.GetEnergy();
             
-            if (skill1Tooltip != null) skill1Tooltip.SetTooltip($"<b>{character.Skill1}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill1)}");
-            if (skill2Tooltip != null) skill2Tooltip.SetTooltip($"<b>{character.Skill2}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill2)}");
-            if (skill3Tooltip != null) skill3Tooltip.SetTooltip($"<b>{character.Skill3}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill3)}");
+            // Skill 1 - show cooldown if on cooldown, and DirtyStab stacks if applicable
+            int cd1 = player.GetSkillCooldown(0);
+            string skill1Name = character.Skill1;
+            string dirtyStabIndicator = "";
+            
+            // Show DirtyStab stack indicator for Rogue
+            if (skill1Name.ToLower() == "dirtystab")
+            {
+                int stacks = player.GetDirtyStabStacks();
+                if (stacks > 0)
+                {
+                    dirtyStabIndicator = $" <color=#ffaa00>[+{stacks * 20}%]</color>";
+                }
+            }
+            
+            if (cd1 > 0)
+            {
+                if (skill1Text != null) skill1Text.text = $"{skill1Name}{dirtyStabIndicator}\n<size=12><color=#888888>CD: {cd1}</color></size>";
+                if (skill1Button != null) skill1Button.interactable = false;
+            }
+            else
+            {
+                if (skill1Text != null) skill1Text.text = $"{skill1Name}{dirtyStabIndicator}";
+                if (skill1Button != null) skill1Button.interactable = true;
+            }
+            
+            // Skill 2 - show cooldown if on cooldown
+            int cd2 = player.GetSkillCooldown(1);
+            if (cd2 > 0)
+            {
+                if (skill2Text != null) skill2Text.text = $"{character.Skill2}\n<size=12><color=#888888>CD: {cd2}</color></size>";
+                if (skill2Button != null) skill2Button.interactable = false;
+            }
+            else
+            {
+                if (skill2Text != null) skill2Text.text = character.Skill2;
+                if (skill2Button != null) skill2Button.interactable = true;
+            }
+            
+            // Skill 3 - show cooldown if on cooldown
+            int cd3 = player.GetSkillCooldown(2);
+            if (cd3 > 0)
+            {
+                if (skill3Text != null) skill3Text.text = $"{character.Skill3}\n<size=12><color=#888888>CD: {cd3}</color></size>";
+                if (skill3Button != null) skill3Button.interactable = false;
+            }
+            else
+            {
+                if (skill3Text != null) skill3Text.text = character.Skill3;
+                if (skill3Button != null) skill3Button.interactable = true;
+            }
+            
+            // Skill 4 - show cooldown if on cooldown
+            int cd4 = player.GetSkillCooldown(3);
+            if (cd4 > 0)
+            {
+                if (skill4Text != null) skill4Text.text = $"{character.Skill4}\n<size=12><color=#888888>CD: {cd4}</color></size>";
+                if (skill4Button != null) skill4Button.interactable = false;
+            }
+            else
+            {
+                if (skill4Text != null) skill4Text.text = character.Skill4;
+                if (skill4Button != null) skill4Button.interactable = true;
+            }
+            
+            // Skill 5 (Ultimate) - show energy and cooldown, disable if not enough energy or on cooldown
+            int cd5 = player.GetSkillCooldown(4);
+            int energyCost = character.Skill5EnergyCost;
+            bool canUseUltimate = player.CanUseUltimate();
+            
+            string skill5Status = "";
+            if (cd5 > 0)
+            {
+                skill5Status = $"\n<size=12><color=#888888>CD: {cd5}</color></size>";
+            }
+            else
+            {
+                skill5Status = $"\n<size=12><color={(canUseUltimate ? "#44ff44" : "#ff4444")}>{currentEnergy}/{energyCost}</color></size>";
+            }
+            
+            if (skill5Text != null) skill5Text.text = $"{character.Skill5}{skill5Status}";
+            if (skill5Button != null) skill5Button.interactable = canUseUltimate;
+            
+            // Update tooltips
+            if (skill1Tooltip != null) skill1Tooltip.SetTooltip($"<b>{character.Skill1}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill1)}\nEnergy Gain: +{character.Skill1EnergyGain}\nCooldown: {character.Skill1Cooldown} turn(s)");
+            if (skill2Tooltip != null) skill2Tooltip.SetTooltip($"<b>{character.Skill2}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill2)}\nEnergy Gain: +{character.Skill2EnergyGain}\nCooldown: {character.Skill2Cooldown} turn(s)");
+            if (skill3Tooltip != null) skill3Tooltip.SetTooltip($"<b>{character.Skill3}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill3)}\nEnergy Gain: +{character.Skill3EnergyGain}\nCooldown: {character.Skill3Cooldown} turn(s)");
+            if (skill4Tooltip != null) skill4Tooltip.SetTooltip($"<b>{character.Skill4}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill4)}\nEnergy Gain: +{character.Skill4EnergyGain}\nCooldown: {character.Skill4Cooldown} turn(s)");
+            if (skill5Tooltip != null) skill5Tooltip.SetTooltip($"<b>{character.Skill5}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill5)}\nEnergy Cost: {character.Skill5EnergyCost}\nCooldown: {character.Skill5Cooldown} turn(s)");
         }
         else
         {
             if (skill1Text != null) skill1Text.text = "---";
             if (skill2Text != null) skill2Text.text = "---";
             if (skill3Text != null) skill3Text.text = "---";
+            if (skill4Text != null) skill4Text.text = "---";
+            if (skill5Text != null) skill5Text.text = "---";
+            
+            if (skill1Button != null) skill1Button.interactable = false;
+            if (skill2Button != null) skill2Button.interactable = false;
+            if (skill3Button != null) skill3Button.interactable = false;
+            if (skill4Button != null) skill4Button.interactable = false;
+            if (skill5Button != null) skill5Button.interactable = false;
             
             if (skill1Tooltip != null) skill1Tooltip.SetTooltip("");
             if (skill2Tooltip != null) skill2Tooltip.SetTooltip("");
             if (skill3Tooltip != null) skill3Tooltip.SetTooltip("");
+            if (skill4Tooltip != null) skill4Tooltip.SetTooltip("");
+            if (skill5Tooltip != null) skill5Tooltip.SetTooltip("");
         }
+    }
+    
+    public void UpdatePlayerEnergy(Player player)
+    {
+        // Energy is shown on Skill 3 button, so just update skill buttons
+        UpdateSkillButtons(player);
     }
 
     public void HideCombat()
@@ -1032,7 +1182,26 @@ public class CombatUI : MonoBehaviour
         var slot = enemySlots[enemy];
         float healthPercent = (float)enemy.Health / enemy.MaxHealth;
         slot.HealthFill.fillAmount = healthPercent;
-        slot.HealthText.text = $"{enemy.Health}/{enemy.MaxHealth}";
+        
+        // Build health text with status effects
+        string healthDisplay = $"{enemy.Health}/{enemy.MaxHealth}";
+        
+        // Show status effect indicators
+        var effects = enemy.GetStatusEffects();
+        foreach (var effect in effects)
+        {
+            if (effect.Type == StatusEffectType.DoT)
+            {
+                string stackText = effect.StackCount > 1 ? $"x{effect.StackCount}" : "";
+                healthDisplay += $" <color=#ff6600>-{(int)effect.Value} DoT{stackText} ({effect.Duration}t)</color>";
+            }
+            else if (effect.Type == StatusEffectType.Stun)
+            {
+                healthDisplay += $" <color=#ffff00>STUNNED ({effect.Duration}t)</color>";
+            }
+        }
+        
+        slot.HealthText.text = healthDisplay;
 
         if (!enemy.IsAlive())
         {
@@ -1045,7 +1214,11 @@ public class CombatUI : MonoBehaviour
     {
         float healthPercent = (float)player.GetHealth() / player.GetMaxHealth();
         playerHealthFill.fillAmount = healthPercent;
-        playerHealthText.text = $"HP: {player.GetHealth()}/{player.GetMaxHealth()}";
+        
+        // Display shield if player has any
+        int shield = player.GetShield();
+        string shieldText = shield > 0 ? $" <color=#44aaff>[+{shield}]</color>" : "";
+        playerHealthText.text = $"HP: {player.GetHealth()}/{player.GetMaxHealth()}{shieldText}";
 
         if (healthPercent > 0.5f)
             playerHealthFill.color = Color.green;
@@ -1057,29 +1230,175 @@ public class CombatUI : MonoBehaviour
 
     public void ShowDamageToEnemy(CombatEnemy enemy, int damage, bool isCrit = false)
     {
-        string critText = isCrit ? " CRIT!" : "";
-        Debug.Log($"[CombatUI] Enemy {enemy.Name} took {damage} damage{critText}");
+        GameLog.System(GameLog.Join(
+            "FloatingText",
+            GameLog.KV("target", enemy != null ? enemy.Name : "null"),
+            GameLog.KV("type", "DamageToEnemy"),
+            GameLog.KV("amount", damage),
+            GameLog.KV("crit", isCrit)
+        ), GameLogVerbosity.Verbose);
+        
+        // Show floating text
+        var fctManager = FloatingTextManager.Instance;
+        if (fctManager == null)
+        {
+            GameLog.Warn(
+                GameLogCategory.System,
+                "[CombatUI]",
+                GameLog.Join(
+                    "FloatingTextMissing",
+                    GameLog.KV("reason", "InstanceNull")
+                )
+            );
+            return;
+        }
+        
+        Transform enemyTransform = GetEnemyTransform(enemy);
+        if (enemyTransform == null)
+        {
+            GameLog.Warn(
+                GameLogCategory.System,
+                "[CombatUI]",
+                GameLog.Join(
+                    "FloatingTextMissing",
+                    GameLog.KV("reason", "EnemyTransformNull"),
+                    GameLog.KV("enemy", enemy != null ? enemy.Name : "null")
+                )
+            );
+            return;
+        }
+        
+        fctManager.ShowDamage(enemyTransform, damage, isCrit);
     }
 
     public void ShowDamageToPlayer(int damage)
     {
-        Debug.Log($"[CombatUI] Player took {damage} damage");
+        GameLog.System(GameLog.Join(
+            "FloatingText",
+            GameLog.KV("target", "Player"),
+            GameLog.KV("type", "DamageToPlayer"),
+            GameLog.KV("amount", damage)
+        ), GameLogVerbosity.Verbose);
+        
+        // Show floating text
+        var fctManager = FloatingTextManager.Instance;
+        if (fctManager != null && playerHealthBar != null)
+        {
+            fctManager.ShowDamageTaken(playerHealthBar.transform, damage);
+        }
+    }
+    
+    public void ShowHealToPlayer(int amount)
+    {
+        GameLog.System(GameLog.Join(
+            "FloatingText",
+            GameLog.KV("target", "Player"),
+            GameLog.KV("type", "HealToPlayer"),
+            GameLog.KV("amount", amount)
+        ), GameLogVerbosity.Verbose);
+        
+        var fctManager = FloatingTextManager.Instance;
+        if (fctManager != null && playerHealthBar != null)
+        {
+            fctManager.ShowHeal(playerHealthBar.transform, amount);
+        }
+    }
+    
+    public void ShowShieldToPlayer(int amount, FloatingTextType shieldType)
+    {
+        var fctManager = FloatingTextManager.Instance;
+        if (fctManager != null && playerHealthBar != null)
+        {
+            fctManager.ShowShield(playerHealthBar.transform, amount, shieldType);
+        }
+    }
+    
+    public void ShowStatusToEnemy(CombatEnemy enemy, string statusName, bool gained, int stacksDelta = 0)
+    {
+        var fctManager = FloatingTextManager.Instance;
+        if (fctManager != null)
+        {
+            Transform enemyTransform = GetEnemyTransform(enemy);
+            if (enemyTransform != null)
+            {
+                fctManager.ShowStatus(enemyTransform, statusName, gained, stacksDelta);
+            }
+        }
+    }
+    
+    public void ShowDoTTickToEnemy(CombatEnemy enemy, int damage, string dotName = "DoT")
+    {
+        var fctManager = FloatingTextManager.Instance;
+        if (fctManager != null)
+        {
+            Transform enemyTransform = GetEnemyTransform(enemy);
+            if (enemyTransform != null)
+            {
+                fctManager.ShowDoTTick(enemyTransform, damage, dotName);
+            }
+        }
+    }
+    
+    public void ShowTurnSkippedToEnemy(CombatEnemy enemy, string reason = "Stunned!")
+    {
+        var fctManager = FloatingTextManager.Instance;
+        if (fctManager != null)
+        {
+            Transform enemyTransform = GetEnemyTransform(enemy);
+            if (enemyTransform != null)
+            {
+                fctManager.ShowTurnSkipped(enemyTransform, reason);
+            }
+        }
+    }
+    
+    public void ShowReactionToEnemy(CombatEnemy enemy, string reactionName, float multiplier = 0f, int bonusDamage = 0)
+    {
+        var fctManager = FloatingTextManager.Instance;
+        if (fctManager != null)
+        {
+            Transform enemyTransform = GetEnemyTransform(enemy);
+            if (enemyTransform != null)
+            {
+                fctManager.ShowReaction(enemyTransform, reactionName, multiplier, bonusDamage);
+            }
+        }
+    }
+    
+    public Transform GetEnemyTransform(CombatEnemy enemy)
+    {
+        if (enemySlots.ContainsKey(enemy))
+        {
+            return enemySlots[enemy].Root.transform;
+        }
+        return null;
+    }
+    
+    public Transform GetPlayerTransform()
+    {
+        return playerHealthBar?.transform;
     }
 
     public void SetPlayerTurn(bool isPlayerTurn)
     {
-        if (attackButton != null)
-            attackButton.interactable = isPlayerTurn;
-        if (skill1Button != null)
-            skill1Button.interactable = isPlayerTurn;
-        if (skill2Button != null)
-            skill2Button.interactable = isPlayerTurn;
-        if (skill3Button != null)
-            skill3Button.interactable = isPlayerTurn;
-            
         if (isPlayerTurn)
         {
+            // Update skill buttons with cooldown/energy state
+            var refs = FindFirstObjectByType<Referencer>();
+            if (refs != null && refs.player != null)
+            {
+                UpdateSkillButtons(refs.player);
+            }
             UpdateReactionIndicator();
+        }
+        else
+        {
+            // Disable all skill buttons during enemy turn
+            if (skill1Button != null) skill1Button.interactable = false;
+            if (skill2Button != null) skill2Button.interactable = false;
+            if (skill3Button != null) skill3Button.interactable = false;
+            if (skill4Button != null) skill4Button.interactable = false;
+            if (skill5Button != null) skill5Button.interactable = false;
         }
     }
     
@@ -1092,7 +1411,21 @@ public class CombatUI : MonoBehaviour
         bool reactionReady = player.HasReactionReady();
         
         Color normalColor = new Color(0.2f, 0.5f, 0.7f, 1f);
-        Color attackNormalColor = new Color(0.8f, 0.2f, 0.2f, 1f);
+        Color ultimateColor = new Color(0.7f, 0.4f, 0.2f, 1f);
+        Color unavailableColor = new Color(0.3f, 0.3f, 0.3f, 1f);
+        
+        // Check skill availability (cooldown and energy)
+        int cd1 = player.GetSkillCooldown(0);
+        int cd2 = player.GetSkillCooldown(1);
+        int cd3 = player.GetSkillCooldown(2);
+        int cd4 = player.GetSkillCooldown(3);
+        int cd5 = player.GetSkillCooldown(4);
+        var character = player.GetCharacter();
+        bool canUseSkill1 = cd1 <= 0;
+        bool canUseSkill2 = cd2 <= 0;
+        bool canUseSkill3 = cd3 <= 0;
+        bool canUseSkill4 = cd4 <= 0;
+        bool canUseUltimate = player.CanUseUltimate();
         
         if (reactionReady)
         {
@@ -1100,17 +1433,39 @@ public class CombatUI : MonoBehaviour
             Color colorA = GetElementColor(orbSystem.OrbAMark);
             Color colorB = GetElementColor(orbSystem.OrbBMark);
             
-            SetButtonDiagonalSplit(attackButton, colorA, colorB);
-            SetButtonDiagonalSplit(skill1Button, colorA, colorB);
-            SetButtonDiagonalSplit(skill2Button, colorA, colorB);
-            SetButtonDiagonalSplit(skill3Button, colorA, colorB);
+            // Only apply reaction colors to skills that are actually usable
+            if (canUseSkill1)
+                SetButtonDiagonalSplit(skill1Button, colorA, colorB);
+            else
+                ClearButtonDiagonalSplit(skill1Button, unavailableColor);
+                
+            if (canUseSkill2)
+                SetButtonDiagonalSplit(skill2Button, colorA, colorB);
+            else
+                ClearButtonDiagonalSplit(skill2Button, unavailableColor);
+                
+            if (canUseSkill3)
+                SetButtonDiagonalSplit(skill3Button, colorA, colorB);
+            else
+                ClearButtonDiagonalSplit(skill3Button, unavailableColor);
+                
+            if (canUseSkill4)
+                SetButtonDiagonalSplit(skill4Button, colorA, colorB);
+            else
+                ClearButtonDiagonalSplit(skill4Button, unavailableColor);
+                
+            if (canUseUltimate)
+                SetButtonDiagonalSplit(skill5Button, colorA, colorB);
+            else
+                ClearButtonDiagonalSplit(skill5Button, unavailableColor);
         }
         else
         {
-            ClearButtonDiagonalSplit(attackButton, attackNormalColor);
-            ClearButtonDiagonalSplit(skill1Button, normalColor);
-            ClearButtonDiagonalSplit(skill2Button, normalColor);
-            ClearButtonDiagonalSplit(skill3Button, normalColor);
+            ClearButtonDiagonalSplit(skill1Button, canUseSkill1 ? normalColor : unavailableColor);
+            ClearButtonDiagonalSplit(skill2Button, canUseSkill2 ? normalColor : unavailableColor);
+            ClearButtonDiagonalSplit(skill3Button, canUseSkill3 ? normalColor : unavailableColor);
+            ClearButtonDiagonalSplit(skill4Button, canUseSkill4 ? normalColor : unavailableColor);
+            ClearButtonDiagonalSplit(skill5Button, canUseUltimate ? ultimateColor : unavailableColor);
         }
     }
     
@@ -1271,17 +1626,17 @@ public class CombatUI : MonoBehaviour
         lootGoldText.fontSize = 24;
         lootGoldText.color = new Color(1f, 0.85f, 0.2f);
 
-        var relicObj = new GameObject("RelicText");
-        relicObj.transform.SetParent(panel.transform, false);
-        var relicRect = relicObj.AddComponent<RectTransform>();
-        relicRect.anchorMin = new Vector2(0.1f, 0.3f);
-        relicRect.anchorMax = new Vector2(0.9f, 0.5f);
-        relicRect.offsetMin = Vector2.zero;
-        relicRect.offsetMax = Vector2.zero;
-        lootRelicText = relicObj.AddComponent<TextMeshProUGUI>();
-        lootRelicText.alignment = TextAlignmentOptions.Center;
-        lootRelicText.fontSize = 20;
-        lootRelicText.color = new Color(0.6f, 0.8f, 1f);
+        var xpObj = new GameObject("XPText");
+        xpObj.transform.SetParent(panel.transform, false);
+        var xpRect = xpObj.AddComponent<RectTransform>();
+        xpRect.anchorMin = new Vector2(0.1f, 0.3f);
+        xpRect.anchorMax = new Vector2(0.9f, 0.5f);
+        xpRect.offsetMin = Vector2.zero;
+        xpRect.offsetMax = Vector2.zero;
+        lootXPText = xpObj.AddComponent<TextMeshProUGUI>();
+        lootXPText.alignment = TextAlignmentOptions.Center;
+        lootXPText.fontSize = 24;
+        lootXPText.color = new Color(0.4f, 0.9f, 1f);
 
         var btnObj = new GameObject("CollectButton");
         btnObj.transform.SetParent(panel.transform, false);
@@ -1312,10 +1667,10 @@ public class CombatUI : MonoBehaviour
         return panel;
     }
 
-    public void ShowLootPanel(int gold, RelicData relic, Player player, NodeBase node, string title = null)
+    public void ShowLootPanel(int gold, int xp, Player player, NodeBase node, string title = null)
     {
         pendingGold = gold;
-        pendingRelic = relic;
+        pendingXP = xp;
         pendingPlayer = player;
         pendingNode = node;
 
@@ -1324,7 +1679,7 @@ public class CombatUI : MonoBehaviour
             lootTitleText.text = title ?? "VICTORY!";
         }
         lootGoldText.text = $"Gold: +{gold}";
-        lootRelicText.text = $"Relic: {relic.DisplayName}\n({relic.StatAffected} +{relic.Amount})";
+        lootXPText.text = $"XP: +{xp}";
 
         combatPanel.SetActive(false);
         lootPanel.SetActive(true);
@@ -1335,7 +1690,7 @@ public class CombatUI : MonoBehaviour
         if (pendingPlayer != null)
         {
             pendingPlayer.AddGold(pendingGold);
-            pendingPlayer.AddRelic(pendingRelic);
+            // XP is already added in CombatManager.EndCombat (Phase 1)
         }
 
         lootPanel.SetActive(false);

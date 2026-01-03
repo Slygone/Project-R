@@ -13,6 +13,7 @@ public class AffinitySelectionUI : MonoBehaviour
     private Action<ElementPair> onPairSelected;
     private bool isActive = false;
     private bool isPairMode = false;
+    private GameObject rerollButton;
 
     void Awake()
     {
@@ -96,6 +97,7 @@ public class AffinitySelectionUI : MonoBehaviour
         
         ClearChoiceButtons();
         CreatePairButtons();
+        CreateOrUpdateRerollButton();
         
         selectionPanel.SetActive(true);
         isActive = true;
@@ -138,6 +140,103 @@ public class AffinitySelectionUI : MonoBehaviour
         foreach (var pair in pairChoices)
         {
             CreatePairButton(container.transform, pair);
+        }
+    }
+
+    private void CreateOrUpdateRerollButton()
+    {
+        // Destroy previous reroll button if exists (we re-create to ensure correct state/position)
+        if (rerollButton != null)
+        {
+            Destroy(rerollButton);
+            rerollButton = null;
+        }
+
+        // Only show in pair mode
+        if (!isPairMode) return;
+
+        // Create button regardless, but disable if not available
+        rerollButton = new GameObject("RerollButton");
+        rerollButton.transform.SetParent(selectionPanel.transform, false);
+
+        var rect = rerollButton.AddComponent<RectTransform>();
+        rect.anchorMin = new Vector2(0.4f, 0.06f);
+        rect.anchorMax = new Vector2(0.6f, 0.12f);
+        rect.offsetMin = Vector2.zero;
+        rect.offsetMax = Vector2.zero;
+
+        var img = rerollButton.AddComponent<Image>();
+        img.color = new Color(0.25f, 0.2f, 0.35f, 1f);
+
+        var btn = rerollButton.AddComponent<Button>();
+        btn.targetGraphic = img;
+        btn.onClick.AddListener(OnRerollClicked);
+        btn.interactable = GameManager.IsPairRerollAvailable();
+
+        var textObj = new GameObject("Text");
+        textObj.transform.SetParent(rerollButton.transform, false);
+        var textRect = textObj.AddComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+
+        var text = textObj.AddComponent<TextMeshProUGUI>();
+        text.alignment = TextAlignmentOptions.Center;
+        text.fontSize = 22;
+        text.color = Color.white;
+        text.text = GameManager.IsPairRerollAvailable() ? "Reroll (1x)" : "Reroll Used";
+    }
+
+    private void OnRerollClicked()
+    {
+        if (!GameManager.IsPairRerollAvailable()) return;
+
+        // Build a pool excluding the currently shown three
+        var allPairs = new List<ElementPair>(ElementPair.GetPredefinedPairs());
+        var filtered = new List<ElementPair>();
+
+        foreach (var p in allPairs)
+        {
+            bool isCurrent = false;
+            foreach (var cur in pairChoices)
+            {
+                if (p.DisplayName == cur.DisplayName ||
+                    (p.OrbA == cur.OrbA && p.OrbB == cur.OrbB))
+                {
+                    isCurrent = true;
+                    break;
+                }
+            }
+            if (!isCurrent) filtered.Add(p);
+        }
+
+        // Safety: if not enough remain (shouldn't happen with 10 total), fall back to full set
+        var source = filtered.Count >= 3 ? filtered : allPairs;
+
+        // Pick 3 unique new options
+        var newChoices = new List<ElementPair>();
+        var temp = new List<ElementPair>(source);
+        while (newChoices.Count < 3 && temp.Count > 0)
+        {
+            int idx = UnityEngine.Random.Range(0, temp.Count);
+            newChoices.Add(temp[idx]);
+            temp.RemoveAt(idx);
+        }
+
+        // Apply and rebuild UI
+        pairChoices = newChoices;
+        ClearChoiceButtons();
+        CreatePairButtons();
+
+        // Consume reroll and update button state
+        GameManager.UsePairReroll();
+        if (rerollButton != null)
+        {
+            var b = rerollButton.GetComponent<Button>();
+            var t = rerollButton.transform.Find("Text").GetComponent<TextMeshProUGUI>();
+            if (b != null) b.interactable = false;
+            if (t != null) t.text = "Reroll Used";
         }
     }
     
@@ -189,7 +288,12 @@ public class AffinitySelectionUI : MonoBehaviour
         var descObj = new GameObject("Description");
         descObj.transform.SetParent(btnObj.transform, false);
         var descText = descObj.AddComponent<TextMeshProUGUI>();
-        descText.text = $"Orb A: {pair.OrbA}\nOrb B: {pair.OrbB}";
+        
+        // Show element names with tier from saved progression
+        var progressA = MetaProgressionManager.Instance.GetElementProgress(pair.OrbA.ToString());
+        var progressB = MetaProgressionManager.Instance.GetElementProgress(pair.OrbB.ToString());
+        descText.text = $"{pair.OrbA} Tier {progressA.AscensionLevel}\n{pair.OrbB} Tier {progressB.AscensionLevel}";
+        
         descText.alignment = TextAlignmentOptions.Center;
         descText.fontSize = 14;
         descText.color = new Color(0.8f, 0.8f, 0.8f);

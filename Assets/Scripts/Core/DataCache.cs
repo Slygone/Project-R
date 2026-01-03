@@ -13,23 +13,31 @@ public static class DataCache
     public static List<RelicData> Relics { get; private set; }
     public static PlayerData PlayerStats { get; private set; }
     public static Dictionary<string, float> QTEMultipliers { get; private set; }
-    public static List<ReactionData> Reactions { get; private set; }
+    public static Dictionary<string, ReactionData> Reactions { get; private set; }
+    public static Dictionary<string, List<ReactionEffectData>> ReactionEffects { get; private set; }
+    public static Dictionary<string, List<ElementalTierData>> ElementalTiers { get; private set; }
+    public static Dictionary<int, WorldEncounterData> WorldEncounters { get; private set; }
 
     public static bool IsLoaded { get; private set; }
 
     public static void LoadAll()
     {
+        GameDataLoader.LoadAll();
+        
         Enemies = LoadEnemies();
         RestOptions = LoadRestOptions();
-        Characters = LoadCharacters();
+        Characters = LoadCharactersFromJson();
         Potions = LoadPotions();
         Relics = LoadRelics();
         PlayerStats = LoadPlayerStats();
         QTEMultipliers = LoadQTEMultipliers();
         Reactions = LoadReactions();
+        ReactionEffects = LoadReactionEffects();
+        ElementalTiers = LoadElementalTiers();
+        WorldEncounters = LoadWorldEncounters();
 
         IsLoaded = true;
-        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEMultipliers.Count} QTE results, {Reactions.Count} reactions, player stats");
+        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEMultipliers.Count} QTE results, {Reactions.Count} reactions, {ReactionEffects.Count} reaction effect groups, {ElementalTiers.Count} element tier groups, {WorldEncounters.Count} world encounters, player stats");
     }
 
     // Parse multiplier from formula like "Health *1.7" or "Damage * 2"
@@ -83,6 +91,32 @@ public static class DataCache
         
         return 0;
     }
+    
+    // Parse damage range like "14-16" into (min, max) tuple
+    private static (int min, int max) ParseDamageRange(string rangeStr)
+    {
+        if (string.IsNullOrEmpty(rangeStr)) return (0, 0);
+        
+        // Try to split by dash
+        var parts = rangeStr.Split('-');
+        if (parts.Length == 2)
+        {
+            if (int.TryParse(parts[0].Trim(), out int min) && 
+                int.TryParse(parts[1].Trim(), out int max))
+            {
+                return (min, max);
+            }
+        }
+        
+        // Fallback: try parsing as single number
+        if (int.TryParse(rangeStr.Trim(), out int single))
+        {
+            return (single, single);
+        }
+        
+        return (0, 0);
+    }
+    
 
     private static List<EnemyData> LoadEnemies()
     {
@@ -96,18 +130,31 @@ public static class DataCache
 
         foreach (var row in rows)
         {
+            // Parse damage range from CSV (e.g., "9-11") and use average as base damage
+            var damageRange = ParseDamageRange(CSVParser.ParseString(row, "DamageRange"));
+            int baseDamage = (damageRange.min + damageRange.max) / 2;
+            
             var enemy = new EnemyData
             {
                 Type = CSVParser.ParseString(row, "Type"),
                 DisplayName = CSVParser.ParseString(row, "DisplayName"),
                 EnemyID = CSVParser.ParseInt(row, "EnemyID"),
                 Health = CSVParser.ParseInt(row, "Health"),
-                Damage = CSVParser.ParseInt(row, "Damage"),
+                Damage = baseDamage, // Base damage - variance applied at attack time
                 BaseResistance = CSVParser.ParseInt(row, "BaseRessistance"),
                 BonusResistance = CSVParser.ParseInt(row, "BonusRessistance"),
                 World2HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World2HealthModifer", "1")),
                 World2DamageMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World2DamageModifer", "1")),
-                World2BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World2BaseResistanceModifier", "0"))
+                World2BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World2BaseResistanceModifier", "0")),
+                World3HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World3HealthModifier", "1")),
+                World3DamageMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World3DamageModifier", "1")),
+                World3BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World3BaseResistanceModifier", "0")),
+                World4HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World4HealthModifier", "1")),
+                World4DamageMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World4DamageModifier", "1")),
+                World4BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World4BaseResistanceModifier", "0")),
+                World5HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World5HealthModifier", "1")),
+                World5DamageMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World5DamageModifier", "1")),
+                World5BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World5BaseResistanceModifier", "0"))
             };
             
             list.Add(enemy);
@@ -140,32 +187,16 @@ public static class DataCache
         return list;
     }
 
-    private static List<CharacterData> LoadCharacters()
+    private static List<CharacterData> LoadCharactersFromJson()
     {
-        var csv = Resources.Load<TextAsset>("Data/character");
-        var rows = CSVParser.Parse(csv.text);
+        var definitions = GameDataLoader.GetAllCharacters();
         var list = new List<CharacterData>();
-
-        foreach (var row in rows)
+        
+        foreach (var def in definitions)
         {
-            list.Add(new CharacterData
-            {
-                DisplayName = CSVParser.ParseString(row, "DisplayName"),
-                CharacterID = CSVParser.ParseInt(row, "CharacterID"),
-                MaxHealth = CSVParser.ParseInt(row, "MaxHealth"),
-                Damage = CSVParser.ParseInt(row, "Damage"),
-                Gold = CSVParser.ParseInt(row, "Gold"),
-                MaxEnergy = CSVParser.ParseInt(row, "MaxEnergy"),
-                CritChance = CSVParser.ParseFloat(row, "CritChance"),
-                CritDamage = CSVParser.ParseFloat(row, "CritDamage"),
-                BaseResistance = CSVParser.ParseInt(row, "BaseRessistance"),
-                BonusResistance = CSVParser.ParseInt(row, "BonusRessistance"),
-                Skill1 = CSVParser.ParseString(row, "Skill1"),
-                Skill2 = CSVParser.ParseString(row, "Skill2"),
-                Skill3 = CSVParser.ParseString(row, "Skill3")
-            });
+            list.Add(GameDataLoader.ToCharacterData(def));
         }
-
+        
         return list;
     }
 
@@ -263,30 +294,77 @@ public static class DataCache
         return dict;
     }
 
-    private static List<ReactionData> LoadReactions()
+    private static Dictionary<string, ReactionData> LoadReactions()
     {
-        var csv = Resources.Load<TextAsset>("Data/reaction");
-        var list = new List<ReactionData>();
+        var csv = Resources.Load<TextAsset>("Data/elementalReactions");
+        var dict = new Dictionary<string, ReactionData>();
         
         if (csv == null)
         {
-            Debug.LogWarning("[DataCache] reaction.csv not found");
-            return list;
+            Debug.LogWarning("[DataCache] elementalReactions.csv not found");
+            return dict;
         }
 
         var rows = CSVParser.Parse(csv.text);
         foreach (var row in rows)
         {
-            list.Add(new ReactionData
+            string reactionId = CSVParser.ParseString(row, "ReactionId", "");
+            if (string.IsNullOrEmpty(reactionId)) continue;
+            
+            dict[reactionId] = new ReactionData
             {
-                ElementA = CSVParser.ParseString(row, "ElementA"),
-                ElementB = CSVParser.ParseString(row, "ElementB"),
-                ReactionName = CSVParser.ParseString(row, "ReactionName"),
-                Multiplier = CSVParser.ParseFloat(row, "Multiplier")
-            });
+                ReactionId = reactionId,
+                Name = CSVParser.ParseString(row, "Name", "Unknown"),
+                DamageMultiplier = CSVParser.ParseFloat(row, "DamageMultiplier", 1f)
+            };
         }
 
-        return list;
+        return dict;
+    }
+    
+    private static Dictionary<string, List<ReactionEffectData>> LoadReactionEffects()
+    {
+        var csv = Resources.Load<TextAsset>("Data/elementalReactionEffects");
+        var dict = new Dictionary<string, List<ReactionEffectData>>();
+        
+        if (csv == null)
+        {
+            Debug.LogWarning("[DataCache] elementalReactionEffects.csv not found");
+            return dict;
+        }
+
+        var rows = CSVParser.Parse(csv.text);
+        foreach (var row in rows)
+        {
+            string reactionId = CSVParser.ParseString(row, "ReactionId", "");
+            if (string.IsNullOrEmpty(reactionId)) continue;
+            
+            var effect = new ReactionEffectData
+            {
+                ReactionId = reactionId,
+                Order = CSVParser.ParseInt(row, "Order", 0),
+                EffectType = CSVParser.ParseString(row, "EffectType", ""),
+                Target = CSVParser.ParseString(row, "Target", "Enemy"),
+                Value = CSVParser.ParseString(row, "Value", ""),
+                DurationTurns = CSVParser.ParseInt(row, "DurationTurns", 0),
+                ChancePct = CSVParser.ParseInt(row, "ChancePct", 100),
+                Notes = CSVParser.ParseString(row, "Notes", "")
+            };
+            
+            if (!dict.ContainsKey(reactionId))
+            {
+                dict[reactionId] = new List<ReactionEffectData>();
+            }
+            dict[reactionId].Add(effect);
+        }
+        
+        // Sort each list by Order
+        foreach (var kvp in dict)
+        {
+            kvp.Value.Sort((a, b) => a.Order.CompareTo(b.Order));
+        }
+
+        return dict;
     }
 
     public static float GetQTEMultiplier(QTEResult result)
@@ -299,25 +377,221 @@ public static class DataCache
         return 1.0f;
     }
 
-    public static (string name, float multiplier) GetReaction(Element a, Element b)
+    // Get reaction definition by directional ReactionId (e.g., "Ice_Fire" for Ice then Fire)
+    public static ReactionData GetReactionDef(string reactionId)
     {
-        if (a == b) return ("None", 1.0f);
+        if (string.IsNullOrEmpty(reactionId)) return GetDefaultReactionDef();
         
-        string aStr = a.ToString();
-        string bStr = b.ToString();
-        
-        if (Reactions != null)
+        if (Reactions != null && Reactions.TryGetValue(reactionId, out var reaction))
         {
-            foreach (var r in Reactions)
-            {
-                if ((r.ElementA == aStr && r.ElementB == bStr) ||
-                    (r.ElementA == bStr && r.ElementB == aStr))
-                {
-                    return (r.ReactionName, r.Multiplier);
-                }
-            }
+            return reaction;
         }
         
-        return ("Reaction", 1.25f);
+        return GetDefaultReactionDef();
+    }
+    
+    // Get reaction effects by ReactionId (returns empty list if none)
+    public static List<ReactionEffectData> GetReactionEffects(string reactionId)
+    {
+        if (string.IsNullOrEmpty(reactionId)) return new List<ReactionEffectData>();
+        
+        if (ReactionEffects != null && ReactionEffects.TryGetValue(reactionId, out var effects))
+        {
+            return effects;
+        }
+        
+        return new List<ReactionEffectData>();
+    }
+    
+    private static ReactionData GetDefaultReactionDef()
+    {
+        return new ReactionData
+        {
+            ReactionId = "Unknown",
+            Name = "Unknown",
+            DamageMultiplier = 1.0f
+        };
+    }
+    
+    // Build ReactionId from two elements (FirstElement_DetonatorElement)
+    public static string BuildReactionId(Element firstElement, Element detonatorElement)
+    {
+        if (firstElement == Element.None || detonatorElement == Element.None)
+            return null;
+        if (firstElement == detonatorElement)
+            return null;
+        return $"{firstElement}_{detonatorElement}";
+    }
+    
+    // Load elemental tier data (XP thresholds and bonuses per element per level)
+    private static Dictionary<string, List<ElementalTierData>> LoadElementalTiers()
+    {
+        var result = new Dictionary<string, List<ElementalTierData>>();
+        
+        var asset = Resources.Load<TextAsset>("Data/elementalTier");
+        if (asset == null)
+        {
+            Debug.LogWarning("[DataCache] elementalTier.csv not found");
+            return result;
+        }
+        
+        var rows = CSVParser.Parse(asset.text);
+        foreach (var row in rows)
+        {
+            string element = CSVParser.ParseString(row, "Element");
+            if (string.IsNullOrEmpty(element)) continue;
+            
+            var tierData = new ElementalTierData
+            {
+                Element = element,
+                Level = CSVParser.ParseInt(row, "Level"),
+                XPRequiredToReachLevel = CSVParser.ParseInt(row, "XPRequiredToReachLevel"),
+                Bonus = CSVParser.ParseString(row, "Bonus")
+            };
+            
+            if (!result.ContainsKey(element))
+            {
+                result[element] = new List<ElementalTierData>();
+            }
+            result[element].Add(tierData);
+        }
+        
+        // Sort each element's tiers by level
+        foreach (var kvp in result)
+        {
+            kvp.Value.Sort((a, b) => a.Level.CompareTo(b.Level));
+        }
+        
+        return result;
+    }
+    
+    /// <summary>
+    /// Get the XP required to reach a specific level for an element.
+    /// </summary>
+    public static int GetElementXPThreshold(string element, int level)
+    {
+        if (ElementalTiers == null || !ElementalTiers.ContainsKey(element))
+            return int.MaxValue;
+        
+        var tiers = ElementalTiers[element];
+        foreach (var tier in tiers)
+        {
+            if (tier.Level == level)
+                return tier.XPRequiredToReachLevel;
+        }
+        return int.MaxValue;
+    }
+    
+    /// <summary>
+    /// Get the bonus text for a specific element level.
+    /// </summary>
+    public static string GetElementBonus(string element, int level)
+    {
+        if (ElementalTiers == null || !ElementalTiers.ContainsKey(element))
+            return "";
+        
+        var tiers = ElementalTiers[element];
+        foreach (var tier in tiers)
+        {
+            if (tier.Level == level)
+                return tier.Bonus;
+        }
+        return "";
+    }
+    
+    /// <summary>
+    /// Get the max level for an element from CSV data.
+    /// </summary>
+    public static int GetElementMaxLevel(string element)
+    {
+        if (ElementalTiers == null || !ElementalTiers.ContainsKey(element))
+            return 1;
+        
+        var tiers = ElementalTiers[element];
+        if (tiers.Count == 0) return 1;
+        return tiers[tiers.Count - 1].Level;
+    }
+    
+    /// <summary>
+    /// Get list of all elements from CSV data.
+    /// </summary>
+    public static List<string> GetAllElements()
+    {
+        if (ElementalTiers == null)
+            return new List<string>();
+        return new List<string>(ElementalTiers.Keys);
+    }
+    
+    private static Dictionary<int, WorldEncounterData> LoadWorldEncounters()
+    {
+        var dict = new Dictionary<int, WorldEncounterData>();
+        
+        var csv = Resources.Load<TextAsset>("Data/worldEncounter");
+        if (csv == null)
+        {
+            Debug.LogWarning("[DataCache] worldEncounter.csv not found, using defaults");
+            // Provide defaults for 5 worlds
+            for (int w = 1; w <= 5; w++)
+            {
+                dict[w] = new WorldEncounterData
+                {
+                    World = w,
+                    NodeCount = 10 + (w - 1) * 2,
+                    CombatNodeCount = 20,
+                    RestNodeCount = 5,
+                    ShopNodeCount = 3,
+                    EliteNodeCount = 10,
+                    RegularEnemy = w,
+                    EliteEnemy = w,
+                    BossEnemy = w
+                };
+            }
+            return dict;
+        }
+        
+        var rows = CSVParser.Parse(csv.text);
+        foreach (var row in rows)
+        {
+            int world = CSVParser.ParseInt(row, "World");
+            if (world <= 0) continue;
+            
+            dict[world] = new WorldEncounterData
+            {
+                World = world,
+                NodeCount = CSVParser.ParseInt(row, "NodeCount", 10),
+                CombatNodeCount = CSVParser.ParseInt(row, "CombatNodeCount", 20),
+                RestNodeCount = CSVParser.ParseInt(row, "RestNodeCount", 5),
+                ShopNodeCount = CSVParser.ParseInt(row, "ShopNodeCount", 3),
+                EliteNodeCount = CSVParser.ParseInt(row, "EliteNodeCount", 10),
+                RegularEnemy = CSVParser.ParseInt(row, "RegularEnemy", 1),
+                EliteEnemy = CSVParser.ParseInt(row, "EliteEnemy", 1),
+                BossEnemy = CSVParser.ParseInt(row, "BossEnemy", 1)
+            };
+        }
+        
+        return dict;
+    }
+    
+    /// <summary>
+    /// Get world encounter data for a specific world. Returns defaults if not found.
+    /// </summary>
+    public static WorldEncounterData GetWorldEncounter(int world)
+    {
+        if (WorldEncounters != null && WorldEncounters.ContainsKey(world))
+            return WorldEncounters[world];
+        
+        // Return defaults
+        return new WorldEncounterData
+        {
+            World = world,
+            NodeCount = 10 + (world - 1) * 2,
+            CombatNodeCount = 20,
+            RestNodeCount = 5,
+            ShopNodeCount = 3,
+            EliteNodeCount = 10,
+            RegularEnemy = world,
+            EliteEnemy = world,
+            BossEnemy = world
+        };
     }
 }

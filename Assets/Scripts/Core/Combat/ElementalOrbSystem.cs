@@ -9,6 +9,7 @@ public class ElementalOrbSystem
     private bool orbAActive = false;
     private bool orbBActive = false;
     private Element detonatorElement = Element.None;
+    private Element firstElement = Element.None;  // The element applied BEFORE the detonator
     private int infusionOrder = 0;
     
     public Element OrbAElement => orbAElement;
@@ -24,13 +25,22 @@ public class ElementalOrbSystem
         orbAElement = a;
         orbBElement = b;
         ClearMarks();
-        Debug.Log($"[ElementalOrbSystem] Element pair set: Orb A = {a}, Orb B = {b}");
+        GameLog.Reaction(GameLog.Join(
+            "ElementPairSet",
+            GameLog.KV("orbA", a),
+            GameLog.KV("orbB", b)
+        ), GameLogVerbosity.Normal);
     }
     
     public void InfuseOrb(bool useOrbA)
     {
         infusionOrder++;
         Element infusedElement;
+        Element previousMark = Element.None;
+        
+        // Track what was already applied before this infusion
+        if (orbAActive) previousMark = orbAMark;
+        if (orbBActive && previousMark == Element.None) previousMark = orbBMark;
         
         if (useOrbA)
         {
@@ -38,7 +48,12 @@ public class ElementalOrbSystem
             orbAActive = true;
             infusedElement = orbAElement;
             ApplyElementBuff(orbAElement);
-            Debug.Log($"[ElementalOrbSystem] Orb A infused with {orbAElement} - mark applied (order: {infusionOrder})");
+            GameLog.Reaction(GameLog.Join(
+                "Infuse",
+                GameLog.KV("orb", "A"),
+                GameLog.KV("element", orbAElement),
+                GameLog.KV("order", infusionOrder)
+            ), GameLogVerbosity.Verbose);
         }
         else
         {
@@ -46,11 +61,33 @@ public class ElementalOrbSystem
             orbBActive = true;
             infusedElement = orbBElement;
             ApplyElementBuff(orbBElement);
-            Debug.Log($"[ElementalOrbSystem] Orb B infused with {orbBElement} - mark applied (order: {infusionOrder})");
+            GameLog.Reaction(GameLog.Join(
+                "Infuse",
+                GameLog.KV("orb", "B"),
+                GameLog.KV("element", orbBElement),
+                GameLog.KV("order", infusionOrder)
+            ), GameLogVerbosity.Verbose);
         }
         
-        detonatorElement = infusedElement;
-        Debug.Log($"[ElementalOrbSystem] Detonator set to {detonatorElement}");
+        // Update first/detonator tracking
+        if (previousMark != Element.None && previousMark != infusedElement)
+        {
+            // There was already a mark - that's the first element, this is the detonator
+            firstElement = previousMark;
+            detonatorElement = infusedElement;
+        }
+        else
+        {
+            // This is the first mark
+            firstElement = infusedElement;
+            detonatorElement = Element.None;
+        }
+        
+        GameLog.Reaction(GameLog.Join(
+            "Marks",
+            GameLog.KV("first", firstElement),
+            GameLog.KV("detonator", detonatorElement)
+        ), GameLogVerbosity.Verbose);
     }
     
     public Element GetInfusedElement(bool useOrbA)
@@ -72,12 +109,21 @@ public class ElementalOrbSystem
     {
         if (!HasReactionReady())
         {
-            Debug.Log("[ElementalOrbSystem] No reaction ready to trigger");
+            GameLog.Reaction(GameLog.Join(
+                "Trigger",
+                GameLog.KV("ready", false)
+            ), GameLogVerbosity.Verbose);
             return;
         }
         
-        var (elementA, elementB) = GetReactionPair();
-        ApplyReactionEffect(elementA, elementB);
+        string reactionId = GetReactionId();
+        string reactionName = GetReactionName();
+        GameLog.Reaction(GameLog.Join(
+            "Trigger",
+            GameLog.KV("ready", true),
+            GameLog.KV("reactionId", reactionId ?? "null"),
+            GameLog.KV("reaction", reactionName)
+        ), GameLogVerbosity.Normal);
         ClearMarks();
     }
     
@@ -88,8 +134,24 @@ public class ElementalOrbSystem
         orbAActive = false;
         orbBActive = false;
         detonatorElement = Element.None;
+        firstElement = Element.None;
         infusionOrder = 0;
-        Debug.Log("[ElementalOrbSystem] Marks cleared");
+        GameLog.Reaction(GameLog.Join(
+            "MarksClear"
+        ), GameLogVerbosity.Verbose);
+    }
+    
+    // Get the first element (the one applied before the detonator)
+    public Element GetFirstElement()
+    {
+        return firstElement;
+    }
+    
+    // Build the directional ReactionId (FirstElement_DetonatorElement)
+    public string GetReactionId()
+    {
+        if (!HasReactionReady()) return null;
+        return DataCache.BuildReactionId(firstElement, detonatorElement);
     }
     
     private void ApplyElementBuff(Element element)
@@ -97,99 +159,47 @@ public class ElementalOrbSystem
         switch (element)
         {
             case Element.Fire:
-                Debug.Log("[ElementalOrbSystem] BUFF: Fire - Attack power increased (TBD)");
+                GameLog.Reaction(GameLog.Join("Buff", GameLog.KV("element", "Fire")), GameLogVerbosity.Verbose);
                 break;
             case Element.Ice:
-                Debug.Log("[ElementalOrbSystem] BUFF: Ice - Crit chance increased (TBD)");
+                GameLog.Reaction(GameLog.Join("Buff", GameLog.KV("element", "Ice")), GameLogVerbosity.Verbose);
                 break;
             case Element.Water:
-                Debug.Log("[ElementalOrbSystem] BUFF: Water - Damage reduction applied (TBD)");
+                GameLog.Reaction(GameLog.Join("Buff", GameLog.KV("element", "Water")), GameLogVerbosity.Verbose);
                 break;
             case Element.Wind:
-                Debug.Log("[ElementalOrbSystem] BUFF: Wind - Speed/evasion increased (TBD)");
+                GameLog.Reaction(GameLog.Join("Buff", GameLog.KV("element", "Wind")), GameLogVerbosity.Verbose);
                 break;
             case Element.Rock:
-                Debug.Log("[ElementalOrbSystem] BUFF: Rock - Shield granted (TBD)");
+                GameLog.Reaction(GameLog.Join("Buff", GameLog.KV("element", "Rock")), GameLogVerbosity.Verbose);
                 break;
             default:
-                Debug.Log("[ElementalOrbSystem] BUFF: None");
+                GameLog.Reaction(GameLog.Join("Buff", GameLog.KV("element", "None")), GameLogVerbosity.Verbose);
                 break;
         }
     }
     
-    private void ApplyReactionEffect(Element a, Element b)
-    {
-        string reactionName = GetReactionName(a, b);
-        Debug.Log($"[ElementalOrbSystem] REACTION TRIGGERED: {a} + {b} = {reactionName}!");
-        
-        switch (reactionName)
-        {
-            case "Melt":
-                Debug.Log("[ElementalOrbSystem] REACTION EFFECT: Melt - 1.5x damage multiplier (TBD)");
-                break;
-            case "Freeze":
-                Debug.Log("[ElementalOrbSystem] REACTION EFFECT: Freeze - Enemy frozen for 1 turn (TBD)");
-                break;
-            case "Vaporize":
-                Debug.Log("[ElementalOrbSystem] REACTION EFFECT: Vaporize - 2x damage multiplier (TBD)");
-                break;
-            case "Swirl":
-                Debug.Log("[ElementalOrbSystem] REACTION EFFECT: Swirl - AoE damage spread (TBD)");
-                break;
-            case "Crystallize":
-                Debug.Log("[ElementalOrbSystem] REACTION EFFECT: Crystallize - Shield generated (TBD)");
-                break;
-            case "Overload":
-                Debug.Log("[ElementalOrbSystem] REACTION EFFECT: Overload - Explosive AoE damage (TBD)");
-                break;
-            case "Superconduct":
-                Debug.Log("[ElementalOrbSystem] REACTION EFFECT: Superconduct - Defense shred (TBD)");
-                break;
-            case "Electro-Charged":
-                Debug.Log("[ElementalOrbSystem] REACTION EFFECT: Electro-Charged - DoT applied (TBD)");
-                break;
-            default:
-                Debug.Log($"[ElementalOrbSystem] REACTION EFFECT: {reactionName} - Generic bonus damage (TBD)");
-                break;
-        }
-    }
-    
-    private string GetReactionName(Element a, Element b)
-    {
-        if ((a == Element.Fire && b == Element.Ice) || (a == Element.Ice && b == Element.Fire))
-            return "Melt";
-        if ((a == Element.Ice && b == Element.Water) || (a == Element.Water && b == Element.Ice))
-            return "Freeze";
-        if ((a == Element.Fire && b == Element.Water) || (a == Element.Water && b == Element.Fire))
-            return "Vaporize";
-        if ((a == Element.Wind && b != Element.Wind && b != Element.Rock) || 
-            (b == Element.Wind && a != Element.Wind && a != Element.Rock))
-            return "Swirl";
-        if ((a == Element.Rock && b != Element.Rock) || (b == Element.Rock && a != Element.Rock))
-            return "Crystallize";
-        if ((a == Element.Fire && b == Element.Wind) || (a == Element.Wind && b == Element.Fire))
-            return "Overload";
-            
-        return $"{a}+{b}";
-    }
-    
+    // Legacy method - now uses data-driven lookup
     public float GetReactionDamageMultiplier()
     {
         if (!HasReactionReady()) return 1f;
         
-        var (a, b) = GetReactionPair();
-        string reactionName = GetReactionName(a, b);
+        string reactionId = GetReactionId();
+        if (string.IsNullOrEmpty(reactionId)) return 1f;
         
-        return reactionName switch
-        {
-            "Melt" => 1.5f,
-            "Vaporize" => 2.0f,
-            "Freeze" => 1.0f,
-            "Swirl" => 1.3f,
-            "Crystallize" => 1.0f,
-            "Overload" => 1.75f,
-            "Superconduct" => 1.25f,
-            _ => 1.2f
-        };
+        var reactionDef = DataCache.GetReactionDef(reactionId);
+        return reactionDef.DamageMultiplier;
+    }
+    
+    // Get reaction name from data
+    public string GetReactionName()
+    {
+        if (!HasReactionReady()) return "None";
+        
+        string reactionId = GetReactionId();
+        if (string.IsNullOrEmpty(reactionId)) return "Unknown";
+        
+        var reactionDef = DataCache.GetReactionDef(reactionId);
+        return reactionDef.Name;
     }
 }

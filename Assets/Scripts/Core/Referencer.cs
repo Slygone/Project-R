@@ -21,6 +21,12 @@ public class Referencer : MonoBehaviour
     public InfusionUI infusionUI;
     public ReactionQTEPanel reactionQTEPanel;
     public MysteryUI mysteryUI;
+    public DefensiveQTE defensiveQTE;
+    
+    // New Run flow UI components
+    public MainMenuUI mainMenuUI;
+    public NewRunCharacterSelectUI newRunCharacterSelectUI;
+    public CharacterLoadoutUI characterLoadoutUI;
     
     public GameObject nodePopupPanel;
     public GameObject victoryPanel;
@@ -124,6 +130,44 @@ public class Referencer : MonoBehaviour
         {
             var mysteryObj = new GameObject("MysteryUI");
             mysteryUI = mysteryObj.AddComponent<MysteryUI>();
+        }
+        
+        // Debug overlay for testing (Phase 0)
+        var debugOverlay = FindFirstObjectByType<DebugOverlay>();
+        if (debugOverlay == null)
+        {
+            var debugObj = new GameObject("DebugOverlay");
+            debugObj.AddComponent<DebugOverlay>();
+        }
+        
+        // Defensive QTE (Phase 3)
+        defensiveQTE = FindFirstObjectByType<DefensiveQTE>();
+        if (defensiveQTE == null)
+        {
+            var dqteObj = new GameObject("DefensiveQTE");
+            defensiveQTE = dqteObj.AddComponent<DefensiveQTE>();
+        }
+        
+        // New Run flow UI components
+        mainMenuUI = FindFirstObjectByType<MainMenuUI>();
+        if (mainMenuUI == null)
+        {
+            var mmObj = new GameObject("MainMenuUI");
+            mainMenuUI = mmObj.AddComponent<MainMenuUI>();
+        }
+        
+        newRunCharacterSelectUI = FindFirstObjectByType<NewRunCharacterSelectUI>();
+        if (newRunCharacterSelectUI == null)
+        {
+            var nrcsObj = new GameObject("NewRunCharacterSelectUI");
+            newRunCharacterSelectUI = nrcsObj.AddComponent<NewRunCharacterSelectUI>();
+        }
+        
+        characterLoadoutUI = FindFirstObjectByType<CharacterLoadoutUI>();
+        if (characterLoadoutUI == null)
+        {
+            var clObj = new GameObject("CharacterLoadoutUI");
+            characterLoadoutUI = clObj.AddComponent<CharacterLoadoutUI>();
         }
 
         var mainCam = Camera.main;
