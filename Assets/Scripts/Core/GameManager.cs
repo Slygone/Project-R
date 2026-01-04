@@ -168,32 +168,31 @@ public class GameManager : MonoBehaviour
         
         Debug.Log($"[GameManager] Starting run with {character.DisplayName}");
         
-        // Now show orb pair selection
-        StartAffinitySelection();
+        // Skip orb selection - new elemental mark system doesn't use orb pairs
+        SkipAffinitySelection();
     }
     
     public int GetTotalNodesForCurrentWorld() => DataCache.GetWorldEncounter(currentWorld).NodeCount;
 
-    private void StartAffinitySelection()
+    private void SkipAffinitySelection()
     {
+        // New system: No orb pair selection needed
+        // Skills can be enchanted with sigils dropped from enemies
+        elementPairChosen = true;
+        affinityChosen = true;
+        
         if (refs != null && refs.playerController != null)
         {
-            refs.playerController.SetCanMove(false);
+            refs.playerController.SetCanMove(true);
         }
-
-        if (refs != null && refs.affinitySelectionUI != null)
-        {
-            refs.affinitySelectionUI.ShowPairSelection(OnElementPairChosen);
-        }
-        else
-        {
-            Debug.LogError("[GameManager] AffinitySelectionUI not found");
-            elementPairChosen = true;
-            if (refs != null && refs.playerController != null)
-            {
-                refs.playerController.SetCanMove(true);
-            }
-        }
+        
+        Debug.Log($"[GameManager] Run started with {refs.player.GetCharacter().DisplayName} (no orb pair - using new elemental mark system)");
+    }
+    
+    private void StartAffinitySelection()
+    {
+        // DEPRECATED: Old orb pair selection - now skipped
+        SkipAffinitySelection();
     }
     
     private void OnElementPairChosen(ElementPair pair)

@@ -38,6 +38,16 @@ public class CombatUI : MonoBehaviour
     private int pendingXP;
     private Player pendingPlayer;
     private NodeBase pendingNode;
+    
+    // Reward system
+    private GameObject rewardContainer;
+    private Button goldRewardButton;
+    private Button xpRewardButton;
+    private GameObject sigilRewardButton;
+    private Element pendingSigil = Element.None;
+    private bool isEnchanting = false;
+    private bool goldCollected = false;
+    private TextMeshProUGUI sigilInstructionText;
     private TextMeshProUGUI combatTitleText;
     
     private bool isTargeting = false;
@@ -68,6 +78,14 @@ public class CombatUI : MonoBehaviour
     private Button endTurnButton;
     private GameObject topBar;
     private GameObject bottomBar;
+    
+    // New bottom bar components
+    private GameObject healthCircle;
+    private TextMeshProUGUI healthCircleText;
+    private TextMeshProUGUI apText;
+    private Image healthFillImage;
+    private Image healthShieldImage;
+    private Image energyFillImage;
     private GameObject relicsPanel;
     private GameObject relicsContainer;
     private Button relicScrollLeftButton;
@@ -404,57 +422,183 @@ public class CombatUI : MonoBehaviour
 
     private void CreateBottomActionBar(Transform parent)
     {
-        // Bottom bar container with rounded dark background
+        // Bottom bar container
         bottomBar = new GameObject("BottomBar");
         bottomBar.transform.SetParent(parent, false);
         var bottomRect = bottomBar.AddComponent<RectTransform>();
-        bottomRect.anchorMin = new Vector2(0.05f, 0.02f);
-        bottomRect.anchorMax = new Vector2(0.95f, 0.20f);
+        bottomRect.anchorMin = new Vector2(0.02f, 0.02f);
+        bottomRect.anchorMax = new Vector2(0.98f, 0.22f);
         bottomRect.offsetMin = Vector2.zero;
         bottomRect.offsetMax = Vector2.zero;
 
-        var bottomBg = bottomBar.AddComponent<Image>();
-        bottomBg.color = new Color(0.12f, 0.10f, 0.08f, 0.95f);
+        // Health Circle (LEFT side - red)
+        CreateHealthCircle(bottomBar.transform);
 
-        // Energy Circle (left side)
+        // Center section with AP display, End Turn button, and Skills
+        CreateCenterSection(bottomBar.transform);
+
+        // Energy Circle (RIGHT side - blue)
         CreateEnergyCircle(bottomBar.transform);
+    }
 
-        // Skill Cards Container (center)
+    private void CreateHealthCircle(Transform parent)
+    {
+        healthCircle = new GameObject("HealthCircle");
+        healthCircle.transform.SetParent(parent, false);
+        var circleRect = healthCircle.AddComponent<RectTransform>();
+        circleRect.anchorMin = new Vector2(0, 0.1f);
+        circleRect.anchorMax = new Vector2(0.12f, 0.9f);
+        circleRect.offsetMin = Vector2.zero;
+        circleRect.offsetMax = Vector2.zero;
+
+        // Background (dark empty state)
+        var bgImage = healthCircle.AddComponent<Image>();
+        bgImage.color = new Color(0.15f, 0.1f, 0.1f, 1f);
+        
+        // Add outline for border effect
+        var outline = healthCircle.AddComponent<Outline>();
+        outline.effectColor = new Color(0.4f, 0.2f, 0.2f, 1f);
+        outline.effectDistance = new Vector2(2, 2);
+
+        // Health fill (red) - fills from bottom up
+        var healthFillObj = new GameObject("HealthFill");
+        healthFillObj.transform.SetParent(healthCircle.transform, false);
+        var healthFillRect = healthFillObj.AddComponent<RectTransform>();
+        healthFillRect.anchorMin = new Vector2(0.08f, 0.08f);
+        healthFillRect.anchorMax = new Vector2(0.92f, 0.92f);
+        healthFillRect.offsetMin = Vector2.zero;
+        healthFillRect.offsetMax = Vector2.zero;
+        healthFillImage = healthFillObj.AddComponent<Image>();
+        healthFillImage.color = new Color(0.8f, 0.2f, 0.2f, 1f);
+        healthFillImage.type = Image.Type.Filled;
+        healthFillImage.fillMethod = Image.FillMethod.Vertical;
+        healthFillImage.fillOrigin = 0; // Bottom
+        healthFillImage.fillAmount = 1f;
+
+        // Shield overlay (light blue, semi-transparent) - fills from bottom up on top of health
+        var shieldFillObj = new GameObject("ShieldFill");
+        shieldFillObj.transform.SetParent(healthCircle.transform, false);
+        var shieldFillRect = shieldFillObj.AddComponent<RectTransform>();
+        shieldFillRect.anchorMin = new Vector2(0.08f, 0.08f);
+        shieldFillRect.anchorMax = new Vector2(0.92f, 0.92f);
+        shieldFillRect.offsetMin = Vector2.zero;
+        shieldFillRect.offsetMax = Vector2.zero;
+        healthShieldImage = shieldFillObj.AddComponent<Image>();
+        healthShieldImage.color = new Color(0.4f, 0.7f, 1f, 0.6f); // Light blue, semi-transparent
+        healthShieldImage.type = Image.Type.Filled;
+        healthShieldImage.fillMethod = Image.FillMethod.Vertical;
+        healthShieldImage.fillOrigin = 0; // Bottom
+        healthShieldImage.fillAmount = 0f; // No shield initially
+
+        // Health number
+        var healthNumObj = new GameObject("HealthNumber");
+        healthNumObj.transform.SetParent(healthCircle.transform, false);
+        var healthNumRect = healthNumObj.AddComponent<RectTransform>();
+        healthNumRect.anchorMin = Vector2.zero;
+        healthNumRect.anchorMax = Vector2.one;
+        healthNumRect.offsetMin = Vector2.zero;
+        healthNumRect.offsetMax = Vector2.zero;
+
+        healthCircleText = healthNumObj.AddComponent<TextMeshProUGUI>();
+        healthCircleText.text = "100";
+        healthCircleText.fontSize = 24;
+        healthCircleText.fontStyle = FontStyles.Bold;
+        healthCircleText.alignment = TextAlignmentOptions.Center;
+        healthCircleText.color = Color.white;
+    }
+
+    private void CreateCenterSection(Transform parent)
+    {
+        // Center container for AP, End Turn, and Skills
+        var centerSection = new GameObject("CenterSection");
+        centerSection.transform.SetParent(parent, false);
+        var centerRect = centerSection.AddComponent<RectTransform>();
+        centerRect.anchorMin = new Vector2(0.14f, 0);
+        centerRect.anchorMax = new Vector2(0.86f, 1);
+        centerRect.offsetMin = Vector2.zero;
+        centerRect.offsetMax = Vector2.zero;
+
+        // AP Display (top) - "AP: X / Y"
+        var apDisplayObj = new GameObject("APDisplay");
+        apDisplayObj.transform.SetParent(centerSection.transform, false);
+        var apRect = apDisplayObj.AddComponent<RectTransform>();
+        apRect.anchorMin = new Vector2(0.3f, 0.78f);
+        apRect.anchorMax = new Vector2(0.7f, 0.98f);
+        apRect.offsetMin = Vector2.zero;
+        apRect.offsetMax = Vector2.zero;
+
+        apText = apDisplayObj.AddComponent<TextMeshProUGUI>();
+        apText.text = "AP: 10 / 10";
+        apText.fontSize = 24;
+        apText.fontStyle = FontStyles.Bold;
+        apText.alignment = TextAlignmentOptions.Center;
+        apText.color = new Color(0.9f, 0.75f, 0.3f); // Golden color
+
+        // End Turn Button (below AP display)
+        var endTurnObj = new GameObject("EndTurnButton");
+        endTurnObj.transform.SetParent(centerSection.transform, false);
+        var btnRect = endTurnObj.AddComponent<RectTransform>();
+        btnRect.anchorMin = new Vector2(0.35f, 0.52f);
+        btnRect.anchorMax = new Vector2(0.65f, 0.76f);
+        btnRect.offsetMin = Vector2.zero;
+        btnRect.offsetMax = Vector2.zero;
+
+        var btnBg = endTurnObj.AddComponent<Image>();
+        btnBg.color = new Color(0.5f, 0.15f, 0.15f, 1f); // Dark red
+
+        endTurnButton = endTurnObj.AddComponent<Button>();
+        endTurnButton.targetGraphic = btnBg;
+        endTurnButton.onClick.AddListener(OnEndTurnClicked);
+
+        // "END TURN" text
+        var endTextObj = new GameObject("EndTurnText");
+        endTextObj.transform.SetParent(endTurnObj.transform, false);
+        var endTextRect = endTextObj.AddComponent<RectTransform>();
+        endTextRect.anchorMin = Vector2.zero;
+        endTextRect.anchorMax = Vector2.one;
+        endTextRect.offsetMin = Vector2.zero;
+        endTextRect.offsetMax = Vector2.zero;
+
+        var endText = endTextObj.AddComponent<TextMeshProUGUI>();
+        endText.text = "END TURN";
+        endText.fontSize = 16;
+        endText.fontStyle = FontStyles.Bold;
+        endText.alignment = TextAlignmentOptions.Center;
+        endText.color = Color.white;
+
+        // Skills Container (bottom)
         var skillsContainer = new GameObject("SkillsContainer");
-        skillsContainer.transform.SetParent(bottomBar.transform, false);
+        skillsContainer.transform.SetParent(centerSection.transform, false);
         actionButtonContainer = skillsContainer;
         var skillsRect = skillsContainer.AddComponent<RectTransform>();
-        skillsRect.anchorMin = new Vector2(0.12f, 0.1f);
-        skillsRect.anchorMax = new Vector2(0.78f, 0.9f);
+        skillsRect.anchorMin = new Vector2(0.02f, 0.02f);
+        skillsRect.anchorMax = new Vector2(0.98f, 0.50f);
         skillsRect.offsetMin = Vector2.zero;
         skillsRect.offsetMax = Vector2.zero;
 
-        // Dark rounded background for skill cards
+        // Dark background for skill cards
         var skillsBg = skillsContainer.AddComponent<Image>();
         skillsBg.color = new Color(0.08f, 0.07f, 0.06f, 0.9f);
 
         var skillsLayout = skillsContainer.AddComponent<HorizontalLayoutGroup>();
-        skillsLayout.spacing = 8;
-        skillsLayout.padding = new RectOffset(10, 10, 8, 8);
+        skillsLayout.spacing = 6;
+        skillsLayout.padding = new RectOffset(8, 8, 4, 4);
         skillsLayout.childAlignment = TextAnchor.MiddleCenter;
         skillsLayout.childControlWidth = true;
         skillsLayout.childControlHeight = true;
         skillsLayout.childForceExpandWidth = true;
         skillsLayout.childForceExpandHeight = true;
 
-        // Create skill cards with hotkey indicators
-        skill1Button = CreateSkillCard(skillsContainer.transform, "Skill1", "1", new Color(0.6f, 0.2f, 0.2f, 1f), OnSkill1Clicked, out skill1Text, out skill1Tooltip);
-        skill2Button = CreateSkillCard(skillsContainer.transform, "Skill2", "2", new Color(0.2f, 0.4f, 0.7f, 1f), OnSkill2Clicked, out skill2Text, out skill2Tooltip);
-        skill3Button = CreateSkillCard(skillsContainer.transform, "Skill3", "3", new Color(0.5f, 0.4f, 0.3f, 1f), OnSkill3Clicked, out skill3Text, out skill3Tooltip);
-        skill4Button = CreateSkillCard(skillsContainer.transform, "Skill4", "Q", new Color(0.3f, 0.3f, 0.4f, 1f), OnSkill4Clicked, out skill4Text, out skill4Tooltip);
-        skill5Button = CreateSkillCard(skillsContainer.transform, "Skill5", "R", new Color(0.7f, 0.5f, 0.2f, 1f), OnSkill5Clicked, out skill5Text, out skill5Tooltip);
+        // Create skill cards with hotkey and AP cost indicators
+        skill1Button = CreateSkillCard(skillsContainer.transform, "Skill1", "1", new Color(0.25f, 0.25f, 0.3f, 1f), OnSkill1Clicked, out skill1Text, out skill1Tooltip);
+        skill2Button = CreateSkillCard(skillsContainer.transform, "Skill2", "2", new Color(0.25f, 0.25f, 0.3f, 1f), OnSkill2Clicked, out skill2Text, out skill2Tooltip);
+        skill3Button = CreateSkillCard(skillsContainer.transform, "Skill3", "3", new Color(0.25f, 0.25f, 0.3f, 1f), OnSkill3Clicked, out skill3Text, out skill3Tooltip);
+        skill4Button = CreateSkillCard(skillsContainer.transform, "Skill4", "4", new Color(0.25f, 0.25f, 0.3f, 1f), OnSkill4Clicked, out skill4Text, out skill4Tooltip);
+        skill5Button = CreateSkillCard(skillsContainer.transform, "Skill5", "5", new Color(0.25f, 0.25f, 0.3f, 1f), OnSkill5Clicked, out skill5Text, out skill5Tooltip);
 
         // Back button (hidden by default, shown during targeting)
         backButton = CreateSkillCard(skillsContainer.transform, "Back", "ESC", new Color(0.4f, 0.4f, 0.4f, 1f), OnBackClicked, out _, out _);
         backButton.gameObject.SetActive(false);
-
-        // End Turn Button (right side)
-        CreateEndTurnButton(bottomBar.transform);
     }
 
     private void CreateEnergyCircle(Transform parent)
@@ -462,94 +606,50 @@ public class CombatUI : MonoBehaviour
         energyCircle = new GameObject("EnergyCircle");
         energyCircle.transform.SetParent(parent, false);
         var circleRect = energyCircle.AddComponent<RectTransform>();
-        circleRect.anchorMin = new Vector2(0.01f, 0.15f);
-        circleRect.anchorMax = new Vector2(0.11f, 0.85f);
+        circleRect.anchorMin = new Vector2(0.88f, 0.1f);
+        circleRect.anchorMax = new Vector2(1f, 0.9f);
         circleRect.offsetMin = Vector2.zero;
         circleRect.offsetMax = Vector2.zero;
 
-        // Background circle
-        var circleBg = energyCircle.AddComponent<Image>();
-        circleBg.color = new Color(0.15f, 0.25f, 0.4f, 1f);
+        // Background (dark empty state)
+        var bgImage = energyCircle.AddComponent<Image>();
+        bgImage.color = new Color(0.1f, 0.1f, 0.15f, 1f);
+        
+        // Add outline for border effect
+        var outline = energyCircle.AddComponent<Outline>();
+        outline.effectColor = new Color(0.2f, 0.3f, 0.5f, 1f);
+        outline.effectDistance = new Vector2(2, 2);
+
+        // Energy fill (blue) - fills from bottom up
+        var energyFillObj = new GameObject("EnergyFill");
+        energyFillObj.transform.SetParent(energyCircle.transform, false);
+        var energyFillRect = energyFillObj.AddComponent<RectTransform>();
+        energyFillRect.anchorMin = new Vector2(0.08f, 0.08f);
+        energyFillRect.anchorMax = new Vector2(0.92f, 0.92f);
+        energyFillRect.offsetMin = Vector2.zero;
+        energyFillRect.offsetMax = Vector2.zero;
+        energyFillImage = energyFillObj.AddComponent<Image>();
+        energyFillImage.color = new Color(0.3f, 0.5f, 0.9f, 1f);
+        energyFillImage.type = Image.Type.Filled;
+        energyFillImage.fillMethod = Image.FillMethod.Vertical;
+        energyFillImage.fillOrigin = 0; // Bottom
+        energyFillImage.fillAmount = 0f; // Start empty
 
         // Energy number
         var energyNumObj = new GameObject("EnergyNumber");
         energyNumObj.transform.SetParent(energyCircle.transform, false);
         var energyNumRect = energyNumObj.AddComponent<RectTransform>();
-        energyNumRect.anchorMin = new Vector2(0, 0.3f);
-        energyNumRect.anchorMax = new Vector2(1, 0.9f);
+        energyNumRect.anchorMin = Vector2.zero;
+        energyNumRect.anchorMax = Vector2.one;
         energyNumRect.offsetMin = Vector2.zero;
         energyNumRect.offsetMax = Vector2.zero;
 
         energyText = energyNumObj.AddComponent<TextMeshProUGUI>();
         energyText.text = "0";
-        energyText.fontSize = 36;
+        energyText.fontSize = 24;
         energyText.fontStyle = FontStyles.Bold;
         energyText.alignment = TextAlignmentOptions.Center;
-        energyText.color = new Color(0.4f, 0.7f, 1f);
-
-        // "ENERGY" label
-        var labelObj = new GameObject("EnergyLabel");
-        labelObj.transform.SetParent(energyCircle.transform, false);
-        var labelRect = labelObj.AddComponent<RectTransform>();
-        labelRect.anchorMin = new Vector2(0, 0);
-        labelRect.anchorMax = new Vector2(1, 0.3f);
-        labelRect.offsetMin = Vector2.zero;
-        labelRect.offsetMax = Vector2.zero;
-
-        var labelText = labelObj.AddComponent<TextMeshProUGUI>();
-        labelText.text = "ENERGY";
-        labelText.fontSize = 10;
-        labelText.alignment = TextAlignmentOptions.Center;
-        labelText.color = new Color(0.6f, 0.8f, 1f);
-    }
-
-    private void CreateEndTurnButton(Transform parent)
-    {
-        var endTurnObj = new GameObject("EndTurnButton");
-        endTurnObj.transform.SetParent(parent, false);
-        var btnRect = endTurnObj.AddComponent<RectTransform>();
-        btnRect.anchorMin = new Vector2(0.80f, 0.1f);
-        btnRect.anchorMax = new Vector2(0.98f, 0.9f);
-        btnRect.offsetMin = Vector2.zero;
-        btnRect.offsetMax = Vector2.zero;
-
-        var btnBg = endTurnObj.AddComponent<Image>();
-        btnBg.color = new Color(0.85f, 0.55f, 0.15f, 1f);
-
-        endTurnButton = endTurnObj.AddComponent<Button>();
-        endTurnButton.targetGraphic = btnBg;
-        endTurnButton.onClick.AddListener(OnEndTurnClicked);
-
-        // "END" text
-        var endTextObj = new GameObject("EndText");
-        endTextObj.transform.SetParent(endTurnObj.transform, false);
-        var endTextRect = endTextObj.AddComponent<RectTransform>();
-        endTextRect.anchorMin = new Vector2(0, 0.55f);
-        endTextRect.anchorMax = new Vector2(1, 0.9f);
-        endTextRect.offsetMin = Vector2.zero;
-        endTextRect.offsetMax = Vector2.zero;
-
-        var endText = endTextObj.AddComponent<TextMeshProUGUI>();
-        endText.text = "END";
-        endText.fontSize = 14;
-        endText.alignment = TextAlignmentOptions.Center;
-        endText.color = Color.white;
-
-        // "TURN" text
-        var turnTextObj = new GameObject("TurnText");
-        turnTextObj.transform.SetParent(endTurnObj.transform, false);
-        var turnTextRect = turnTextObj.AddComponent<RectTransform>();
-        turnTextRect.anchorMin = new Vector2(0, 0.15f);
-        turnTextRect.anchorMax = new Vector2(1, 0.55f);
-        turnTextRect.offsetMin = Vector2.zero;
-        turnTextRect.offsetMax = Vector2.zero;
-
-        var turnText = turnTextObj.AddComponent<TextMeshProUGUI>();
-        turnText.text = "TURN";
-        turnText.fontSize = 20;
-        turnText.fontStyle = FontStyles.Bold;
-        turnText.alignment = TextAlignmentOptions.Center;
-        turnText.color = Color.white;
+        energyText.color = Color.white;
     }
 
     private Button CreateSkillCard(Transform parent, string name, string hotkey, Color bgColor, UnityEngine.Events.UnityAction onClick, out TextMeshProUGUI textComponent, out TooltipTrigger tooltip)
@@ -1513,6 +1613,7 @@ public class CombatUI : MonoBehaviour
         UpdateSkillButtons(player);
         UpdatePlayerHealth(player);
         UpdateEnergyDisplay(player);
+        UpdateAPDisplay(player);
         RefreshPotionButtons(player);
         RefreshRelicsDisplay(player);
         combatPanel.SetActive(true);
@@ -1535,9 +1636,12 @@ public class CombatUI : MonoBehaviour
         if (character != null)
         {
             int currentEnergy = player.GetEnergy();
+            int currentAP = player.GetCurrentAP();
             
-            // Skill 1 - show cooldown if on cooldown, and DirtyStab stacks if applicable
+            // Skill 1 - show AP cost, cooldown if on cooldown, and DirtyStab stacks if applicable
             int cd1 = player.GetSkillCooldown(0);
+            int ap1 = character.Skill1APCost;
+            bool canUse1 = cd1 <= 0 && player.HasEnoughAP(ap1);
             string skill1Name = character.Skill1;
             string dirtyStabIndicator = "";
             
@@ -1553,78 +1657,98 @@ public class CombatUI : MonoBehaviour
             
             if (cd1 > 0)
             {
-                if (skill1Text != null) skill1Text.text = $"{skill1Name}{dirtyStabIndicator}\n<size=12><color=#888888>CD: {cd1}</color></size>";
+                if (skill1Text != null) skill1Text.text = $"{skill1Name}{dirtyStabIndicator}\n<size=10><color=#888888>CD: {cd1}</color></size>";
                 if (skill1Button != null) skill1Button.interactable = false;
             }
             else
             {
-                if (skill1Text != null) skill1Text.text = $"{skill1Name}{dirtyStabIndicator}";
-                if (skill1Button != null) skill1Button.interactable = true;
+                string apColor = player.HasEnoughAP(ap1) ? "#aaaaaa" : "#ff4444";
+                if (skill1Text != null) skill1Text.text = $"<size=10><color={apColor}>{ap1} AP</color></size>\n{skill1Name}{dirtyStabIndicator}";
+                if (skill1Button != null) skill1Button.interactable = canUse1;
             }
             
-            // Skill 2 - show cooldown if on cooldown
+            // Skill 2 - show AP cost and cooldown
             int cd2 = player.GetSkillCooldown(1);
+            int ap2 = character.Skill2APCost;
+            bool canUse2 = cd2 <= 0 && player.HasEnoughAP(ap2);
             if (cd2 > 0)
             {
-                if (skill2Text != null) skill2Text.text = $"{character.Skill2}\n<size=12><color=#888888>CD: {cd2}</color></size>";
+                if (skill2Text != null) skill2Text.text = $"{character.Skill2}\n<size=10><color=#888888>CD: {cd2}</color></size>";
                 if (skill2Button != null) skill2Button.interactable = false;
             }
             else
             {
-                if (skill2Text != null) skill2Text.text = character.Skill2;
-                if (skill2Button != null) skill2Button.interactable = true;
+                string apColor = player.HasEnoughAP(ap2) ? "#aaaaaa" : "#ff4444";
+                if (skill2Text != null) skill2Text.text = $"<size=10><color={apColor}>{ap2} AP</color></size>\n{character.Skill2}";
+                if (skill2Button != null) skill2Button.interactable = canUse2;
             }
             
-            // Skill 3 - show cooldown if on cooldown
+            // Skill 3 - show AP cost and cooldown
             int cd3 = player.GetSkillCooldown(2);
+            int ap3 = character.Skill3APCost;
+            bool canUse3 = cd3 <= 0 && player.HasEnoughAP(ap3);
             if (cd3 > 0)
             {
-                if (skill3Text != null) skill3Text.text = $"{character.Skill3}\n<size=12><color=#888888>CD: {cd3}</color></size>";
+                if (skill3Text != null) skill3Text.text = $"{character.Skill3}\n<size=10><color=#888888>CD: {cd3}</color></size>";
                 if (skill3Button != null) skill3Button.interactable = false;
             }
             else
             {
-                if (skill3Text != null) skill3Text.text = character.Skill3;
-                if (skill3Button != null) skill3Button.interactable = true;
+                string apColor = player.HasEnoughAP(ap3) ? "#aaaaaa" : "#ff4444";
+                if (skill3Text != null) skill3Text.text = $"<size=10><color={apColor}>{ap3} AP</color></size>\n{character.Skill3}";
+                if (skill3Button != null) skill3Button.interactable = canUse3;
             }
             
-            // Skill 4 - show cooldown if on cooldown
+            // Skill 4 - show AP cost and cooldown
             int cd4 = player.GetSkillCooldown(3);
+            int ap4 = character.Skill4APCost;
+            bool canUse4 = cd4 <= 0 && player.HasEnoughAP(ap4);
             if (cd4 > 0)
             {
-                if (skill4Text != null) skill4Text.text = $"{character.Skill4}\n<size=12><color=#888888>CD: {cd4}</color></size>";
+                if (skill4Text != null) skill4Text.text = $"{character.Skill4}\n<size=10><color=#888888>CD: {cd4}</color></size>";
                 if (skill4Button != null) skill4Button.interactable = false;
             }
             else
             {
-                if (skill4Text != null) skill4Text.text = character.Skill4;
-                if (skill4Button != null) skill4Button.interactable = true;
+                string apColor = player.HasEnoughAP(ap4) ? "#aaaaaa" : "#ff4444";
+                if (skill4Text != null) skill4Text.text = $"<size=10><color={apColor}>{ap4} AP</color></size>\n{character.Skill4}";
+                if (skill4Button != null) skill4Button.interactable = canUse4;
             }
             
-            // Skill 5 (Ultimate) - show energy and cooldown, disable if not enough energy or on cooldown
+            // Skill 5 (Ultimate) - show AP cost, energy cost and cooldown
             int cd5 = player.GetSkillCooldown(4);
+            int ap5 = character.Skill5APCost;
             int energyCost = character.Skill5EnergyCost;
-            bool canUseUltimate = player.CanUseUltimate();
+            bool canUseUltimate = player.CanUseUltimate() && player.HasEnoughAP(ap5);
             
             string skill5Status = "";
             if (cd5 > 0)
             {
-                skill5Status = $"\n<size=12><color=#888888>CD: {cd5}</color></size>";
+                skill5Status = $"\n<size=10><color=#888888>CD: {cd5}</color></size>";
             }
             else
             {
-                skill5Status = $"\n<size=12><color={(canUseUltimate ? "#44ff44" : "#ff4444")}>{currentEnergy}/{energyCost}</color></size>";
+                string apColor = player.HasEnoughAP(ap5) ? "#aaaaaa" : "#ff4444";
+                string energyColor = currentEnergy >= energyCost ? "#44ff44" : "#ff4444";
+                skill5Status = $"<size=10><color={apColor}>{ap5} AP</color></size>\n{character.Skill5}\n<size=10><color={energyColor}>{currentEnergy}E</color></size>";
             }
             
-            if (skill5Text != null) skill5Text.text = $"{character.Skill5}{skill5Status}";
+            if (skill5Text != null) skill5Text.text = cd5 > 0 ? $"{character.Skill5}{skill5Status}" : skill5Status;
             if (skill5Button != null) skill5Button.interactable = canUseUltimate;
             
-            // Update tooltips
-            if (skill1Tooltip != null) skill1Tooltip.SetTooltip($"<b>{character.Skill1}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill1)}\nEnergy Gain: +{character.Skill1EnergyGain}\nCooldown: {character.Skill1Cooldown} turn(s)");
-            if (skill2Tooltip != null) skill2Tooltip.SetTooltip($"<b>{character.Skill2}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill2)}\nEnergy Gain: +{character.Skill2EnergyGain}\nCooldown: {character.Skill2Cooldown} turn(s)");
-            if (skill3Tooltip != null) skill3Tooltip.SetTooltip($"<b>{character.Skill3}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill3)}\nEnergy Gain: +{character.Skill3EnergyGain}\nCooldown: {character.Skill3Cooldown} turn(s)");
-            if (skill4Tooltip != null) skill4Tooltip.SetTooltip($"<b>{character.Skill4}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill4)}\nEnergy Gain: +{character.Skill4EnergyGain}\nCooldown: {character.Skill4Cooldown} turn(s)");
-            if (skill5Tooltip != null) skill5Tooltip.SetTooltip($"<b>{character.Skill5}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill5)}\nEnergy Cost: {character.Skill5EnergyCost}\nCooldown: {character.Skill5Cooldown} turn(s)");
+            // Update tooltips with AP cost
+            if (skill1Tooltip != null) skill1Tooltip.SetTooltip($"<b>{character.Skill1}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill1)}\nAP Cost: {character.Skill1APCost}\nEnergy Gain: +{character.Skill1EnergyGain}\nCooldown: {character.Skill1Cooldown} turn(s)");
+            if (skill2Tooltip != null) skill2Tooltip.SetTooltip($"<b>{character.Skill2}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill2)}\nAP Cost: {character.Skill2APCost}\nEnergy Gain: +{character.Skill2EnergyGain}\nCooldown: {character.Skill2Cooldown} turn(s)");
+            if (skill3Tooltip != null) skill3Tooltip.SetTooltip($"<b>{character.Skill3}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill3)}\nAP Cost: {character.Skill3APCost}\nEnergy Gain: +{character.Skill3EnergyGain}\nCooldown: {character.Skill3Cooldown} turn(s)");
+            if (skill4Tooltip != null) skill4Tooltip.SetTooltip($"<b>{character.Skill4}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill4)}\nAP Cost: {character.Skill4APCost}\nEnergy Gain: +{character.Skill4EnergyGain}\nCooldown: {character.Skill4Cooldown} turn(s)");
+            if (skill5Tooltip != null) skill5Tooltip.SetTooltip($"<b>{character.Skill5}</b>\n{PlayerStatsUI.GetSkillDescription(character.Skill5)}\nAP Cost: {character.Skill5APCost}\nEnergy Cost: {character.Skill5EnergyCost}\nCooldown: {character.Skill5Cooldown} turn(s)");
+            
+            // Update skill button colors based on element enchantment
+            UpdateSkillButtonElementColor(skill1Button, player.GetSkillElement(1));
+            UpdateSkillButtonElementColor(skill2Button, player.GetSkillElement(2));
+            UpdateSkillButtonElementColor(skill3Button, player.GetSkillElement(3));
+            UpdateSkillButtonElementColor(skill4Button, player.GetSkillElement(4));
+            UpdateSkillButtonElementColor(skill5Button, player.GetSkillElement(5));
         }
         else
         {
@@ -1784,6 +1908,18 @@ public class CombatUI : MonoBehaviour
         var damageLayout = damageObj.AddComponent<LayoutElement>();
         damageLayout.preferredHeight = 20;
 
+        // Elemental marks display
+        var marksObj = new GameObject("Marks");
+        marksObj.transform.SetParent(slot.transform, false);
+        var marksText = marksObj.AddComponent<TextMeshProUGUI>();
+        marksText.text = "";
+        marksText.alignment = TextAlignmentOptions.Center;
+        marksText.fontSize = 12;
+        marksText.color = Color.white;
+        marksText.richText = true;
+        var marksLayout = marksObj.AddComponent<LayoutElement>();
+        marksLayout.preferredHeight = 18;
+
         enemySlots[enemy] = new EnemyUISlot
         {
             Root = slot,
@@ -1791,7 +1927,8 @@ public class CombatUI : MonoBehaviour
             HealthText = healthText,
             NameText = nameText,
             Arrow = arrowObj,
-            ClickArea = clickBtn
+            ClickArea = clickBtn,
+            MarksText = marksText
         };
     }
 
@@ -1822,6 +1959,26 @@ public class CombatUI : MonoBehaviour
         }
         
         slot.HealthText.text = healthDisplay;
+        
+        // Update elemental marks display
+        if (slot.MarksText != null)
+        {
+            var marks = enemy.GetMarks();
+            if (marks.Count > 0)
+            {
+                var markStrings = new System.Collections.Generic.List<string>();
+                foreach (var kvp in marks)
+                {
+                    string colorHex = ColorUtility.ToHtmlStringRGB(GetElementColor(kvp.Key));
+                    markStrings.Add($"<color=#{colorHex}>{kvp.Key}:{kvp.Value}</color>");
+                }
+                slot.MarksText.text = string.Join(" ", markStrings);
+            }
+            else
+            {
+                slot.MarksText.text = "";
+            }
+        }
 
         if (!enemy.IsAlive())
         {
@@ -1842,12 +1999,46 @@ public class CombatUI : MonoBehaviour
         
         // Display HP in top bar format with heart icon
         int shield = player.GetShield();
+        int maxShield = player.GetMaxShield();
         string shieldText = shield > 0 ? $" <color=#44aaff>[+{shield}]</color>" : "";
         
         if (playerHealthText != null)
         {
             string hpColor = healthPercent > 0.5f ? "#55ff55" : (healthPercent > 0.25f ? "#ffff55" : "#ff5555");
             playerHealthText.text = $"<color=#cc3333>♥</color> <color={hpColor}>{player.GetHealth()}/{player.GetMaxHealth()}</color>{shieldText}";
+        }
+        
+        // Update health circle fill in bottom bar
+        if (healthFillImage != null)
+        {
+            healthFillImage.fillAmount = healthPercent;
+        }
+        
+        // Update shield overlay - show proportional to max shield
+        if (healthShieldImage != null)
+        {
+            if (shield > 0 && maxShield > 0)
+            {
+                float shieldPercent = (float)shield / maxShield;
+                healthShieldImage.fillAmount = shieldPercent;
+            }
+            else
+            {
+                healthShieldImage.fillAmount = 0f;
+            }
+        }
+        
+        // Update health circle text - show health, or health+shield if shielded
+        if (healthCircleText != null)
+        {
+            if (shield > 0)
+            {
+                healthCircleText.text = $"{player.GetHealth()}\n<size=14><color=#66ccff>+{shield}</color></size>";
+            }
+            else
+            {
+                healthCircleText.text = player.GetHealth().ToString();
+            }
         }
         
         // Update gold display
@@ -1859,9 +2050,28 @@ public class CombatUI : MonoBehaviour
     
     public void UpdateEnergyDisplay(Player player)
     {
+        int currentEnergy = player.GetEnergy();
+        int maxEnergy = player.GetMaxEnergy();
+        
+        // Update energy fill amount
+        if (energyFillImage != null && maxEnergy > 0)
+        {
+            float energyPercent = (float)currentEnergy / maxEnergy;
+            energyFillImage.fillAmount = energyPercent;
+        }
+        
+        // Update energy text
         if (energyText != null)
         {
-            energyText.text = player.GetEnergy().ToString();
+            energyText.text = currentEnergy.ToString();
+        }
+    }
+    
+    public void UpdateAPDisplay(Player player)
+    {
+        if (apText != null)
+        {
+            apText.text = $"AP: {player.GetCurrentAP()} / {player.GetMaxAP()}";
         }
     }
 
@@ -2041,69 +2251,19 @@ public class CombatUI : MonoBehaviour
     
     public void UpdateReactionIndicator()
     {
+        // New mark system: Skill colors are now based on element enchantments
+        // This method now just ensures skill buttons have correct element colors
         var refs = FindFirstObjectByType<Referencer>();
         if (refs == null || refs.player == null) return;
         
         var player = refs.player;
-        bool reactionReady = player.HasReactionReady();
         
-        Color normalColor = new Color(0.2f, 0.5f, 0.7f, 1f);
-        Color ultimateColor = new Color(0.7f, 0.4f, 0.2f, 1f);
-        Color unavailableColor = new Color(0.3f, 0.3f, 0.3f, 1f);
-        
-        // Check skill availability (cooldown and energy)
-        int cd1 = player.GetSkillCooldown(0);
-        int cd2 = player.GetSkillCooldown(1);
-        int cd3 = player.GetSkillCooldown(2);
-        int cd4 = player.GetSkillCooldown(3);
-        int cd5 = player.GetSkillCooldown(4);
-        var character = player.GetCharacter();
-        bool canUseSkill1 = cd1 <= 0;
-        bool canUseSkill2 = cd2 <= 0;
-        bool canUseSkill3 = cd3 <= 0;
-        bool canUseSkill4 = cd4 <= 0;
-        bool canUseUltimate = player.CanUseUltimate();
-        
-        if (reactionReady)
-        {
-            var orbSystem = player.GetOrbSystem();
-            Color colorA = GetElementColor(orbSystem.OrbAMark);
-            Color colorB = GetElementColor(orbSystem.OrbBMark);
-            
-            // Only apply reaction colors to skills that are actually usable
-            if (canUseSkill1)
-                SetButtonDiagonalSplit(skill1Button, colorA, colorB);
-            else
-                ClearButtonDiagonalSplit(skill1Button, unavailableColor);
-                
-            if (canUseSkill2)
-                SetButtonDiagonalSplit(skill2Button, colorA, colorB);
-            else
-                ClearButtonDiagonalSplit(skill2Button, unavailableColor);
-                
-            if (canUseSkill3)
-                SetButtonDiagonalSplit(skill3Button, colorA, colorB);
-            else
-                ClearButtonDiagonalSplit(skill3Button, unavailableColor);
-                
-            if (canUseSkill4)
-                SetButtonDiagonalSplit(skill4Button, colorA, colorB);
-            else
-                ClearButtonDiagonalSplit(skill4Button, unavailableColor);
-                
-            if (canUseUltimate)
-                SetButtonDiagonalSplit(skill5Button, colorA, colorB);
-            else
-                ClearButtonDiagonalSplit(skill5Button, unavailableColor);
-        }
-        else
-        {
-            ClearButtonDiagonalSplit(skill1Button, canUseSkill1 ? normalColor : unavailableColor);
-            ClearButtonDiagonalSplit(skill2Button, canUseSkill2 ? normalColor : unavailableColor);
-            ClearButtonDiagonalSplit(skill3Button, canUseSkill3 ? normalColor : unavailableColor);
-            ClearButtonDiagonalSplit(skill4Button, canUseSkill4 ? normalColor : unavailableColor);
-            ClearButtonDiagonalSplit(skill5Button, canUseUltimate ? ultimateColor : unavailableColor);
-        }
+        // Update skill button colors based on their element enchantments
+        UpdateSkillButtonElementColor(skill1Button, player.GetSkillElement(1));
+        UpdateSkillButtonElementColor(skill2Button, player.GetSkillElement(2));
+        UpdateSkillButtonElementColor(skill3Button, player.GetSkillElement(3));
+        UpdateSkillButtonElementColor(skill4Button, player.GetSkillElement(4));
+        UpdateSkillButtonElementColor(skill5Button, player.GetSkillElement(5));
     }
     
     private void SetButtonDiagonalSplit(Button button, Color topColor, Color bottomColor)
@@ -2222,6 +2382,7 @@ public class CombatUI : MonoBehaviour
         public TextMeshProUGUI NameText;
         public GameObject Arrow;
         public Button ClickArea;
+        public TextMeshProUGUI MarksText;
     }
 
     private GameObject CreateLootPanel(Transform parent)
@@ -2230,56 +2391,135 @@ public class CombatUI : MonoBehaviour
         panel.transform.SetParent(parent, false);
 
         var rect = panel.AddComponent<RectTransform>();
-        rect.anchorMin = new Vector2(0.3f, 0.3f);
-        rect.anchorMax = new Vector2(0.7f, 0.7f);
+        rect.anchorMin = new Vector2(0.25f, 0.2f);
+        rect.anchorMax = new Vector2(0.75f, 0.8f);
         rect.offsetMin = Vector2.zero;
         rect.offsetMax = Vector2.zero;
 
         var bg = panel.AddComponent<Image>();
         bg.color = new Color(0.1f, 0.1f, 0.15f, 0.95f);
 
+        // Title: "Reward"
         var titleObj = new GameObject("Title");
         titleObj.transform.SetParent(panel.transform, false);
         var titleRect = titleObj.AddComponent<RectTransform>();
-        titleRect.anchorMin = new Vector2(0, 0.75f);
-        titleRect.anchorMax = new Vector2(1, 0.95f);
+        titleRect.anchorMin = new Vector2(0, 0.85f);
+        titleRect.anchorMax = new Vector2(1, 0.98f);
         titleRect.offsetMin = Vector2.zero;
         titleRect.offsetMax = Vector2.zero;
         lootTitleText = titleObj.AddComponent<TextMeshProUGUI>();
-        lootTitleText.text = "VICTORY!";
+        lootTitleText.text = "Reward";
         lootTitleText.alignment = TextAlignmentOptions.Center;
-        lootTitleText.fontSize = 32;
+        lootTitleText.fontSize = 36;
+        lootTitleText.fontStyle = FontStyles.Bold;
         lootTitleText.color = new Color(1f, 0.85f, 0.2f);
 
-        var goldObj = new GameObject("GoldText");
-        goldObj.transform.SetParent(panel.transform, false);
-        var goldRect = goldObj.AddComponent<RectTransform>();
-        goldRect.anchorMin = new Vector2(0.1f, 0.5f);
-        goldRect.anchorMax = new Vector2(0.9f, 0.65f);
-        goldRect.offsetMin = Vector2.zero;
-        goldRect.offsetMax = Vector2.zero;
-        lootGoldText = goldObj.AddComponent<TextMeshProUGUI>();
-        lootGoldText.alignment = TextAlignmentOptions.Center;
-        lootGoldText.fontSize = 24;
+        // Reward container for clickable items
+        rewardContainer = new GameObject("RewardContainer");
+        rewardContainer.transform.SetParent(panel.transform, false);
+        var containerRect = rewardContainer.AddComponent<RectTransform>();
+        containerRect.anchorMin = new Vector2(0.05f, 0.25f);
+        containerRect.anchorMax = new Vector2(0.95f, 0.82f);
+        containerRect.offsetMin = Vector2.zero;
+        containerRect.offsetMax = Vector2.zero;
+
+        // Gold reward button (clickable)
+        var goldBtnObj = new GameObject("GoldReward");
+        goldBtnObj.transform.SetParent(rewardContainer.transform, false);
+        var goldBtnRect = goldBtnObj.AddComponent<RectTransform>();
+        goldBtnRect.anchorMin = new Vector2(0.05f, 0.7f);
+        goldBtnRect.anchorMax = new Vector2(0.95f, 0.95f);
+        goldBtnRect.offsetMin = Vector2.zero;
+        goldBtnRect.offsetMax = Vector2.zero;
+        var goldBtnImage = goldBtnObj.AddComponent<Image>();
+        goldBtnImage.color = new Color(0.2f, 0.18f, 0.1f, 0.9f);
+        goldRewardButton = goldBtnObj.AddComponent<Button>();
+        goldRewardButton.targetGraphic = goldBtnImage;
+        goldRewardButton.onClick.AddListener(OnGoldRewardClicked);
+
+        var goldTextObj = new GameObject("Text");
+        goldTextObj.transform.SetParent(goldBtnObj.transform, false);
+        var goldTextRect = goldTextObj.AddComponent<RectTransform>();
+        goldTextRect.anchorMin = Vector2.zero;
+        goldTextRect.anchorMax = Vector2.one;
+        goldTextRect.offsetMin = new Vector2(10, 0);
+        goldTextRect.offsetMax = new Vector2(-10, 0);
+        lootGoldText = goldTextObj.AddComponent<TextMeshProUGUI>();
+        lootGoldText.alignment = TextAlignmentOptions.MidlineLeft;
+        lootGoldText.fontSize = 22;
         lootGoldText.color = new Color(1f, 0.85f, 0.2f);
 
-        var xpObj = new GameObject("XPText");
-        xpObj.transform.SetParent(panel.transform, false);
-        var xpRect = xpObj.AddComponent<RectTransform>();
-        xpRect.anchorMin = new Vector2(0.1f, 0.3f);
-        xpRect.anchorMax = new Vector2(0.9f, 0.5f);
-        xpRect.offsetMin = Vector2.zero;
-        xpRect.offsetMax = Vector2.zero;
-        lootXPText = xpObj.AddComponent<TextMeshProUGUI>();
-        lootXPText.alignment = TextAlignmentOptions.Center;
-        lootXPText.fontSize = 24;
+        // XP display (auto-collected, visual feedback)
+        var xpBtnObj = new GameObject("XPReward");
+        xpBtnObj.transform.SetParent(rewardContainer.transform, false);
+        var xpBtnRect = xpBtnObj.AddComponent<RectTransform>();
+        xpBtnRect.anchorMin = new Vector2(0.05f, 0.4f);
+        xpBtnRect.anchorMax = new Vector2(0.95f, 0.65f);
+        xpBtnRect.offsetMin = Vector2.zero;
+        xpBtnRect.offsetMax = Vector2.zero;
+        var xpBtnImage = xpBtnObj.AddComponent<Image>();
+        xpBtnImage.color = new Color(0.1f, 0.15f, 0.2f, 0.9f);
+
+        var xpTextObj = new GameObject("Text");
+        xpTextObj.transform.SetParent(xpBtnObj.transform, false);
+        var xpTextRect = xpTextObj.AddComponent<RectTransform>();
+        xpTextRect.anchorMin = Vector2.zero;
+        xpTextRect.anchorMax = Vector2.one;
+        xpTextRect.offsetMin = new Vector2(10, 0);
+        xpTextRect.offsetMax = new Vector2(-10, 0);
+        lootXPText = xpTextObj.AddComponent<TextMeshProUGUI>();
+        lootXPText.alignment = TextAlignmentOptions.MidlineLeft;
+        lootXPText.fontSize = 22;
         lootXPText.color = new Color(0.4f, 0.9f, 1f);
 
-        var btnObj = new GameObject("CollectButton");
+        // Sigil reward button (for elite enemies - initially hidden)
+        sigilRewardButton = new GameObject("SigilReward");
+        sigilRewardButton.transform.SetParent(rewardContainer.transform, false);
+        var sigilBtnRect = sigilRewardButton.AddComponent<RectTransform>();
+        sigilBtnRect.anchorMin = new Vector2(0.05f, 0.1f);
+        sigilBtnRect.anchorMax = new Vector2(0.95f, 0.35f);
+        sigilBtnRect.offsetMin = Vector2.zero;
+        sigilBtnRect.offsetMax = Vector2.zero;
+        var sigilBtnImage = sigilRewardButton.AddComponent<Image>();
+        sigilBtnImage.color = new Color(0.3f, 0.1f, 0.1f, 0.9f);
+        var sigilBtn = sigilRewardButton.AddComponent<Button>();
+        sigilBtn.targetGraphic = sigilBtnImage;
+        sigilBtn.onClick.AddListener(OnSigilRewardClicked);
+
+        var sigilTextObj = new GameObject("Text");
+        sigilTextObj.transform.SetParent(sigilRewardButton.transform, false);
+        var sigilTextRect = sigilTextObj.AddComponent<RectTransform>();
+        sigilTextRect.anchorMin = Vector2.zero;
+        sigilTextRect.anchorMax = Vector2.one;
+        sigilTextRect.offsetMin = new Vector2(10, 0);
+        sigilTextRect.offsetMax = new Vector2(-10, 0);
+        var sigilText = sigilTextObj.AddComponent<TextMeshProUGUI>();
+        sigilText.text = "Sigil"; // Will be updated with element
+        sigilText.alignment = TextAlignmentOptions.MidlineLeft;
+        sigilText.fontSize = 22;
+        sigilText.color = Color.white;
+        sigilRewardButton.SetActive(false);
+
+        // Instruction text for sigil enchantment
+        var instrObj = new GameObject("InstructionText");
+        instrObj.transform.SetParent(panel.transform, false);
+        var instrRect = instrObj.AddComponent<RectTransform>();
+        instrRect.anchorMin = new Vector2(0.05f, 0.15f);
+        instrRect.anchorMax = new Vector2(0.95f, 0.24f);
+        instrRect.offsetMin = Vector2.zero;
+        instrRect.offsetMax = Vector2.zero;
+        sigilInstructionText = instrObj.AddComponent<TextMeshProUGUI>();
+        sigilInstructionText.text = "";
+        sigilInstructionText.alignment = TextAlignmentOptions.Center;
+        sigilInstructionText.fontSize = 18;
+        sigilInstructionText.color = new Color(0.8f, 0.8f, 0.5f);
+
+        // Continue button (shown after all rewards collected)
+        var btnObj = new GameObject("ContinueButton");
         btnObj.transform.SetParent(panel.transform, false);
         var btnRect = btnObj.AddComponent<RectTransform>();
-        btnRect.anchorMin = new Vector2(0.25f, 0.08f);
-        btnRect.anchorMax = new Vector2(0.75f, 0.22f);
+        btnRect.anchorMin = new Vector2(0.3f, 0.03f);
+        btnRect.anchorMax = new Vector2(0.7f, 0.13f);
         btnRect.offsetMin = Vector2.zero;
         btnRect.offsetMax = Vector2.zero;
         var btnImage = btnObj.AddComponent<Image>();
@@ -2296,27 +2536,328 @@ public class CombatUI : MonoBehaviour
         btnTextRect.offsetMin = Vector2.zero;
         btnTextRect.offsetMax = Vector2.zero;
         var btnText = btnTextObj.AddComponent<TextMeshProUGUI>();
-        btnText.text = "COLLECT";
+        btnText.text = "CONTINUE";
         btnText.alignment = TextAlignmentOptions.Center;
-        btnText.fontSize = 22;
+        btnText.fontSize = 20;
         btnText.color = Color.white;
 
         return panel;
     }
+    
+    private void UpdateSkillButtonElementColor(Button button, Element element)
+    {
+        if (button == null) return;
+        
+        var image = button.GetComponent<Image>();
+        if (image == null) return;
+        
+        if (element != Element.None)
+        {
+            // Tint the button with the element color (darker version for background)
+            Color elemColor = GetElementColor(element);
+            image.color = new Color(elemColor.r * 0.4f, elemColor.g * 0.4f, elemColor.b * 0.4f, 0.9f);
+        }
+        else
+        {
+            // Default dark gray for non-enchanted skills
+            image.color = new Color(0.2f, 0.2f, 0.25f, 0.9f);
+        }
+    }
+    
+    private void OnGoldRewardClicked()
+    {
+        if (goldCollected || pendingPlayer == null) return;
+        
+        pendingPlayer.AddGold(pendingGold);
+        goldCollected = true;
+        
+        // Update visual to show collected
+        if (lootGoldText != null)
+        {
+            lootGoldText.text = $"<color=#888888><s>Gold: +{pendingGold}</s> (Collected)</color>";
+        }
+        if (goldRewardButton != null)
+        {
+            goldRewardButton.interactable = false;
+        }
+    }
+    
+    private void OnSigilRewardClicked()
+    {
+        if (pendingSigil == Element.None) return;
+        
+        // Start enchantment mode - player needs to click a skill
+        isEnchanting = true;
+        if (sigilInstructionText != null)
+        {
+            sigilInstructionText.text = $"Click a skill to enchant with {pendingSigil}";
+        }
+        
+        // Hide loot panel temporarily and show skill selection
+        lootPanel.SetActive(false);
+        ShowEnchantmentSkillSelection();
+    }
+    
+    private void ShowEnchantmentSkillSelection()
+    {
+        // Show the bottom bar with skills for enchantment
+        if (bottomBar != null) bottomBar.SetActive(true);
+        
+        // Create an overlay panel for skill selection
+        var overlay = new GameObject("EnchantOverlay");
+        overlay.transform.SetParent(lootPanel.transform.parent, false);
+        var overlayRect = overlay.AddComponent<RectTransform>();
+        overlayRect.anchorMin = Vector2.zero;
+        overlayRect.anchorMax = Vector2.one;
+        overlayRect.offsetMin = Vector2.zero;
+        overlayRect.offsetMax = Vector2.zero;
+        
+        // Semi-transparent background
+        var overlayBg = overlay.AddComponent<Image>();
+        overlayBg.color = new Color(0, 0, 0, 0.7f);
+        
+        // Instruction
+        var instrObj = new GameObject("Instruction");
+        instrObj.transform.SetParent(overlay.transform, false);
+        var instrRect = instrObj.AddComponent<RectTransform>();
+        instrRect.anchorMin = new Vector2(0.2f, 0.6f);
+        instrRect.anchorMax = new Vector2(0.8f, 0.8f);
+        instrRect.offsetMin = Vector2.zero;
+        instrRect.offsetMax = Vector2.zero;
+        var instrText = instrObj.AddComponent<TextMeshProUGUI>();
+        instrText.text = $"Select a skill to enchant with <color=#{ColorUtility.ToHtmlStringRGB(GetElementColor(pendingSigil))}>{pendingSigil}</color>";
+        instrText.alignment = TextAlignmentOptions.Center;
+        instrText.fontSize = 28;
+        instrText.color = Color.white;
+        
+        // Create skill buttons for enchantment
+        CreateEnchantmentSkillButtons(overlay.transform);
+        
+        enchantOverlay = overlay;
+    }
+    
+    private GameObject enchantOverlay;
+    
+    private void CreateEnchantmentSkillButtons(Transform parent)
+    {
+        if (pendingPlayer == null) return;
+        var character = pendingPlayer.GetCharacter();
+        if (character == null) return;
+        
+        var buttonContainer = new GameObject("SkillButtons");
+        buttonContainer.transform.SetParent(parent, false);
+        var containerRect = buttonContainer.AddComponent<RectTransform>();
+        containerRect.anchorMin = new Vector2(0.1f, 0.25f);
+        containerRect.anchorMax = new Vector2(0.9f, 0.55f);
+        containerRect.offsetMin = Vector2.zero;
+        containerRect.offsetMax = Vector2.zero;
+        
+        string[] skillNames = { character.Skill1, character.Skill2, character.Skill3, character.Skill4, character.Skill5 };
+        
+        float buttonWidth = 0.18f;
+        float spacing = 0.02f;
+        float startX = 0.5f - (2.5f * buttonWidth + 2 * spacing);
+        
+        for (int i = 0; i < 5; i++)
+        {
+            int skillNum = i + 1;
+            string skillName = skillNames[i];
+            // Use runtime element from player (includes sigil enchantments)
+            Element currElem = pendingPlayer.GetSkillElement(skillNum);
+            
+            var btnObj = new GameObject($"Skill{skillNum}Btn");
+            btnObj.transform.SetParent(buttonContainer.transform, false);
+            var btnRect = btnObj.AddComponent<RectTransform>();
+            float xPos = startX + i * (buttonWidth + spacing);
+            btnRect.anchorMin = new Vector2(xPos, 0.1f);
+            btnRect.anchorMax = new Vector2(xPos + buttonWidth, 0.9f);
+            btnRect.offsetMin = Vector2.zero;
+            btnRect.offsetMax = Vector2.zero;
+            
+            var btnImage = btnObj.AddComponent<Image>();
+            // Color based on current element enchantment
+            btnImage.color = currElem != Element.None ? GetElementColor(currElem) * 0.5f : new Color(0.25f, 0.25f, 0.3f);
+            
+            var btn = btnObj.AddComponent<Button>();
+            btn.targetGraphic = btnImage;
+            btn.onClick.AddListener(() => OnEnchantSkillClicked(skillNum));
+            
+            // Skill name and element text
+            var textObj = new GameObject("Text");
+            textObj.transform.SetParent(btnObj.transform, false);
+            var textRect = textObj.AddComponent<RectTransform>();
+            textRect.anchorMin = Vector2.zero;
+            textRect.anchorMax = Vector2.one;
+            textRect.offsetMin = new Vector2(3, 3);
+            textRect.offsetMax = new Vector2(-3, -3);
+            var text = textObj.AddComponent<TextMeshProUGUI>();
+            
+            // Show skill name with current element enchantment
+            if (currElem != Element.None)
+            {
+                string elemColorHex = ColorUtility.ToHtmlStringRGB(GetElementColor(currElem));
+                text.text = $"<size=12>{skillNum}</size>\n{skillName}\n<color=#{elemColorHex}><b>[{currElem}]</b></color>";
+            }
+            else
+            {
+                text.text = $"<size=12>{skillNum}</size>\n{skillName}\n<color=#666666>[None]</color>";
+            }
+            text.alignment = TextAlignmentOptions.Center;
+            text.fontSize = 12;
+            text.color = Color.white;
+        }
+        
+        // Cancel button
+        var cancelObj = new GameObject("CancelBtn");
+        cancelObj.transform.SetParent(parent, false);
+        var cancelRect = cancelObj.AddComponent<RectTransform>();
+        cancelRect.anchorMin = new Vector2(0.4f, 0.08f);
+        cancelRect.anchorMax = new Vector2(0.6f, 0.18f);
+        cancelRect.offsetMin = Vector2.zero;
+        cancelRect.offsetMax = Vector2.zero;
+        var cancelImage = cancelObj.AddComponent<Image>();
+        cancelImage.color = new Color(0.5f, 0.2f, 0.2f);
+        var cancelBtn = cancelObj.AddComponent<Button>();
+        cancelBtn.targetGraphic = cancelImage;
+        cancelBtn.onClick.AddListener(OnCancelEnchantment);
+        
+        var cancelTextObj = new GameObject("Text");
+        cancelTextObj.transform.SetParent(cancelObj.transform, false);
+        var cancelTextRect = cancelTextObj.AddComponent<RectTransform>();
+        cancelTextRect.anchorMin = Vector2.zero;
+        cancelTextRect.anchorMax = Vector2.one;
+        var cancelText = cancelTextObj.AddComponent<TextMeshProUGUI>();
+        cancelText.text = "Cancel";
+        cancelText.alignment = TextAlignmentOptions.Center;
+        cancelText.fontSize = 16;
+        cancelText.color = Color.white;
+    }
+    
+    private Element ParseElement(string elementStr)
+    {
+        if (string.IsNullOrEmpty(elementStr) || elementStr.ToLower() == "none") return Element.None;
+        if (System.Enum.TryParse<Element>(elementStr, true, out Element result)) return result;
+        return Element.None;
+    }
+    
+    private void OnEnchantSkillClicked(int skillNumber)
+    {
+        if (!isEnchanting || pendingSigil == Element.None || pendingPlayer == null) return;
+        
+        // Apply enchantment to the skill
+        pendingPlayer.EnchantSkill(skillNumber, pendingSigil);
+        
+        // Clean up
+        isEnchanting = false;
+        pendingSigil = Element.None;
+        
+        if (enchantOverlay != null)
+        {
+            Destroy(enchantOverlay);
+            enchantOverlay = null;
+        }
+        
+        // Hide sigil button and show loot panel again
+        if (sigilRewardButton != null)
+        {
+            var sigilText = sigilRewardButton.GetComponentInChildren<TextMeshProUGUI>();
+            if (sigilText != null)
+            {
+                sigilText.text = "<color=#888888><s>Sigil</s> (Used)</color>";
+            }
+            sigilRewardButton.GetComponent<Button>().interactable = false;
+        }
+        
+        lootPanel.SetActive(true);
+        if (sigilInstructionText != null)
+        {
+            sigilInstructionText.text = $"Skill {skillNumber} enchanted!";
+        }
+    }
+    
+    private void OnCancelEnchantment()
+    {
+        isEnchanting = false;
+        
+        if (enchantOverlay != null)
+        {
+            Destroy(enchantOverlay);
+            enchantOverlay = null;
+        }
+        
+        lootPanel.SetActive(true);
+        if (sigilInstructionText != null)
+        {
+            sigilInstructionText.text = "";
+        }
+    }
 
-    public void ShowLootPanel(int gold, int xp, Player player, NodeBase node, string title = null)
+    public void ShowLootPanel(int gold, int xp, Player player, NodeBase node, string title = null, bool isElite = false)
     {
         pendingGold = gold;
         pendingXP = xp;
         pendingPlayer = player;
         pendingNode = node;
+        goldCollected = false;
+        pendingSigil = Element.None;
+        isEnchanting = false;
 
         if (lootTitleText != null)
         {
-            lootTitleText.text = title ?? "VICTORY!";
+            lootTitleText.text = "Reward";
         }
-        lootGoldText.text = $"Gold: +{gold}";
-        lootXPText.text = $"XP: +{xp}";
+        
+        // Reset gold button
+        if (goldRewardButton != null)
+        {
+            goldRewardButton.interactable = true;
+        }
+        if (lootGoldText != null)
+        {
+            lootGoldText.text = $"<color=#FFD700>◆</color> Gold: +{gold} <size=16>(Click to collect)</size>";
+        }
+        
+        // XP is auto-collected, show as already gained
+        if (lootXPText != null)
+        {
+            lootXPText.text = $"<color=#66CCFF>★</color> Experience: +{xp} <size=16>(Auto)</size>";
+        }
+        
+        // Sigil for elite enemies
+        if (sigilRewardButton != null)
+        {
+            if (isElite)
+            {
+                // Random element sigil drop
+                var elements = new Element[] { Element.Fire, Element.Ice, Element.Water, Element.Wind, Element.Rock };
+                pendingSigil = elements[UnityEngine.Random.Range(0, elements.Length)];
+                
+                var sigilBtnImage = sigilRewardButton.GetComponent<Image>();
+                if (sigilBtnImage != null)
+                {
+                    sigilBtnImage.color = GetElementColor(pendingSigil) * 0.4f;
+                }
+                
+                var sigilText = sigilRewardButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (sigilText != null)
+                {
+                    sigilText.text = $"<color=#{ColorUtility.ToHtmlStringRGB(GetElementColor(pendingSigil))}>◈</color> {pendingSigil} Sigil <size=16>(Click to enchant a skill)</size>";
+                    sigilText.color = GetElementColor(pendingSigil);
+                }
+                
+                sigilRewardButton.GetComponent<Button>().interactable = true;
+                sigilRewardButton.SetActive(true);
+            }
+            else
+            {
+                sigilRewardButton.SetActive(false);
+            }
+        }
+        
+        if (sigilInstructionText != null)
+        {
+            sigilInstructionText.text = "";
+        }
 
         combatPanel.SetActive(false);
         lootPanel.SetActive(true);
@@ -2324,13 +2865,21 @@ public class CombatUI : MonoBehaviour
 
     private void OnCollectLootClicked()
     {
-        if (pendingPlayer != null)
+        // Auto-collect gold if not already collected
+        if (!goldCollected && pendingPlayer != null)
         {
             pendingPlayer.AddGold(pendingGold);
-            // XP is already added in CombatManager.EndCombat (Phase 1)
+            goldCollected = true;
         }
 
         lootPanel.SetActive(false);
+        
+        // Clean up any enchant overlay
+        if (enchantOverlay != null)
+        {
+            Destroy(enchantOverlay);
+            enchantOverlay = null;
+        }
 
         if (combatManager == null)
         {

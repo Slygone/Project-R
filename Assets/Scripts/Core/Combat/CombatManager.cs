@@ -70,6 +70,12 @@ public class CombatManager : MonoBehaviour
         combatActive = true;
         isPlayerTurn = true;
         isEndingCombat = false;
+        
+        // Ensure player combat state is reset (sets AP to max, clears per-combat effects)
+        if (player != null)
+        {
+            player.ResetCombatState();
+        }
 
         string bossNames = string.Join(" & ", enemies.ConvertAll(e => e.Name));
         GameLog.Combat(GameLog.Join(
@@ -87,6 +93,9 @@ public class CombatManager : MonoBehaviour
         if (combatUI != null)
         {
             combatUI.ShowCombat(enemies, player, title);
+            // Refresh skill/AP displays to reflect reset state
+            combatUI.UpdateSkillButtons(player);
+            combatUI.UpdateAPDisplay(player);
         }
     }
 
@@ -184,21 +193,9 @@ public class CombatManager : MonoBehaviour
         if (!combatActive || !isPlayerTurn) return;
         if (target == null || !target.IsAlive()) return;
 
-        if (player.HasElementPair())
-        {
-            if (player.HasReactionReady())
-            {
-                TriggerReactionAction(target, 0, true);
-            }
-            else
-            {
-                RequestInfusion(target, 0, true);
-            }
-        }
-        else
-        {
-            ExecuteAttack(target);
-        }
+        // New mark system: Just execute the attack directly
+        // Marks will be applied based on skill element enchantments
+        ExecuteAttack(target);
     }
     
     private void RequestInfusion(CombatEnemy target, int skillNumber, bool isAttack)
@@ -301,44 +298,61 @@ public class CombatManager : MonoBehaviour
         pendingReactionDetonator = Element.None;
     }
     
+    // DEPRECATED: Old orb-based reaction system - now using new mark system
     private void TriggerReactionAction(CombatEnemy target, int skillNumber, bool isAttack)
     {
+        // This method is no longer used - reactions are now triggered by the mark system
+        // When 6 marks of same element OR 3+3 of different elements are applied to an enemy
+        GameLog.Combat(GameLog.Join("DeprecatedMethod", GameLog.KV("method", "TriggerReactionAction")));
+    }
+    
+    /// <summary>
+    /// New mark-based reaction trigger. Called when marks reach threshold on an enemy.
+    /// </summary>
+    private void TriggerMarkReaction(CombatEnemy target, ReactionTriggerInfo reactionInfo)
+    {
+        if (target == null || reactionInfo == null) return;
+        
         pendingTarget = target;
-        pendingSkillNumber = skillNumber;
-        pendingIsAttack = isAttack;
+        pendingReactionFirstElement = reactionInfo.PrimaryElement;
+        pendingReactionDetonator = reactionInfo.SecondaryElement != Element.None ? reactionInfo.SecondaryElement : reactionInfo.PrimaryElement;
+        pendingInfusedElement = reactionInfo.PrimaryElement;
+        pendingReactionId = reactionInfo.GetReactionId();
         
-        var orbSystem = player.GetOrbSystem();
-        pendingReactionFirstElement = orbSystem.GetFirstElement();
-        pendingReactionDetonator = orbSystem.DetonatorElement;
-        pendingInfusedElement = orbSystem.DetonatorElement;
-        pendingReactionId = orbSystem.GetReactionId();
-        
-        // Get reaction data from CSV via directional ReactionId
+        // Get reaction data from CSV
         var reactionDef = DataCache.GetReactionDef(pendingReactionId);
-        pendingReactionName = reactionDef.Name;
-        pendingReactionMultiplier = reactionDef.DamageMultiplier;
+        if (reactionDef == null)
+        {
+            // Fallback for unknown reactions
+            pendingReactionName = reactionInfo.IsSingleElement ? $"{reactionInfo.PrimaryElement} Burst" : $"{reactionInfo.PrimaryElement}-{reactionInfo.SecondaryElement} Fusion";
+            pendingReactionMultiplier = reactionInfo.IsSingleElement ? 1.5f : 2.0f;
+        }
+        else
+        {
+            pendingReactionName = reactionDef.Name;
+            pendingReactionMultiplier = reactionDef.DamageMultiplier;
+        }
         
-        var effects = DataCache.GetReactionEffects(pendingReactionId);
-        
-        orbSystem.ClearMarks();
+        // Consume the marks
+        target.ConsumeMarksForReaction(reactionInfo);
         
         string attackerName = player != null && player.GetCharacter() != null ? player.GetCharacter().DisplayName : "Player";
         GameLog.Reaction(GameLog.Join(
-            "Trigger",
+            "MarkReactionTrigger",
             GameLog.KV("id", pendingReactionId),
             GameLog.KV("name", pendingReactionName),
             GameLog.KV("mult", pendingReactionMultiplier.ToString("F2")),
-            GameLog.KV("first", pendingReactionFirstElement),
-            GameLog.KV("det", pendingReactionDetonator),
+            GameLog.KV("type", reactionInfo.IsSingleElement ? "single" : "dual"),
+            GameLog.KV("primary", reactionInfo.PrimaryElement),
+            GameLog.KV("secondary", reactionInfo.SecondaryElement),
             GameLog.KV("attacker", attackerName),
-            GameLog.KV("target", pendingTarget != null ? pendingTarget.Name : "null"),
-            GameLog.KV("effects", effects.Count)
+            GameLog.KV("target", target.Name)
         ));
         
-        // Show reaction floating text on target
-        if (combatUI != null && pendingTarget != null)
+        // Show reaction floating text
+        if (combatUI != null)
         {
-            combatUI.ShowReactionToEnemy(pendingTarget, pendingReactionName, pendingReactionMultiplier);
+            combatUI.ShowReactionToEnemy(target, pendingReactionName, pendingReactionMultiplier);
         }
         
         if (qtePanel == null)
@@ -439,8 +453,12 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
-        isPlayerTurn = false;
-        StartCoroutine(DelayedEnemyTurn());
+        // Player can continue using skills - turn does NOT end after attack
+        if (combatUI != null)
+        {
+            combatUI.UpdateSkillButtons(player);
+            combatUI.UpdateAPDisplay(player);
+        }
     }
     
     private void ExecuteAttackWithReaction(CombatEnemy target, float reactionMultiplier, float qteMultiplier, Element? forcedElement, QTEResult qteResult)
@@ -539,8 +557,12 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
-        isPlayerTurn = false;
-        StartCoroutine(DelayedEnemyTurn());
+        // Player can continue using skills - turn does NOT end after reaction
+        if (combatUI != null)
+        {
+            combatUI.UpdateSkillButtons(player);
+            combatUI.UpdateAPDisplay(player);
+        }
     }
 
     public void OnPlayerSkill(int skillNumber)
@@ -583,6 +605,20 @@ public class CombatManager : MonoBehaviour
             return;
         }
         
+        // Check AP cost
+        int apCost = GetSkillAPCost(character, skillNumber);
+        if (!player.HasEnoughAP(apCost))
+        {
+            GameLog.Combat(GameLog.Join(
+                "SkillBlocked",
+                GameLog.KV("skill", skillNumber),
+                GameLog.KV("reason", "ap"),
+                GameLog.KV("need", apCost),
+                GameLog.KV("have", player.GetCurrentAP())
+            ), GameLogVerbosity.Verbose);
+            return;
+        }
+        
         // Check energy for Skill 5 (Ultimate)
         if (skillNumber == 5 && !player.CanUseUltimate())
         {
@@ -596,27 +632,19 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
-        if (player.HasElementPair())
-        {
-            if (player.HasReactionReady())
-            {
-                TriggerReactionAction(target, skillNumber, false);
-            }
-            else
-            {
-                RequestInfusion(target, skillNumber, false);
-            }
-        }
-        else
-        {
-            ExecuteSkill(skillNumber, target);
-        }
+        // New mark system: Just execute the skill directly
+        // Marks will be applied based on skill element enchantments
+        ExecuteSkill(skillNumber, target);
     }
     
     private void ExecuteSkill(int skillNumber, CombatEnemy target, float reactionMultiplier = 1f, Element? forcedElement = null)
     {
         var character = player.GetCharacter();
         if (character == null) return;
+
+        // Spend AP for this skill
+        int apCost = GetSkillAPCost(character, skillNumber);
+        player.SpendAP(apCost);
 
         // Get skill info from character data
         string skillName;
@@ -695,9 +723,8 @@ public class CombatManager : MonoBehaviour
         int baseDamage = Mathf.RoundToInt(player.GetCharacterDamage() * skillMultiplier * dirtyStabBonus);
         
         // Add elemental bonuses
-        int elementalBonus = player.HasElementPair() 
-            ? player.GetElementalBonus(player.GetOrbAElement()) + player.GetElementalBonus(player.GetOrbBElement())
-            : player.GetAffinityBonus();
+        // Add affinity bonus (new mark system doesn't use orb pairs)
+        int elementalBonus = player.GetAffinityBonus();
         baseDamage += Mathf.RoundToInt(elementalBonus * skillMultiplier);
         
         int totalDamageDealt = 0;
@@ -792,6 +819,62 @@ public class CombatManager : MonoBehaviour
             GameLog.KV("totalDamage", totalDamageDealt)
         ));
         
+        // ========== ELEMENTAL MARK SYSTEM ==========
+        // Apply elemental marks based on skill data (element, markChance, markCount)
+        if (target != null && target.IsAlive())
+        {
+            Element skillElement = player.GetSkillElement(skillNumber);
+            int markChance = GetSkillMarkChance(character, skillNumber);
+            int markCount = GetSkillMarkCount(character, skillNumber);
+            
+            if (skillElement != Element.None && markChance > 0 && markCount > 0)
+            {
+                int roll = Random.Range(0, 100);
+                if (roll < markChance)
+                {
+                    bool reactionTriggered = target.AddMarks(skillElement, markCount);
+                    
+                    GameLog.Combat(GameLog.Join(
+                        "MarkApply",
+                        GameLog.KV("skill", skillName),
+                        GameLog.KV("element", skillElement),
+                        GameLog.KV("chance", $"{markChance}%"),
+                        GameLog.KV("roll", roll),
+                        GameLog.KV("marks", markCount),
+                        GameLog.KV("target", target.Name)
+                    ));
+                    
+                    // Check if reaction was triggered
+                    if (reactionTriggered)
+                    {
+                        var reactionInfo = target.GetReactionTriggerInfo();
+                        if (reactionInfo != null)
+                        {
+                            string reactionId = reactionInfo.GetReactionId();
+                            GameLog.Combat(GameLog.Join(
+                                "ElementalReaction",
+                                GameLog.KV("type", reactionInfo.IsSingleElement ? "single" : "dual"),
+                                GameLog.KV("reaction", reactionId),
+                                GameLog.KV("primary", reactionInfo.PrimaryElement),
+                                GameLog.KV("secondary", reactionInfo.SecondaryElement),
+                                GameLog.KV("target", target.Name)
+                            ));
+                            
+                            // Trigger reaction effect (QTE panel or direct execution)
+                            // Note: marks are consumed inside TriggerMarkReaction
+                            TriggerMarkReaction(target, reactionInfo);
+                        }
+                    }
+                    
+                    // Update enemy UI to show marks
+                    if (combatUI != null)
+                    {
+                        combatUI.UpdateEnemyHealth(target);
+                    }
+                }
+            }
+        }
+        
         // Apply skill-specific effects AFTER damage
         ApplySkillEffects(skillLower, skillEffect, target, totalDamageDealt, attackElement);
         
@@ -836,12 +919,49 @@ public class CombatManager : MonoBehaviour
         {
             combatUI.UpdatePlayerEnergy(player);
             combatUI.UpdateSkillButtons(player);
+            combatUI.UpdateAPDisplay(player);
         }
-
-        isPlayerTurn = false;
         
-        // Add combat pacing delay after player action for floating text readability
-        StartCoroutine(DelayedEnemyTurn());
+        // Player can continue using skills if they have AP - turn does NOT end automatically
+    }
+    
+    private int GetSkillAPCost(CharacterData character, int skillNumber)
+    {
+        switch (skillNumber)
+        {
+            case 1: return character.Skill1APCost;
+            case 2: return character.Skill2APCost;
+            case 3: return character.Skill3APCost;
+            case 4: return character.Skill4APCost;
+            case 5: return character.Skill5APCost;
+            default: return 2;
+        }
+    }
+    
+    private int GetSkillMarkChance(CharacterData character, int skillNumber)
+    {
+        switch (skillNumber)
+        {
+            case 1: return character.Skill1MarkChance;
+            case 2: return character.Skill2MarkChance;
+            case 3: return character.Skill3MarkChance;
+            case 4: return character.Skill4MarkChance;
+            case 5: return character.Skill5MarkChance;
+            default: return 0;
+        }
+    }
+    
+    private int GetSkillMarkCount(CharacterData character, int skillNumber)
+    {
+        switch (skillNumber)
+        {
+            case 1: return character.Skill1MarkCount;
+            case 2: return character.Skill2MarkCount;
+            case 3: return character.Skill3MarkCount;
+            case 4: return character.Skill4MarkCount;
+            case 5: return character.Skill5MarkCount;
+            default: return 0;
+        }
     }
     
     private System.Collections.IEnumerator DelayedEnemyTurn()
@@ -1067,9 +1187,7 @@ public class CombatManager : MonoBehaviour
         // Player Skill Attack Order with Reaction:
         // 1. Base damage = (character damage * skill multiplier) + elemental bonus
         int charDamage = player.GetCharacterDamage();
-        int elementalBonus = player.HasElementPair() 
-            ? player.GetElementalBonus(player.GetOrbAElement()) + player.GetElementalBonus(player.GetOrbBElement())
-            : player.GetAffinityBonus();
+        int elementalBonus = player.GetAffinityBonus();
         float baseDamage = (charDamage * skillMultiplier) + (elementalBonus * skillMultiplier);
         
         // 2. Apply variance (0.90-1.10)
@@ -1183,10 +1301,10 @@ public class CombatManager : MonoBehaviour
         {
             combatUI.UpdatePlayerEnergy(player);
             combatUI.UpdateSkillButtons(player);
+            combatUI.UpdateAPDisplay(player);
         }
 
-        isPlayerTurn = false;
-        StartCoroutine(DelayedEnemyTurn());
+        // Player can continue using skills - turn does NOT end after reaction skill
     }
     
     private float GetSkillMultiplier(string skillName)
@@ -1538,10 +1656,14 @@ public class CombatManager : MonoBehaviour
         
         // Tick down cooldowns at start of player's turn
         player.TickCooldowns();
+        
+        // Refresh AP at start of player's turn
+        player.RefreshAP();
 
         if (combatUI != null)
         {
             combatUI.SetPlayerTurn(true);
+            combatUI.UpdateAPDisplay(player);
         }
     }
 
@@ -1623,30 +1745,13 @@ public class CombatManager : MonoBehaviour
             if (currentCombatType == CombatType.Elite)
             {
                 goldReward *= 2;
-                
-                var mysteryNode = currentNode as MysteryNode;
-                if (mysteryNode != null && mysteryNode.IsEliteFight())
-                {
-                    mysteryNode.GiveEliteRewards();
-                    
-                    if (combatUI != null)
-                    {
-                        combatUI.HideCombat();
-                    }
-                    
-                    if (currentNode != null)
-                    {
-                        currentNode.OnNodeCompleted();
-                    }
-                    currentNode = null;
-                    return;
-                }
             }
 
+            // Show reward UI for all combat victories (including elite)
             if (combatUI != null)
             {
-                string lootTitle = currentCombatType == CombatType.Elite ? "ELITE VICTORY!" : "VICTORY!";
-                combatUI.ShowLootPanel(goldReward, xpReward, player, currentNode, lootTitle);
+                bool isElite = currentCombatType == CombatType.Elite;
+                combatUI.ShowLootPanel(goldReward, xpReward, player, currentNode, null, isElite);
             }
         }
         else

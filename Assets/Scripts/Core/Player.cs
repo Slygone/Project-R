@@ -16,6 +16,10 @@ public class Player : MonoBehaviour
     private int tempCritChanceBonus = 0;
     private int tempCritDamageBonus = 0;
     
+    // Action Points System
+    private int currentAP;
+    private int maxAP = 10;
+    
     // Wound/Threshold System (Phase 2)
     private const int THRESHOLD_SIZE = 50;
     private int lowestThresholdLevel = -1; // -1 means not initialized yet
@@ -34,6 +38,9 @@ public class Player : MonoBehaviour
     // Skill cooldown tracking (index 0-3 = Skill1-4, index 4 = Skill5/Ultimate)
     private int[] skillCooldowns = new int[5];
     private int combatTurnCount = 0;
+    
+    // Skill element enchantments (runtime overrides from sigils)
+    private Element[] skillElements = new Element[5] { Element.None, Element.None, Element.None, Element.None, Element.None };
     
     // Status effects (Shield, Block)
     private StatusEffectManager statusEffects = new StatusEffectManager();
@@ -526,6 +533,65 @@ public class Player : MonoBehaviour
     
     public bool IsSkillOnCooldown(int skillIndex) => GetSkillCooldown(skillIndex) > 0;
     
+    // ========== SKILL ELEMENT ENCHANTMENT SYSTEM ==========
+    
+    public Element GetSkillElement(int skillNumber)
+    {
+        int index = skillNumber - 1;
+        if (index >= 0 && index < 5)
+        {
+            // Return runtime enchantment if set, otherwise return base element from character data
+            if (skillElements[index] != Element.None)
+            {
+                return skillElements[index];
+            }
+            
+            // Fallback to character data element
+            if (selectedCharacter != null)
+            {
+                string elemStr = skillNumber switch
+                {
+                    1 => selectedCharacter.Skill1Element,
+                    2 => selectedCharacter.Skill2Element,
+                    3 => selectedCharacter.Skill3Element,
+                    4 => selectedCharacter.Skill4Element,
+                    5 => selectedCharacter.Skill5Element,
+                    _ => "none"
+                };
+                if (!string.IsNullOrEmpty(elemStr) && elemStr.ToLower() != "none")
+                {
+                    if (System.Enum.TryParse<Element>(elemStr, true, out Element result))
+                    {
+                        return result;
+                    }
+                }
+            }
+        }
+        return Element.None;
+    }
+    
+    public void EnchantSkill(int skillNumber, Element element)
+    {
+        int index = skillNumber - 1;
+        if (index >= 0 && index < 5)
+        {
+            skillElements[index] = element;
+            GameLog.System(GameLog.Join(
+                "SkillEnchant",
+                GameLog.KV("skill", skillNumber),
+                GameLog.KV("element", element)
+            ));
+        }
+    }
+    
+    public void ClearSkillEnchantments()
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            skillElements[i] = Element.None;
+        }
+    }
+    
     public bool CanUseUltimate()
     {
         if (selectedCharacter == null) return false;
@@ -643,6 +709,7 @@ public class Player : MonoBehaviour
         // NOTE: Cooldowns are NOT reset - they persist between combats
         combatTurnCount = 0;
         dirtyStabConsecutiveUses = 0;
+        currentAP = maxAP; // Start combat with full AP
         statusEffects.ClearCombatEffects(); // Keep shield, clear block
         GameLog.System(GameLog.Join(
             "CombatStateReset",
@@ -657,6 +724,33 @@ public class Player : MonoBehaviour
     }
     
     public int GetCombatTurnCount() => combatTurnCount;
+    
+    // ========== ACTION POINTS SYSTEM ==========
+    
+    public int GetCurrentAP() => currentAP;
+    public int GetMaxAP() => maxAP;
+    
+    public bool HasEnoughAP(int cost) => currentAP >= cost;
+    
+    public void SpendAP(int cost)
+    {
+        currentAP -= cost;
+        if (currentAP < 0) currentAP = 0;
+        GameLog.Combat(GameLog.Join(
+            "APSpend",
+            GameLog.KV("cost", cost),
+            GameLog.KV("ap", $"{currentAP}/{maxAP}")
+        ), GameLogVerbosity.Verbose);
+    }
+    
+    public void RefreshAP()
+    {
+        currentAP = maxAP;
+        GameLog.Combat(GameLog.Join(
+            "APRefresh",
+            GameLog.KV("ap", $"{currentAP}/{maxAP}")
+        ), GameLogVerbosity.Verbose);
+    }
     
     // ========== STATUS EFFECTS (SHIELD, BLOCK) ==========
     

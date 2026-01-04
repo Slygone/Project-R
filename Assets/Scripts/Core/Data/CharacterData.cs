@@ -18,6 +18,10 @@ public class CharacterData
     public string Skill1Effect;
     public int Skill1Cooldown;
     public int Skill1EnergyGain;
+    public int Skill1APCost;
+    public string Skill1Element;
+    public int Skill1MarkChance;
+    public int Skill1MarkCount;
     
     // Skill 2
     public string Skill2;
@@ -25,6 +29,10 @@ public class CharacterData
     public string Skill2Effect;
     public int Skill2Cooldown;
     public int Skill2EnergyGain;
+    public int Skill2APCost;
+    public string Skill2Element;
+    public int Skill2MarkChance;
+    public int Skill2MarkCount;
     
     // Skill 3
     public string Skill3;
@@ -32,6 +40,10 @@ public class CharacterData
     public string Skill3Effect;
     public int Skill3Cooldown;
     public int Skill3EnergyGain;
+    public int Skill3APCost;
+    public string Skill3Element;
+    public int Skill3MarkChance;
+    public int Skill3MarkCount;
     
     // Skill 4
     public string Skill4;
@@ -39,6 +51,10 @@ public class CharacterData
     public string Skill4Effect;
     public int Skill4Cooldown;
     public int Skill4EnergyGain;
+    public int Skill4APCost;
+    public string Skill4Element;
+    public int Skill4MarkChance;
+    public int Skill4MarkCount;
     
     // Skill 5 (Ultimate - uses energy instead of gaining)
     public string Skill5;
@@ -46,6 +62,10 @@ public class CharacterData
     public string Skill5Effect;
     public int Skill5Cooldown;
     public int Skill5EnergyCost;
+    public int Skill5APCost;
+    public string Skill5Element;
+    public int Skill5MarkChance;
+    public int Skill5MarkCount;
     
     // Talent Perks (4 tiers, A/B options each) - loaded from CSV
     public string Perk1a;

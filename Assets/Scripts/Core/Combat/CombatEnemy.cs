@@ -1,3 +1,6 @@
+using System.Collections.Generic;
+using System.Linq;
+
 public class CombatEnemy
 {
     public string Name;
@@ -17,6 +20,12 @@ public class CombatEnemy
     
     // Status effects (DoT, Stun)
     private StatusEffectManager statusEffects = new StatusEffectManager();
+    
+    // Elemental Mark System
+    // Tracks marks by element: 6 of same OR 3+3 of different triggers reaction
+    private Dictionary<Element, int> elementalMarks = new Dictionary<Element, int>();
+    private const int MARKS_FOR_SINGLE_REACTION = 6;
+    private const int MARKS_FOR_DUAL_REACTION = 3;
 
     public CombatEnemy(EnemyData data) : this(data, 1) { }
     
@@ -179,5 +188,191 @@ public class CombatEnemy
     public void TickTempResists()
     {
         statusEffects.TickTempResists();
+    }
+    
+    // ========== ELEMENTAL MARK SYSTEM ==========
+    
+    /// <summary>
+    /// Add elemental marks to this enemy. Returns true if a reaction was triggered.
+    /// </summary>
+    public bool AddMarks(Element element, int count)
+    {
+        if (element == Element.None || count <= 0) return false;
+        
+        if (!elementalMarks.ContainsKey(element))
+        {
+            elementalMarks[element] = 0;
+        }
+        elementalMarks[element] += count;
+        
+        GameLog.Combat(GameLog.Join(
+            "MarkApplied",
+            GameLog.KV("target", Name),
+            GameLog.KV("element", element),
+            GameLog.KV("count", count),
+            GameLog.KV("total", elementalMarks[element])
+        ), GameLogVerbosity.Verbose);
+        
+        return CheckReactionTrigger();
+    }
+    
+    /// <summary>
+    /// Check if marks meet reaction trigger conditions.
+    /// Returns true if 6 of same element OR 3+3 of two different elements.
+    /// </summary>
+    public bool CheckReactionTrigger()
+    {
+        // Check for 6 of same element
+        foreach (var kvp in elementalMarks)
+        {
+            if (kvp.Value >= MARKS_FOR_SINGLE_REACTION)
+            {
+                return true;
+            }
+        }
+        
+        // Check for 3+3 of two different elements
+        var elementsWithThreeOrMore = elementalMarks.Where(kvp => kvp.Value >= MARKS_FOR_DUAL_REACTION).ToList();
+        if (elementsWithThreeOrMore.Count >= 2)
+        {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /// <summary>
+    /// Get reaction info if triggered. Returns null if no reaction.
+    /// </summary>
+    public ReactionTriggerInfo GetReactionTriggerInfo()
+    {
+        // Check for 6 of same element (single element reaction)
+        foreach (var kvp in elementalMarks)
+        {
+            if (kvp.Value >= MARKS_FOR_SINGLE_REACTION)
+            {
+                return new ReactionTriggerInfo
+                {
+                    IsSingleElement = true,
+                    PrimaryElement = kvp.Key,
+                    SecondaryElement = Element.None,
+                    MarksConsumed = MARKS_FOR_SINGLE_REACTION
+                };
+            }
+        }
+        
+        // Check for 3+3 of two different elements (dual element reaction)
+        var elementsWithThreeOrMore = elementalMarks
+            .Where(kvp => kvp.Value >= MARKS_FOR_DUAL_REACTION)
+            .OrderByDescending(kvp => kvp.Value)
+            .ToList();
+            
+        if (elementsWithThreeOrMore.Count >= 2)
+        {
+            return new ReactionTriggerInfo
+            {
+                IsSingleElement = false,
+                PrimaryElement = elementsWithThreeOrMore[0].Key,
+                SecondaryElement = elementsWithThreeOrMore[1].Key,
+                MarksConsumed = MARKS_FOR_DUAL_REACTION * 2
+            };
+        }
+        
+        return null;
+    }
+    
+    /// <summary>
+    /// Consume marks after reaction triggers.
+    /// </summary>
+    public void ConsumeMarksForReaction(ReactionTriggerInfo info)
+    {
+        if (info == null) return;
+        
+        if (info.IsSingleElement)
+        {
+            // Consume 6 marks of the single element
+            if (elementalMarks.ContainsKey(info.PrimaryElement))
+            {
+                elementalMarks[info.PrimaryElement] -= MARKS_FOR_SINGLE_REACTION;
+                if (elementalMarks[info.PrimaryElement] <= 0)
+                {
+                    elementalMarks.Remove(info.PrimaryElement);
+                }
+            }
+        }
+        else
+        {
+            // Consume 3 marks from each element
+            if (elementalMarks.ContainsKey(info.PrimaryElement))
+            {
+                elementalMarks[info.PrimaryElement] -= MARKS_FOR_DUAL_REACTION;
+                if (elementalMarks[info.PrimaryElement] <= 0)
+                {
+                    elementalMarks.Remove(info.PrimaryElement);
+                }
+            }
+            if (elementalMarks.ContainsKey(info.SecondaryElement))
+            {
+                elementalMarks[info.SecondaryElement] -= MARKS_FOR_DUAL_REACTION;
+                if (elementalMarks[info.SecondaryElement] <= 0)
+                {
+                    elementalMarks.Remove(info.SecondaryElement);
+                }
+            }
+        }
+        
+        GameLog.Combat(GameLog.Join(
+            "MarksConsumed",
+            GameLog.KV("target", Name),
+            GameLog.KV("type", info.IsSingleElement ? "single" : "dual"),
+            GameLog.KV("primary", info.PrimaryElement),
+            GameLog.KV("secondary", info.SecondaryElement)
+        ), GameLogVerbosity.Verbose);
+    }
+    
+    /// <summary>
+    /// Get current marks for display.
+    /// </summary>
+    public Dictionary<Element, int> GetMarks() => new Dictionary<Element, int>(elementalMarks);
+    
+    /// <summary>
+    /// Get total mark count across all elements.
+    /// </summary>
+    public int GetTotalMarkCount() => elementalMarks.Values.Sum();
+    
+    /// <summary>
+    /// Clear all marks (e.g., on combat end).
+    /// </summary>
+    public void ClearAllMarks()
+    {
+        elementalMarks.Clear();
+    }
+}
+
+/// <summary>
+/// Info about a triggered reaction.
+/// </summary>
+public class ReactionTriggerInfo
+{
+    public bool IsSingleElement;
+    public Element PrimaryElement;
+    public Element SecondaryElement;
+    public int MarksConsumed;
+    
+    public string GetReactionId()
+    {
+        if (IsSingleElement)
+        {
+            // Single element reactions (6 of same)
+            return $"{PrimaryElement}_{PrimaryElement}";
+        }
+        else
+        {
+            // Dual element reactions (3+3)
+            // Sort alphabetically to ensure consistent reaction IDs
+            var elements = new[] { PrimaryElement.ToString(), SecondaryElement.ToString() };
+            System.Array.Sort(elements);
+            return $"{elements[0]}_{elements[1]}";
+        }
     }
 }
