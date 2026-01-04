@@ -132,13 +132,6 @@ public class Referencer : MonoBehaviour
             mysteryUI = mysteryObj.AddComponent<MysteryUI>();
         }
         
-        // Debug overlay for testing (Phase 0)
-        var debugOverlay = FindFirstObjectByType<DebugOverlay>();
-        if (debugOverlay == null)
-        {
-            var debugObj = new GameObject("DebugOverlay");
-            debugObj.AddComponent<DebugOverlay>();
-        }
         
         // Defensive QTE (Phase 3)
         defensiveQTE = FindFirstObjectByType<DefensiveQTE>();

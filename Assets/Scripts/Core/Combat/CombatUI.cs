@@ -69,6 +69,12 @@ public class CombatUI : MonoBehaviour
     private GameObject topBar;
     private GameObject bottomBar;
     private GameObject relicsPanel;
+    private GameObject relicsContainer;
+    private Button relicScrollLeftButton;
+    private Button relicScrollRightButton;
+    private List<GameObject> relicIcons = new List<GameObject>();
+    private int relicScrollIndex = 0;
+    private const int MAX_VISIBLE_RELICS = 5;
     private Player currentPlayer;
 
     void Awake()
@@ -143,6 +149,7 @@ public class CombatUI : MonoBehaviour
         // Create UI sections
         CreateTopBar(panel.transform);
         CreatePotionContainer(panel.transform);
+        CreateRelicsPanel(panel.transform);
         CreateEnemyContainer(panel.transform);
         CreateBottomActionBar(panel.transform);
         CreatePlayerHealthBar(panel.transform);
@@ -246,39 +253,111 @@ public class CombatUI : MonoBehaviour
         // Keep combatTitleText reference for special titles (Boss Fight, etc.)
         combatTitleText = floorText;
 
-        // Right section: Relics display
-        var rightSection = new GameObject("RightSection");
-        rightSection.transform.SetParent(topBar.transform, false);
-        var rightRect = rightSection.AddComponent<RectTransform>();
-        rightRect.anchorMin = new Vector2(0.65f, 0);
-        rightRect.anchorMax = new Vector2(1, 1);
-        rightRect.offsetMin = Vector2.zero;
-        rightRect.offsetMax = Vector2.zero;
-        
-        // Relics panel
-        CreateRelicsPanel(rightSection.transform);
     }
     
     private void CreateRelicsPanel(Transform parent)
     {
+        // Main relics panel - positioned in top-right corner below top bar
         relicsPanel = new GameObject("RelicsPanel");
         relicsPanel.transform.SetParent(parent, false);
         var panelRect = relicsPanel.AddComponent<RectTransform>();
-        panelRect.anchorMin = Vector2.zero;
-        panelRect.anchorMax = Vector2.one;
-        panelRect.offsetMin = new Vector2(5, 2);
-        panelRect.offsetMax = new Vector2(-5, -2);
+        // Position: top-right area, with padding from edges
+        panelRect.anchorMin = new Vector2(1, 1);
+        panelRect.anchorMax = new Vector2(1, 1);
+        panelRect.pivot = new Vector2(1, 1);
+        // Total width: leftArrow(24) + relics(5*40 + 4*4 spacing) + rightArrow(24) + padding = 280
+        // Height: 50 for relics + padding
+        panelRect.sizeDelta = new Vector2(340, 60);
+        panelRect.anchoredPosition = new Vector2(-15, -45); // 15px from right, 45px from top
         
-        var layout = relicsPanel.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 5;
-        layout.childAlignment = TextAnchor.MiddleRight;
-        layout.childControlWidth = false;
-        layout.childControlHeight = false;
-        layout.childForceExpandWidth = false;
-        layout.childForceExpandHeight = false;
-        layout.padding = new RectOffset(5, 5, 2, 2);
+        // Visible background with border effect
+        var panelBg = relicsPanel.AddComponent<Image>();
+        panelBg.color = new Color(0.12f, 0.12f, 0.18f, 0.9f);
         
-        // Placeholder relic slots will be populated by RefreshRelicsDisplay
+        // Add outline for border effect
+        var outline = relicsPanel.AddComponent<Outline>();
+        outline.effectColor = new Color(0.4f, 0.4f, 0.5f, 0.8f);
+        outline.effectDistance = new Vector2(2, 2);
+        
+        // Left scroll button - fixed position on left side
+        var leftBtnObj = new GameObject("RelicScrollLeft");
+        leftBtnObj.transform.SetParent(relicsPanel.transform, false);
+        var leftBtnRect = leftBtnObj.AddComponent<RectTransform>();
+        leftBtnRect.anchorMin = new Vector2(0, 0);
+        leftBtnRect.anchorMax = new Vector2(0, 1);
+        leftBtnRect.pivot = new Vector2(0, 0.5f);
+        leftBtnRect.sizeDelta = new Vector2(24, 0);
+        leftBtnRect.anchoredPosition = new Vector2(4, 0);
+        var leftBtnImage = leftBtnObj.AddComponent<Image>();
+        leftBtnImage.color = new Color(0.25f, 0.25f, 0.3f, 1f);
+        relicScrollLeftButton = leftBtnObj.AddComponent<Button>();
+        relicScrollLeftButton.targetGraphic = leftBtnImage;
+        relicScrollLeftButton.onClick.AddListener(OnRelicScrollLeft);
+        var leftText = new GameObject("Text");
+        leftText.transform.SetParent(leftBtnObj.transform, false);
+        var leftTextRect = leftText.AddComponent<RectTransform>();
+        leftTextRect.anchorMin = Vector2.zero;
+        leftTextRect.anchorMax = Vector2.one;
+        leftTextRect.offsetMin = Vector2.zero;
+        leftTextRect.offsetMax = Vector2.zero;
+        var leftTmp = leftText.AddComponent<TextMeshProUGUI>();
+        leftTmp.text = "<";
+        leftTmp.fontSize = 20;
+        leftTmp.fontStyle = FontStyles.Bold;
+        leftTmp.alignment = TextAlignmentOptions.Center;
+        leftTmp.color = Color.white;
+        leftBtnObj.SetActive(false);
+        
+        // Relic icons container - centered between arrows
+        relicsContainer = new GameObject("RelicsContainer");
+        relicsContainer.transform.SetParent(relicsPanel.transform, false);
+        var containerRect = relicsContainer.AddComponent<RectTransform>();
+        containerRect.anchorMin = new Vector2(0, 0);
+        containerRect.anchorMax = new Vector2(1, 1);
+        containerRect.offsetMin = new Vector2(32, 5); // Left padding for arrow
+        containerRect.offsetMax = new Vector2(-32, -5); // Right padding for arrow
+        
+        // Inner container background (slightly lighter to show relic area)
+        var containerBg = relicsContainer.AddComponent<Image>();
+        containerBg.color = new Color(0.08f, 0.08f, 0.12f, 0.6f);
+        
+        var containerLayout = relicsContainer.AddComponent<HorizontalLayoutGroup>();
+        containerLayout.spacing = 4;
+        containerLayout.childAlignment = TextAnchor.MiddleCenter;
+        containerLayout.childControlWidth = true;
+        containerLayout.childControlHeight = true;
+        containerLayout.childForceExpandWidth = false;
+        containerLayout.childForceExpandHeight = false;
+        containerLayout.padding = new RectOffset(4, 4, 2, 2);
+        
+        // Right scroll button - fixed position on right side
+        var rightBtnObj = new GameObject("RelicScrollRight");
+        rightBtnObj.transform.SetParent(relicsPanel.transform, false);
+        var rightBtnRect = rightBtnObj.AddComponent<RectTransform>();
+        rightBtnRect.anchorMin = new Vector2(1, 0);
+        rightBtnRect.anchorMax = new Vector2(1, 1);
+        rightBtnRect.pivot = new Vector2(1, 0.5f);
+        rightBtnRect.sizeDelta = new Vector2(24, 0);
+        rightBtnRect.anchoredPosition = new Vector2(-4, 0);
+        var rightBtnImage = rightBtnObj.AddComponent<Image>();
+        rightBtnImage.color = new Color(0.25f, 0.25f, 0.3f, 1f);
+        relicScrollRightButton = rightBtnObj.AddComponent<Button>();
+        relicScrollRightButton.targetGraphic = rightBtnImage;
+        relicScrollRightButton.onClick.AddListener(OnRelicScrollRight);
+        var rightText = new GameObject("Text");
+        rightText.transform.SetParent(rightBtnObj.transform, false);
+        var rightTextRect = rightText.AddComponent<RectTransform>();
+        rightTextRect.anchorMin = Vector2.zero;
+        rightTextRect.anchorMax = Vector2.one;
+        rightTextRect.offsetMin = Vector2.zero;
+        rightTextRect.offsetMax = Vector2.zero;
+        var rightTmp = rightText.AddComponent<TextMeshProUGUI>();
+        rightTmp.text = ">";
+        rightTmp.fontSize = 20;
+        rightTmp.fontStyle = FontStyles.Bold;
+        rightTmp.alignment = TextAlignmentOptions.Center;
+        rightTmp.color = Color.white;
+        rightBtnObj.SetActive(false);
     }
 
     private void CreatePlayerHealthBar(Transform parent)
@@ -527,7 +606,7 @@ public class CombatUI : MonoBehaviour
         textComponent.fontSize = 11;
         textComponent.alignment = TextAlignmentOptions.Center;
         textComponent.color = Color.white;
-        textComponent.enableWordWrapping = false;
+        textComponent.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
         textComponent.overflowMode = TextOverflowModes.Ellipsis;
 
         // Energy cost (bottom)
@@ -574,11 +653,13 @@ public class CombatUI : MonoBehaviour
         containerRect.anchorMax = new Vector2(0.12f, 0.93f);
         containerRect.offsetMin = Vector2.zero;
         containerRect.offsetMax = Vector2.zero;
+        // Shift the container up by 15 pixels
+        containerRect.anchoredPosition = new Vector2(0f, 15f);
 
         var layout = potionContainer.AddComponent<HorizontalLayoutGroup>();
         layout.spacing = 4;
-        layout.childControlWidth = false;
-        layout.childControlHeight = false;
+        layout.childControlWidth = true;
+        layout.childControlHeight = true;
         layout.childForceExpandWidth = false;
         layout.childForceExpandHeight = false;
         layout.childAlignment = TextAnchor.MiddleLeft;
@@ -654,10 +735,10 @@ public class CombatUI : MonoBehaviour
 
         // Make it circular with compact fixed size
         var layoutElem = btnObj.AddComponent<LayoutElement>();
-        layoutElem.preferredWidth = 24;
-        layoutElem.preferredHeight = 24;
-        layoutElem.minWidth = 24;
-        layoutElem.minHeight = 24;
+        layoutElem.preferredWidth = 55;
+        layoutElem.preferredHeight = 55;
+        layoutElem.minWidth = 55;
+        layoutElem.minHeight = 55;
 
         var btnImage = btnObj.AddComponent<Image>();
         btnImage.sprite = CreateCircleSprite();
@@ -738,36 +819,89 @@ public class CombatUI : MonoBehaviour
     
     private void RefreshRelicsDisplay(Player player)
     {
-        if (relicsPanel == null) return;
+        if (relicsContainer == null) return;
         
-        // Clear existing relic icons
-        for (int i = relicsPanel.transform.childCount - 1; i >= 0; i--)
+        // Clear existing relic icons from the container
+        for (int i = relicsContainer.transform.childCount - 1; i >= 0; i--)
         {
-            Destroy(relicsPanel.transform.GetChild(i).gameObject);
+            Destroy(relicsContainer.transform.GetChild(i).gameObject);
         }
+        relicIcons.Clear();
         
         // Get player's relics
         var relics = player.GetRelics();
         
-        foreach (var relic in relics)
+        // Clamp scroll index
+        int maxScrollIndex = Mathf.Max(0, relics.Count - MAX_VISIBLE_RELICS);
+        relicScrollIndex = Mathf.Clamp(relicScrollIndex, 0, maxScrollIndex);
+        
+        // Create visible relic icons (up to MAX_VISIBLE_RELICS)
+        int startIndex = relicScrollIndex;
+        int endIndex = Mathf.Min(startIndex + MAX_VISIBLE_RELICS, relics.Count);
+        
+        for (int i = startIndex; i < endIndex; i++)
         {
-            CreateRelicIcon(relic);
+            CreateRelicIcon(relics[i]);
+        }
+        
+        // Update scroll button visibility
+        UpdateRelicScrollButtons(relics.Count);
+    }
+    
+    private void UpdateRelicScrollButtons(int totalRelics)
+    {
+        if (relicScrollLeftButton != null)
+        {
+            relicScrollLeftButton.gameObject.SetActive(relicScrollIndex > 0);
+        }
+        if (relicScrollRightButton != null)
+        {
+            relicScrollRightButton.gameObject.SetActive(relicScrollIndex + MAX_VISIBLE_RELICS < totalRelics);
+        }
+    }
+    
+    private void OnRelicScrollLeft()
+    {
+        if (relicScrollIndex > 0)
+        {
+            relicScrollIndex--;
+            if (currentPlayer != null)
+            {
+                RefreshRelicsDisplay(currentPlayer);
+            }
+        }
+    }
+    
+    private void OnRelicScrollRight()
+    {
+        if (currentPlayer != null)
+        {
+            var relics = currentPlayer.GetRelics();
+            if (relicScrollIndex + MAX_VISIBLE_RELICS < relics.Count)
+            {
+                relicScrollIndex++;
+                RefreshRelicsDisplay(currentPlayer);
+            }
         }
     }
     
     private void CreateRelicIcon(RelicData relic)
     {
         var iconObj = new GameObject($"Relic_{relic.Id}");
-        iconObj.transform.SetParent(relicsPanel.transform, false);
+        iconObj.transform.SetParent(relicsContainer.transform, false);
+        relicIcons.Add(iconObj);
         
-        // Fixed size circular icon
+        // Fixed size circular icon - sized to fit within container (46px to fit 50px inner height)
         var layoutElem = iconObj.AddComponent<LayoutElement>();
-        layoutElem.preferredWidth = 24;
-        layoutElem.preferredHeight = 24;
-        layoutElem.minWidth = 24;
-        layoutElem.minHeight = 24;
+        layoutElem.preferredWidth = 46;
+        layoutElem.preferredHeight = 46;
+        layoutElem.minWidth = 46;
+        layoutElem.minHeight = 46;
         
         var iconImage = iconObj.AddComponent<Image>();
+        iconImage.sprite = CreateCircleSprite();
+        iconImage.type = Image.Type.Simple;
+        iconImage.preserveAspect = true;
         // Use rarity color as placeholder
         iconImage.color = GetRelicRarityColor(relic.Rarity);
         
@@ -822,7 +956,7 @@ public class CombatUI : MonoBehaviour
     {
         if (cachedCircleSprite != null) return cachedCircleSprite;
         
-        int size = 24;
+        int size = 55;
         var texture = new Texture2D(size, size, TextureFormat.RGBA32, false);
         float radius = size / 2f;
         float centerX = size / 2f;
