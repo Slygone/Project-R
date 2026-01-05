@@ -40,121 +40,54 @@ public static class DataCache
         Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEMultipliers.Count} QTE results, {Reactions.Count} reactions, {ReactionEffects.Count} reaction effect groups, {ElementalTiers.Count} element tier groups, {WorldEncounters.Count} world encounters, player stats");
     }
 
-    // Parse multiplier from formula like "Health *1.7" or "Damage * 2"
-    private static float ParseMultiplier(string formula)
-    {
-        if (string.IsNullOrEmpty(formula)) return 1f;
-        
-        // Find the * character and extract the number after it
-        int starIndex = formula.IndexOf('*');
-        if (starIndex >= 0 && starIndex < formula.Length - 1)
-        {
-            string numPart = formula.Substring(starIndex + 1).Trim();
-            if (float.TryParse(numPart, System.Globalization.NumberStyles.Float, 
-                System.Globalization.CultureInfo.InvariantCulture, out float result))
-            {
-                return result;
-            }
-        }
-        
-        // Try parsing as plain number
-        if (float.TryParse(formula.Trim(), System.Globalization.NumberStyles.Float,
-            System.Globalization.CultureInfo.InvariantCulture, out float plain))
-        {
-            return plain;
-        }
-        
-        return 1f;
-    }
-    
-    // Parse addend from formula like "Base Resistance + 10"
-    private static int ParseAddend(string formula)
-    {
-        if (string.IsNullOrEmpty(formula)) return 0;
-        
-        // Find the + character and extract the number after it
-        int plusIndex = formula.IndexOf('+');
-        if (plusIndex >= 0 && plusIndex < formula.Length - 1)
-        {
-            string numPart = formula.Substring(plusIndex + 1).Trim();
-            if (int.TryParse(numPart, out int result))
-            {
-                return result;
-            }
-        }
-        
-        // Try parsing as plain number
-        if (int.TryParse(formula.Trim(), out int plain))
-        {
-            return plain;
-        }
-        
-        return 0;
-    }
-    
-    // Parse damage range like "14-16" into (min, max) tuple
-    private static (int min, int max) ParseDamageRange(string rangeStr)
-    {
-        if (string.IsNullOrEmpty(rangeStr)) return (0, 0);
-        
-        // Try to split by dash
-        var parts = rangeStr.Split('-');
-        if (parts.Length == 2)
-        {
-            if (int.TryParse(parts[0].Trim(), out int min) && 
-                int.TryParse(parts[1].Trim(), out int max))
-            {
-                return (min, max);
-            }
-        }
-        
-        // Fallback: try parsing as single number
-        if (int.TryParse(rangeStr.Trim(), out int single))
-        {
-            return (single, single);
-        }
-        
-        return (0, 0);
-    }
-    
-
     private static List<EnemyData> LoadEnemies()
     {
-        var csv = Resources.Load<TextAsset>("Data/enemy");
-        var rows = CSVParser.Parse(csv.text);
+        var json = Resources.Load<TextAsset>("Data/enemies");
         var list = new List<EnemyData>();
 
         RegularEnemies = new List<EnemyData>();
         EliteEnemies = new List<EnemyData>();
         BossEnemies = new List<EnemyData>();
 
-        foreach (var row in rows)
+        if (json == null)
         {
-            // Parse damage range from CSV (e.g., "9-11") and use average as base damage
-            var damageRange = ParseDamageRange(CSVParser.ParseString(row, "DamageRange"));
-            int baseDamage = (damageRange.min + damageRange.max) / 2;
+            Debug.LogWarning("[DataCache] enemies.json not found");
+            return list;
+        }
+
+        var wrapper = JsonUtility.FromJson<EnemyListWrapper>(json.text);
+        if (wrapper == null || wrapper.enemies == null)
+        {
+            Debug.LogWarning("[DataCache] Failed to parse enemies.json");
+            return list;
+        }
+
+        foreach (var e in wrapper.enemies)
+        {
+            // Use average of damage range as base damage
+            int baseDamage = (e.baseDamageMin + e.baseDamageMax) / 2;
             
             var enemy = new EnemyData
             {
-                Type = CSVParser.ParseString(row, "Type"),
-                DisplayName = CSVParser.ParseString(row, "DisplayName"),
-                EnemyID = CSVParser.ParseInt(row, "EnemyID"),
-                Health = CSVParser.ParseInt(row, "Health"),
-                Damage = baseDamage, // Base damage - variance applied at attack time
-                BaseResistance = CSVParser.ParseInt(row, "BaseRessistance"),
-                BonusResistance = CSVParser.ParseInt(row, "BonusRessistance"),
-                World2HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World2HealthModifer", "1")),
-                World2DamageMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World2DamageModifer", "1")),
-                World2BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World2BaseResistanceModifier", "0")),
-                World3HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World3HealthModifier", "1")),
-                World3DamageMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World3DamageModifier", "1")),
-                World3BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World3BaseResistanceModifier", "0")),
-                World4HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World4HealthModifier", "1")),
-                World4DamageMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World4DamageModifier", "1")),
-                World4BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World4BaseResistanceModifier", "0")),
-                World5HealthMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World5HealthModifier", "1")),
-                World5DamageMultiplier = ParseMultiplier(CSVParser.ParseString(row, "World5DamageModifier", "1")),
-                World5BaseResistanceAddend = ParseAddend(CSVParser.ParseString(row, "World5BaseResistanceModifier", "0"))
+                Type = e.type,
+                DisplayName = e.displayName,
+                EnemyID = e.enemyId,
+                Health = e.baseHealth,
+                Damage = baseDamage,
+                BaseResistance = e.baseResistance,
+                BonusResistance = e.bonusResistance,
+                World2HealthMultiplier = e.healthModifiers.Length > 1 ? e.healthModifiers[1] : 1f,
+                World2DamageMultiplier = e.damageModifiers.Length > 1 ? e.damageModifiers[1] : 1f,
+                World2BaseResistanceAddend = e.resistanceModifiers.Length > 1 ? e.resistanceModifiers[1] : 0,
+                World3HealthMultiplier = e.healthModifiers.Length > 2 ? e.healthModifiers[2] : 1f,
+                World3DamageMultiplier = e.damageModifiers.Length > 2 ? e.damageModifiers[2] : 1f,
+                World3BaseResistanceAddend = e.resistanceModifiers.Length > 2 ? e.resistanceModifiers[2] : 0,
+                World4HealthMultiplier = e.healthModifiers.Length > 3 ? e.healthModifiers[3] : 1f,
+                World4DamageMultiplier = e.damageModifiers.Length > 3 ? e.damageModifiers[3] : 1f,
+                World4BaseResistanceAddend = e.resistanceModifiers.Length > 3 ? e.resistanceModifiers[3] : 0,
+                World5HealthMultiplier = e.healthModifiers.Length > 4 ? e.healthModifiers[4] : 1f,
+                World5DamageMultiplier = e.damageModifiers.Length > 4 ? e.damageModifiers[4] : 1f,
+                World5BaseResistanceAddend = e.resistanceModifiers.Length > 4 ? e.resistanceModifiers[4] : 0
             };
             
             list.Add(enemy);
@@ -165,6 +98,30 @@ public static class DataCache
         }
 
         return list;
+    }
+    
+    [System.Serializable]
+    private class EnemyListWrapper
+    {
+        public List<EnemyJsonEntry> enemies;
+    }
+    
+    [System.Serializable]
+    private class EnemyJsonEntry
+    {
+        public string type;
+        public string displayName;
+        public int enemyId;
+        public int baseHealth;
+        public float[] healthModifiers;
+        public string skill1;
+        public string skill2;
+        public int baseDamageMin;
+        public int baseDamageMax;
+        public float[] damageModifiers;
+        public int baseResistance;
+        public int[] resistanceModifiers;
+        public int bonusResistance;
     }
 
     private static List<RestData> LoadRestOptions()
@@ -351,30 +308,49 @@ public static class DataCache
 
     private static Dictionary<string, ReactionData> LoadReactions()
     {
-        var csv = Resources.Load<TextAsset>("Data/elementalReactions");
+        var json = Resources.Load<TextAsset>("Data/elementalReactions");
         var dict = new Dictionary<string, ReactionData>();
         
-        if (csv == null)
+        if (json == null)
         {
-            Debug.LogWarning("[DataCache] elementalReactions.csv not found");
+            Debug.LogWarning("[DataCache] elementalReactions.json not found");
             return dict;
         }
 
-        var rows = CSVParser.Parse(csv.text);
-        foreach (var row in rows)
+        var wrapper = JsonUtility.FromJson<ReactionListWrapper>(json.text);
+        if (wrapper == null || wrapper.reactions == null)
         {
-            string reactionId = CSVParser.ParseString(row, "ReactionId", "");
-            if (string.IsNullOrEmpty(reactionId)) continue;
+            Debug.LogWarning("[DataCache] Failed to parse elementalReactions.json");
+            return dict;
+        }
+        
+        foreach (var r in wrapper.reactions)
+        {
+            if (string.IsNullOrEmpty(r.id)) continue;
             
-            dict[reactionId] = new ReactionData
+            dict[r.id] = new ReactionData
             {
-                ReactionId = reactionId,
-                Name = CSVParser.ParseString(row, "Name", "Unknown"),
-                DamageMultiplier = CSVParser.ParseFloat(row, "DamageMultiplier", 1f)
+                ReactionId = r.id,
+                Name = r.name,
+                DamageMultiplier = r.damageMultiplier
             };
         }
 
         return dict;
+    }
+    
+    [System.Serializable]
+    private class ReactionListWrapper
+    {
+        public List<ReactionJsonEntry> reactions;
+    }
+    
+    [System.Serializable]
+    private class ReactionJsonEntry
+    {
+        public string id;
+        public string name;
+        public float damageMultiplier;
     }
     
     private static Dictionary<string, List<ReactionEffectData>> LoadReactionEffects()
