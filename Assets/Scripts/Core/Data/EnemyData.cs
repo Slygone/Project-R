@@ -8,6 +8,13 @@ public class EnemyData
     public int BaseResistance;
     public int BonusResistance;
     
+    // Rewards
+    public int RewardXP;
+    public int RewardGoldMin;
+    public int RewardGoldMax;
+    public int SigilChance; // 0-100 percent chance to drop sigil
+    public int RelicChance; // 0-100 percent chance to drop relic
+    
     // World modifiers parsed from CSV formulas
     // Health/Damage use multipliers (e.g., 1.7 means Health * 1.7)
     // BaseResistance uses addend (e.g., 10 means BaseResistance + 10)
@@ -27,8 +34,8 @@ public class EnemyData
     public float World5DamageMultiplier = 1f;
     public int World5BaseResistanceAddend = 0;
     
-    public bool IsElite => Type == "Elite Enemy";
-    public bool IsBoss => Type == "Boss Enemy";
+    public bool IsElite => Type == "Elite";
+    public bool IsBoss => Type == "Boss";
     public bool IsRegular => Type == "Enemy";
     
     // Get stats for a specific world

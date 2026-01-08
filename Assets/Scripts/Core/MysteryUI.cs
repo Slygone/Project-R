@@ -126,7 +126,7 @@ public class MysteryUI : MonoBehaviour
         descRect.offsetMin = Vector2.zero;
         descRect.offsetMax = Vector2.zero;
         var descText = descObj.AddComponent<TextMeshProUGUI>();
-        descText.text = "Fight a powerful elite enemy\n\n<color=#FFD700>Rewards:</color>\n• 2 Relics (1 matching element)\n• Double Gold";
+        descText.text = "Fight a powerful elite enemy\n\n<color=#FFD700>Rewards:</color>\n• 3 XP, 6-9 Gold\n• Elemental Sigil\n• 50% Relic Chance";
         descText.alignment = TextAlignmentOptions.Center;
         descText.fontSize = 16;
         descText.color = new Color(0.9f, 0.8f, 0.8f);

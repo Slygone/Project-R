@@ -13,7 +13,8 @@
       "damageModifiers": [1.0, 1.5, 1.9, 2.4, 3.0],
       "baseResistance": 15,
       "resistanceModifiers": [0, 10, 15, 20, 25],
-      "bonusResistance": 20
+      "bonusResistance": 20,
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
     },
     {
       "type": "Enemy",
@@ -28,7 +29,8 @@
       "damageModifiers": [1.0, 1.5, 1.9, 2.4, 3.0],
       "baseResistance": 20,
       "resistanceModifiers": [0, 10, 15, 20, 25],
-      "bonusResistance": 15
+      "bonusResistance": 15,
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
     },
     {
       "type": "Enemy",
@@ -43,7 +45,8 @@
       "damageModifiers": [1.0, 1.5, 1.9, 2.4, 3.0],
       "baseResistance": 15,
       "resistanceModifiers": [0, 10, 15, 20, 25],
-      "bonusResistance": 25
+      "bonusResistance": 25,
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
     },
     {
       "type": "Enemy",
@@ -58,7 +61,8 @@
       "damageModifiers": [1.0, 1.5, 1.9, 2.4, 3.0],
       "baseResistance": 20,
       "resistanceModifiers": [0, 10, 15, 20, 25],
-      "bonusResistance": 25
+      "bonusResistance": 25,
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
     },
     {
       "type": "Enemy",
@@ -73,7 +77,8 @@
       "damageModifiers": [1.0, 1.5, 1.9, 2.4, 3.0],
       "baseResistance": 20,
       "resistanceModifiers": [0, 10, 15, 20, 25],
-      "bonusResistance": 30
+      "bonusResistance": 30,
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
     },
     {
       "type": "Enemy",
@@ -88,7 +93,8 @@
       "damageModifiers": [1.0, 1.5, 1.9, 2.4, 3.0],
       "baseResistance": 25,
       "resistanceModifiers": [0, 10, 15, 20, 25],
-      "bonusResistance": 25
+      "bonusResistance": 25,
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
     },
     {
       "type": "Enemy",
@@ -103,7 +109,8 @@
       "damageModifiers": [1.0, 1.5, 1.9, 2.4, 3.0],
       "baseResistance": 30,
       "resistanceModifiers": [0, 10, 15, 20, 25],
-      "bonusResistance": 10
+      "bonusResistance": 10,
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
     },
     {
       "type": "Enemy",
@@ -118,7 +125,8 @@
       "damageModifiers": [1.0, 1.5, 1.9, 2.4, 3.0],
       "baseResistance": 30,
       "resistanceModifiers": [0, 10, 15, 20, 25],
-      "bonusResistance": 10
+      "bonusResistance": 10,
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
     },
     {
       "type": "Elite",
@@ -133,7 +141,8 @@
       "damageModifiers": [1.0, 1.7, 2.2, 2.8, 3.6],
       "baseResistance": 35,
       "resistanceModifiers": [0, 15, 20, 25, 30],
-      "bonusResistance": 20
+      "bonusResistance": 20,
+      "rewards": { "xp": 3, "goldMin": 6, "goldMax": 9, "sigilChance": 100, "relicChance": 50 }
     },
     {
       "type": "Elite",
@@ -148,7 +157,8 @@
       "damageModifiers": [1.0, 1.7, 2.2, 2.8, 3.6],
       "baseResistance": 25,
       "resistanceModifiers": [0, 15, 20, 25, 30],
-      "bonusResistance": 30
+      "bonusResistance": 30,
+      "rewards": { "xp": 3, "goldMin": 6, "goldMax": 9, "sigilChance": 100, "relicChance": 50 }
     },
     {
       "type": "Elite",
@@ -163,7 +173,8 @@
       "damageModifiers": [1.0, 1.7, 2.2, 2.8, 3.6],
       "baseResistance": 30,
       "resistanceModifiers": [0, 15, 20, 25, 30],
-      "bonusResistance": 30
+      "bonusResistance": 30,
+      "rewards": { "xp": 3, "goldMin": 6, "goldMax": 9, "sigilChance": 100, "relicChance": 50 }
     },
     {
       "type": "Elite",
@@ -178,7 +189,8 @@
       "damageModifiers": [1.0, 1.7, 2.2, 2.8, 3.6],
       "baseResistance": 45,
       "resistanceModifiers": [0, 15, 20, 25, 30],
-      "bonusResistance": 25
+      "bonusResistance": 25,
+      "rewards": { "xp": 3, "goldMin": 6, "goldMax": 9, "sigilChance": 100, "relicChance": 50 }
     },
     {
       "type": "Boss",
@@ -193,7 +205,8 @@
       "damageModifiers": [1.0, 2.0, 2.6, 3.3, 4.2],
       "baseResistance": 45,
       "resistanceModifiers": [0, 18, 23, 28, 33],
-      "bonusResistance": 20
+      "bonusResistance": 20,
+      "rewards": { "xp": 9, "goldMin": 12, "goldMax": 16, "sigilChance": 100, "relicChance": 100 }
     },
     {
       "type": "Boss",
@@ -208,7 +221,8 @@
       "damageModifiers": [1.0, 2.0, 2.6, 3.3, 4.2],
       "baseResistance": 30,
       "resistanceModifiers": [0, 18, 23, 28, 33],
-      "bonusResistance": 30
+      "bonusResistance": 30,
+      "rewards": { "xp": 9, "goldMin": 12, "goldMax": 16, "sigilChance": 100, "relicChance": 100 }
     },
     {
       "type": "Boss",
@@ -223,7 +237,8 @@
       "damageModifiers": [1.0, 2.0, 2.6, 3.3, 4.2],
       "baseResistance": 35,
       "resistanceModifiers": [0, 18, 23, 28, 33],
-      "bonusResistance": 35
+      "bonusResistance": 35,
+      "rewards": { "xp": 9, "goldMin": 12, "goldMax": 16, "sigilChance": 100, "relicChance": 100 }
     },
     {
       "type": "Boss",
@@ -238,7 +253,8 @@
       "damageModifiers": [1.0, 2.0, 2.6, 3.3, 4.2],
       "baseResistance": 40,
       "resistanceModifiers": [0, 18, 23, 28, 33],
-      "bonusResistance": 25
+      "bonusResistance": 25,
+      "rewards": { "xp": 9, "goldMin": 12, "goldMax": 16, "sigilChance": 100, "relicChance": 100 }
     }
   ]
 }

@@ -76,6 +76,11 @@ public static class DataCache
                 Damage = baseDamage,
                 BaseResistance = e.baseResistance,
                 BonusResistance = e.bonusResistance,
+                RewardXP = e.rewards != null ? e.rewards.xp : 0,
+                RewardGoldMin = e.rewards != null ? e.rewards.goldMin : 0,
+                RewardGoldMax = e.rewards != null ? e.rewards.goldMax : 0,
+                SigilChance = e.rewards != null ? e.rewards.sigilChance : 0,
+                RelicChance = e.rewards != null ? e.rewards.relicChance : 0,
                 World2HealthMultiplier = e.healthModifiers.Length > 1 ? e.healthModifiers[1] : 1f,
                 World2DamageMultiplier = e.damageModifiers.Length > 1 ? e.damageModifiers[1] : 1f,
                 World2BaseResistanceAddend = e.resistanceModifiers.Length > 1 ? e.resistanceModifiers[1] : 0,
@@ -122,6 +127,17 @@ public static class DataCache
         public int baseResistance;
         public int[] resistanceModifiers;
         public int bonusResistance;
+        public EnemyRewardsJson rewards;
+    }
+    
+    [System.Serializable]
+    private class EnemyRewardsJson
+    {
+        public int xp;
+        public int goldMin;
+        public int goldMax;
+        public int sigilChance;
+        public int relicChance;
     }
 
     private static List<RestData> LoadRestOptions()

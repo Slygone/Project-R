@@ -14,6 +14,13 @@ public class CombatEnemy
     public bool IsBoss;
     public bool IsElite;
     
+    // Rewards from JSON
+    public int RewardXP;
+    public int RewardGoldMin;
+    public int RewardGoldMax;
+    public int SigilChance;
+    public int RelicChance;
+    
     // Damage variance range (applied each attack)
     private const float VARIANCE_MIN = 0.90f;
     private const float VARIANCE_MAX = 1.10f;
@@ -40,6 +47,13 @@ public class CombatEnemy
         BonusResistance = data.BonusResistance;
         IsBoss = data.IsBoss;
         IsElite = data.IsElite;
+        
+        // Load rewards from JSON
+        RewardXP = data.RewardXP;
+        RewardGoldMin = data.RewardGoldMin;
+        RewardGoldMax = data.RewardGoldMax;
+        SigilChance = data.SigilChance;
+        RelicChance = data.RelicChance;
         
         if (data.IsBoss)
         {

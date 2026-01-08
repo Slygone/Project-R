@@ -44,9 +44,12 @@ public class CombatUI : MonoBehaviour
     private Button goldRewardButton;
     private Button xpRewardButton;
     private GameObject sigilRewardButton;
+    private GameObject relicRewardButton;
     private Element pendingSigil = Element.None;
+    private RelicData pendingRelic = null;
     private bool isEnchanting = false;
     private bool goldCollected = false;
+    private bool relicCollected = false;
     private TextMeshProUGUI sigilInstructionText;
     private TextMeshProUGUI combatTitleText;
     
@@ -2500,6 +2503,41 @@ public class CombatUI : MonoBehaviour
         sigilText.color = Color.white;
         sigilRewardButton.SetActive(false);
 
+        // Relic reward button (for boss/elite enemies - initially hidden)
+        relicRewardButton = new GameObject("RelicReward");
+        relicRewardButton.transform.SetParent(rewardContainer.transform, false);
+        var relicBtnRect = relicRewardButton.AddComponent<RectTransform>();
+        relicBtnRect.anchorMin = new Vector2(0.05f, -0.20f);
+        relicBtnRect.anchorMax = new Vector2(0.95f, 0.05f);
+        relicBtnRect.offsetMin = Vector2.zero;
+        relicBtnRect.offsetMax = Vector2.zero;
+        var relicBtnImage = relicRewardButton.AddComponent<Image>();
+        relicBtnImage.color = new Color(0.3f, 0.2f, 0.4f, 0.9f);
+        relicBtnImage.raycastTarget = true;
+        var relicBtn = relicRewardButton.AddComponent<Button>();
+        relicBtn.targetGraphic = relicBtnImage;
+        var relicColors = relicBtn.colors;
+        relicColors.normalColor = new Color(0.3f, 0.2f, 0.4f, 0.9f);
+        relicColors.highlightedColor = new Color(0.5f, 0.3f, 0.6f, 1f);
+        relicColors.pressedColor = new Color(0.6f, 0.4f, 0.7f, 1f);
+        relicBtn.colors = relicColors;
+        relicBtn.onClick.AddListener(OnRelicRewardClicked);
+
+        var relicTextObj = new GameObject("Text");
+        relicTextObj.transform.SetParent(relicRewardButton.transform, false);
+        var relicTextRect = relicTextObj.AddComponent<RectTransform>();
+        relicTextRect.anchorMin = Vector2.zero;
+        relicTextRect.anchorMax = Vector2.one;
+        relicTextRect.offsetMin = new Vector2(10, 0);
+        relicTextRect.offsetMax = new Vector2(-10, 0);
+        var relicText = relicTextObj.AddComponent<TextMeshProUGUI>();
+        relicText.text = "Relic"; // Will be updated with relic name
+        relicText.alignment = TextAlignmentOptions.MidlineLeft;
+        relicText.fontSize = 22;
+        relicText.color = Color.white;
+        relicText.raycastTarget = false;
+        relicRewardButton.SetActive(false);
+
         // Instruction text for sigil enchantment
         var instrObj = new GameObject("InstructionText");
         instrObj.transform.SetParent(panel.transform, false);
@@ -2596,6 +2634,31 @@ public class CombatUI : MonoBehaviour
         // Hide loot panel temporarily and show skill selection
         lootPanel.SetActive(false);
         ShowEnchantmentSkillSelection();
+    }
+    
+    private void OnRelicRewardClicked()
+    {
+        if (pendingRelic == null || relicCollected || pendingPlayer == null) return;
+        
+        // Add relic to player
+        pendingPlayer.AddRelic(pendingRelic);
+        relicCollected = true;
+        
+        // Update button appearance
+        if (relicRewardButton != null)
+        {
+            relicRewardButton.GetComponent<Button>().interactable = false;
+            var relicText = relicRewardButton.GetComponentInChildren<TextMeshProUGUI>();
+            if (relicText != null)
+            {
+                relicText.text = $"<color=#9966FF>✦</color> {pendingRelic.DisplayName} <size=16>(Collected!)</size>";
+            }
+        }
+        
+        GameLog.System(GameLog.Join(
+            "RelicRewardCollected",
+            GameLog.KV("relic", pendingRelic.DisplayName)
+        ));
     }
     
     private void ShowEnchantmentSkillSelection()
@@ -2792,19 +2855,21 @@ public class CombatUI : MonoBehaviour
         }
     }
 
-    public void ShowLootPanel(int gold, int xp, Player player, NodeBase node, string title = null, bool isElite = false)
+    public void ShowLootPanel(int gold, int xp, Player player, NodeBase node, string title = null, bool isElite = false, bool isBoss = false, bool dropsSigil = false, bool dropsRelic = false)
     {
         pendingGold = gold;
         pendingXP = xp;
         pendingPlayer = player;
         pendingNode = node;
         goldCollected = false;
+        relicCollected = false;
         pendingSigil = Element.None;
+        pendingRelic = null;
         isEnchanting = false;
 
         if (lootTitleText != null)
         {
-            lootTitleText.text = "Reward";
+            lootTitleText.text = isBoss ? "BOSS DEFEATED!" : "Reward";
         }
         
         // Reset gold button
@@ -2823,10 +2888,11 @@ public class CombatUI : MonoBehaviour
             lootXPText.text = $"<color=#66CCFF>★</color> Experience: +{xp} <size=16>(Auto)</size>";
         }
         
-        // Sigil for elite enemies
+        // Sigil drop (from elite or boss with dropsSigil flag, or legacy isElite behavior)
+        bool showSigil = dropsSigil || isElite;
         if (sigilRewardButton != null)
         {
-            if (isElite)
+            if (showSigil)
             {
                 // Random element sigil drop
                 var elements = new Element[] { Element.Fire, Element.Ice, Element.Water, Element.Wind, Element.Rock };
@@ -2851,6 +2917,35 @@ public class CombatUI : MonoBehaviour
             else
             {
                 sigilRewardButton.SetActive(false);
+            }
+        }
+        
+        // Relic drop (boss rewards)
+        if (relicRewardButton != null)
+        {
+            if (dropsRelic && DataCache.Relics != null && DataCache.Relics.Count > 0)
+            {
+                // Random relic drop
+                pendingRelic = DataCache.Relics[UnityEngine.Random.Range(0, DataCache.Relics.Count)];
+                
+                var relicBtnImage = relicRewardButton.GetComponent<Image>();
+                if (relicBtnImage != null)
+                {
+                    relicBtnImage.color = new Color(0.6f, 0.4f, 0.8f, 1f); // Purple for relics
+                }
+                
+                var relicText = relicRewardButton.GetComponentInChildren<TextMeshProUGUI>();
+                if (relicText != null)
+                {
+                    relicText.text = $"<color=#9966FF>✦</color> {pendingRelic.DisplayName} <size=16>(Click to collect)</size>";
+                }
+                
+                relicRewardButton.GetComponent<Button>().interactable = true;
+                relicRewardButton.SetActive(true);
+            }
+            else
+            {
+                relicRewardButton.SetActive(false);
             }
         }
         

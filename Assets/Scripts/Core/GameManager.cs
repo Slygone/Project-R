@@ -9,7 +9,6 @@ public class GameManager : MonoBehaviour
     private static bool pairRerollUsed = false;
     private const int MAX_WORLD = 5;
     private bool affinityChosen = false;
-    private bool elementPairChosen = false;
     private bool characterChosen = false;
     
     // Track which character is used for the current run (for ascension award)
@@ -178,7 +177,6 @@ public class GameManager : MonoBehaviour
     {
         // New system: No orb pair selection needed
         // Skills can be enchanted with sigils dropped from enemies
-        elementPairChosen = true;
         affinityChosen = true;
         
         if (refs != null && refs.playerController != null)
@@ -195,29 +193,6 @@ public class GameManager : MonoBehaviour
         SkipAffinitySelection();
     }
     
-    private void OnElementPairChosen(ElementPair pair)
-    {
-        elementPairChosen = true;
-        affinityChosen = true;
-
-        if (refs != null && refs.player != null)
-        {
-            refs.player.SetElementPair(pair);
-        }
-
-        if (refs != null && refs.playerController != null)
-        {
-            refs.playerController.SetCanMove(true);
-        }
-
-        if (refs != null && refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
-        {
-            refs.playerStatsUI.UpdateStats();
-        }
-
-        Debug.Log($"[GameManager] Run started with {refs.player.GetCharacter().DisplayName} and {pair.DisplayName} orb pair");
-    }
-
     private void StartCharacterSelection()
     {
         if (refs != null && refs.characterSelectionUI != null)
@@ -269,7 +244,6 @@ public class GameManager : MonoBehaviour
     }
 
     public bool HasAffinityBeenChosen() => affinityChosen;
-    public bool HasElementPairBeenChosen() => elementPairChosen;
     public bool HasCharacterBeenChosen() => characterChosen;
 
     public void OnNodeCompleted()
@@ -558,7 +532,6 @@ public class GameManager : MonoBehaviour
         completedNodes = 0;
         pairRerollUsed = false;
         affinityChosen = false;
-        elementPairChosen = false;
         characterChosen = false;
         currentRunCharacter = null;
         ResetRunXP();
