@@ -57,13 +57,24 @@ public class CombatManager : MonoBehaviour
         var encounter = DataCache.GetWorldEncounter(world);
         int bossCount = encounter.BossEnemy;
         
-        if (DataCache.BossEnemies.Count > 0)
+        // Ensure DataCache is loaded
+        if (!DataCache.IsLoaded)
         {
-            for (int i = 0; i < bossCount; i++)
-            {
-                var bossData = DataCache.BossEnemies[Random.Range(0, DataCache.BossEnemies.Count)];
-                enemies.Add(new CombatEnemy(bossData, world));
-            }
+            DataCache.LoadAll();
+        }
+        
+        if (DataCache.BossEnemies == null || DataCache.BossEnemies.Count == 0)
+        {
+            Debug.LogError($"[CombatManager] No boss enemies loaded! Cannot start boss fight for world {world}");
+            // Don't auto-win - show error state
+            onBossCombatComplete?.Invoke(false);
+            return;
+        }
+        
+        for (int i = 0; i < bossCount; i++)
+        {
+            var bossData = DataCache.BossEnemies[Random.Range(0, DataCache.BossEnemies.Count)];
+            enemies.Add(new CombatEnemy(bossData, world));
         }
 
         combatActive = true;
@@ -1514,23 +1525,31 @@ public class CombatManager : MonoBehaviour
             pendingDefensiveQTEAttacker = enemy;
         }
 
-        float healPercent = DefensiveQTE.GetHealPercent(qteResult);
-        int healAmount = Mathf.RoundToInt(player.GetMaxHealth() * healPercent);
-        if (healAmount > 0)
+        // Convert DefensiveQTEResult to QTEResult for data lookup
+        QTEResult dataResult = qteResult switch
         {
-            player.Heal(healAmount);
+            DefensiveQTEResult.Perfect => QTEResult.Perfect,
+            DefensiveQTEResult.Good => QTEResult.Good,
+            _ => QTEResult.Bad
+        };
+        
+        // Apply shield based on QTE result (percentage of max HP)
+        int shieldPercent = ReactionQTE.GetQteDefensiveShieldPercent(dataResult);
+        int shieldAmount = Mathf.RoundToInt(player.GetMaxHealth() * (shieldPercent / 100f));
+        if (shieldAmount > 0)
+        {
+            player.AddShield(shieldAmount);
             GameLog.Combat(GameLog.Join(
-                "Heal",
+                "ShieldGain",
                 GameLog.KV("who", "Player"),
-                GameLog.KV("amount", healAmount),
+                GameLog.KV("amount", shieldAmount),
                 GameLog.KV("source", $"DefensiveQTE:{qteResult}")
             ));
             
             if (combatUI != null)
             {
                 combatUI.UpdatePlayerHealth(player);
-                // Show heal floating text from QTE
-                combatUI.ShowHealToPlayer(healAmount);
+                combatUI.ShowShieldGainToPlayer(shieldAmount);
             }
         }
 
@@ -1538,7 +1557,7 @@ public class CombatManager : MonoBehaviour
             "DefensiveQTE",
             GameLog.KV("attacker", enemy.Name),
             GameLog.KV("result", qteResult),
-            GameLog.KV("healed", healAmount)
+            GameLog.KV("shieldGained", shieldAmount)
         ), GameLogVerbosity.Verbose);
 
         if (pendingDefensiveQTEDamage > 0)
@@ -1658,6 +1677,9 @@ public class CombatManager : MonoBehaviour
 
     private bool AllEnemiesDead()
     {
+        // Guard: if no enemies were spawned, don't consider it a victory
+        if (enemies.Count == 0) return false;
+        
         foreach (var enemy in enemies)
         {
             if (enemy.IsAlive()) return false;
@@ -1690,10 +1712,6 @@ public class CombatManager : MonoBehaviour
             GameLog.KV("victory", victory),
             GameLog.KV("type", currentCombatType)
         ));
-
-        // Re-enable player free roam at combat end
-        var pcEnd = FindFirstObjectByType<PlayerController>();
-        if (pcEnd != null) pcEnd.SetCanMove(true);
 
         if (victory)
         {

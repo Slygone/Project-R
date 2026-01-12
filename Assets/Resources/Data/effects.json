@@ -122,5 +122,17 @@
         "maxStacks": 2
       }
     }
-  ]
+  ],
+  "qteEffects": {
+    "offensive": [
+      { "result": "Bad", "multiplier": 0.9 },
+      { "result": "Good", "multiplier": 1.0 },
+      { "result": "Perfect", "multiplier": 1.1 }
+    ],
+    "defensive": [
+      { "result": "Bad", "shieldPercent": 1, "description": "Gain 1% max HP as shield" },
+      { "result": "Good", "shieldPercent": 3, "description": "Gain 3% max HP as shield" },
+      { "result": "Perfect", "shieldPercent": 5, "description": "Gain 5% max HP as shield" }
+    ]
+  }
 }

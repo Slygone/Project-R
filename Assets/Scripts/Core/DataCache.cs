@@ -11,8 +11,8 @@ public static class DataCache
     public static List<CharacterData> Characters { get; private set; }
     public static List<PotionData> Potions { get; private set; }
     public static List<RelicData> Relics { get; private set; }
-    public static PlayerData PlayerStats { get; private set; }
-    public static Dictionary<string, float> QTEMultipliers { get; private set; }
+    public static Dictionary<string, float> QTEOffensiveMultipliers { get; private set; }
+    public static Dictionary<string, int> QTEDefensiveShield { get; private set; }
     public static Dictionary<string, ReactionData> Reactions { get; private set; }
     public static Dictionary<string, List<ReactionEffectData>> ReactionEffects { get; private set; }
     public static Dictionary<string, List<ElementalTierData>> ElementalTiers { get; private set; }
@@ -29,15 +29,14 @@ public static class DataCache
         Characters = LoadCharactersFromJson();
         Potions = LoadPotions();
         Relics = LoadRelics();
-        PlayerStats = LoadPlayerStats();
-        QTEMultipliers = LoadQTEMultipliers();
+        LoadQTEEffects();
         Reactions = LoadReactions();
         ReactionEffects = LoadReactionEffects();
         ElementalTiers = LoadElementalTiers();
         WorldEncounters = LoadWorldEncounters();
 
         IsLoaded = true;
-        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEMultipliers.Count} QTE results, {Reactions.Count} reactions, {ReactionEffects.Count} reaction effect groups, {ElementalTiers.Count} element tier groups, {WorldEncounters.Count} world encounters, player stats");
+        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEOffensiveMultipliers.Count} QTE offensive, {QTEDefensiveShield.Count} QTE defensive, {Reactions.Count} reactions, {ReactionEffects.Count} reaction effect groups, {ElementalTiers.Count} element tier groups, {WorldEncounters.Count} world encounters");
     }
 
     private static List<EnemyData> LoadEnemies()
@@ -268,58 +267,70 @@ public static class DataCache
         public string description;
     }
 
-    private static PlayerData LoadPlayerStats()
+    private static void LoadQTEEffects()
     {
-        var csv = Resources.Load<TextAsset>("Data/player");
-        if (csv == null)
-        {
-            throw new System.Exception("Missing player.csv. Expected a TextAsset at Resources/Data/player.csv. Run Tools/Data/Update All CSVs to generate it.");
-        }
-
-        var rows = CSVParser.Parse(csv.text);
-        if (rows == null || rows.Count == 0)
-        {
-            throw new System.Exception("player.csv has no data rows. Ensure the sheet contains at least one non-empty row and is exported correctly.");
-        }
-
-        var row = rows[0];
-
-        return new PlayerData
-        {
-            MaxHealth = CSVParser.ParseInt(row, "MaxHealth"),
-            Damage = CSVParser.ParseInt(row, "Damage"),
-            Gold = CSVParser.ParseInt(row, "Gold"),
-            MaxEnergy = CSVParser.ParseInt(row, "MaxEnergy"),
-            CritChance = CSVParser.ParseInt(row, "CritChance"),
-            CritDamage = CSVParser.ParseFloat(row, "CritDamage"),
-            BaseResistance = CSVParser.ParseInt(row, "BaseRessistance"),
-            BonusResistance = CSVParser.ParseInt(row, "BonusRessistance")
-        };
-    }
-
-    private static Dictionary<string, float> LoadQTEMultipliers()
-    {
-        var csv = Resources.Load<TextAsset>("Data/qte");
-        var dict = new Dictionary<string, float>();
+        QTEOffensiveMultipliers = new Dictionary<string, float>();
+        QTEDefensiveShield = new Dictionary<string, int>();
         
-        if (csv == null)
+        var json = Resources.Load<TextAsset>("Data/effects");
+        if (json == null)
         {
-            Debug.LogWarning("[DataCache] qte.csv not found, using defaults");
-            dict["Bad"] = 0.9f;
-            dict["Good"] = 1.0f;
-            dict["Perfect"] = 1.1f;
-            return dict;
+            throw new System.Exception("Missing effects.json. Expected a TextAsset at Resources/Data/effects.json.");
         }
-
-        var rows = CSVParser.Parse(csv.text);
-        foreach (var row in rows)
+        
+        var wrapper = JsonUtility.FromJson<EffectsWrapper>(json.text);
+        if (wrapper == null || wrapper.qteEffects == null)
         {
-            string result = CSVParser.ParseString(row, "Result");
-            float multiplier = CSVParser.ParseFloat(row, "Multiplier");
-            dict[result] = multiplier;
+            throw new System.Exception("effects.json missing qteEffects section.");
         }
-
-        return dict;
+        
+        if (wrapper.qteEffects.offensive == null || wrapper.qteEffects.offensive.Length == 0)
+        {
+            throw new System.Exception("effects.json qteEffects.offensive is empty or missing.");
+        }
+        
+        if (wrapper.qteEffects.defensive == null || wrapper.qteEffects.defensive.Length == 0)
+        {
+            throw new System.Exception("effects.json qteEffects.defensive is empty or missing.");
+        }
+        
+        foreach (var qte in wrapper.qteEffects.offensive)
+        {
+            QTEOffensiveMultipliers[qte.result] = qte.multiplier;
+        }
+        
+        foreach (var qte in wrapper.qteEffects.defensive)
+        {
+            QTEDefensiveShield[qte.result] = qte.shieldPercent;
+        }
+    }
+    
+    [System.Serializable]
+    private class EffectsWrapper
+    {
+        public QTEEffectsData qteEffects;
+    }
+    
+    [System.Serializable]
+    private class QTEEffectsData
+    {
+        public QTEOffensiveEntry[] offensive;
+        public QTEDefensiveEntry[] defensive;
+    }
+    
+    [System.Serializable]
+    private class QTEOffensiveEntry
+    {
+        public string result;
+        public float multiplier;
+    }
+    
+    [System.Serializable]
+    private class QTEDefensiveEntry
+    {
+        public string result;
+        public int shieldPercent;
+        public string description;
     }
 
     private static Dictionary<string, ReactionData> LoadReactions()
@@ -414,14 +425,24 @@ public static class DataCache
         return dict;
     }
 
-    public static float GetQTEMultiplier(QTEResult result)
+    public static float GetQTEOffensiveMultiplier(QTEResult result)
     {
         string key = result.ToString();
-        if (QTEMultipliers != null && QTEMultipliers.TryGetValue(key, out float mult))
+        if (QTEOffensiveMultipliers != null && QTEOffensiveMultipliers.TryGetValue(key, out float mult))
         {
             return mult;
         }
-        return 1.0f;
+        throw new System.Exception($"QTE offensive multiplier not found for result: {key}");
+    }
+    
+    public static int GetQTEDefensiveShield(QTEResult result)
+    {
+        string key = result.ToString();
+        if (QTEDefensiveShield != null && QTEDefensiveShield.TryGetValue(key, out int shieldPercent))
+        {
+            return shieldPercent;
+        }
+        throw new System.Exception($"QTE defensive shield not found for result: {key}");
     }
 
     // Get reaction definition by directional ReactionId (e.g., "Ice_Fire" for Ice then Fire)

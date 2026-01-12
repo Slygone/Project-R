@@ -159,11 +159,21 @@ public class GameManager : MonoBehaviour
         currentRunCharacter = character;
         characterChosen = true;
         
-        // Apply character to player
+        // IMPORTANT: Reset player state before applying new character
+        // This clears relics, potions, gold, shields, skill enchantments from previous run
         if (refs != null && refs.player != null)
         {
+            refs.player.ResetForNewRun();
             refs.player.SelectCharacter(character);
         }
+        
+        // Reset world and node tracking
+        currentWorld = 1;
+        completedNodes = 0;
+        runXP = 0;
+        runDetonatorXP.Clear();
+        pairRerollUsed = false;
+        UpdateNodeCounter();
         
         Debug.Log($"[GameManager] Starting run with {character.DisplayName}");
         

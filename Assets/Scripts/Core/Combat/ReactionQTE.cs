@@ -12,7 +12,12 @@ public static class ReactionQTE
 {
     public static float GetQteMultiplier(QTEResult result)
     {
-        return DataCache.GetQTEMultiplier(result);
+        return DataCache.GetQTEOffensiveMultiplier(result);
+    }
+    
+    public static int GetQteDefensiveShieldPercent(QTEResult result)
+    {
+        return DataCache.GetQTEDefensiveShield(result);
     }
 
     // New directional lookup by ReactionId

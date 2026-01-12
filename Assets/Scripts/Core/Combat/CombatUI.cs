@@ -104,8 +104,39 @@ public class CombatUI : MonoBehaviour
         SetupUI();
     }
 
+    private void HandleSkillHotkeys()
+    {
+        if (Input.GetKeyDown(KeyCode.Alpha1) || Input.GetKeyDown(KeyCode.Keypad1))
+        {
+            if (skill1Button != null && skill1Button.interactable) OnSkill1Clicked();
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha2) || Input.GetKeyDown(KeyCode.Keypad2))
+        {
+            if (skill2Button != null && skill2Button.interactable) OnSkill2Clicked();
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha3) || Input.GetKeyDown(KeyCode.Keypad3))
+        {
+            if (skill3Button != null && skill3Button.interactable) OnSkill3Clicked();
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha4) || Input.GetKeyDown(KeyCode.Keypad4))
+        {
+            if (skill4Button != null && skill4Button.interactable) OnSkill4Clicked();
+        }
+        else if (Input.GetKeyDown(KeyCode.Alpha5) || Input.GetKeyDown(KeyCode.Keypad5))
+        {
+            if (skill5Button != null && skill5Button.interactable) OnSkill5Clicked();
+        }
+    }
+
     void Update()
     {
+        // Hotkeys for skills when not targeting
+        if (combatPanel != null && combatPanel.activeSelf && !isTargeting)
+        {
+            HandleSkillHotkeys();
+            return;
+        }
+
         if (!isTargeting) return;
         
         if (Input.GetKeyDown(KeyCode.Escape) || Input.GetKeyDown(KeyCode.Backspace))
@@ -2163,6 +2194,22 @@ public class CombatUI : MonoBehaviour
         }
     }
     
+    public void ShowShieldGainToPlayer(int amount)
+    {
+        GameLog.System(GameLog.Join(
+            "FloatingText",
+            GameLog.KV("target", "Player"),
+            GameLog.KV("type", "ShieldGain"),
+            GameLog.KV("amount", amount)
+        ), GameLogVerbosity.Verbose);
+        
+        var fctManager = FloatingTextManager.Instance;
+        if (fctManager != null && playerHealthBar != null)
+        {
+            fctManager.ShowShield(playerHealthBar.transform, amount, FloatingTextType.ShieldGain);
+        }
+    }
+    
     public void ShowStatusToEnemy(CombatEnemy enemy, string statusName, bool gained, int stacksDelta = 0)
     {
         var fctManager = FloatingTextManager.Instance;
@@ -2513,14 +2560,8 @@ public class CombatUI : MonoBehaviour
         relicBtnRect.offsetMax = Vector2.zero;
         var relicBtnImage = relicRewardButton.AddComponent<Image>();
         relicBtnImage.color = new Color(0.3f, 0.2f, 0.4f, 0.9f);
-        relicBtnImage.raycastTarget = true;
         var relicBtn = relicRewardButton.AddComponent<Button>();
         relicBtn.targetGraphic = relicBtnImage;
-        var relicColors = relicBtn.colors;
-        relicColors.normalColor = new Color(0.3f, 0.2f, 0.4f, 0.9f);
-        relicColors.highlightedColor = new Color(0.5f, 0.3f, 0.6f, 1f);
-        relicColors.pressedColor = new Color(0.6f, 0.4f, 0.7f, 1f);
-        relicBtn.colors = relicColors;
         relicBtn.onClick.AddListener(OnRelicRewardClicked);
 
         var relicTextObj = new GameObject("Text");

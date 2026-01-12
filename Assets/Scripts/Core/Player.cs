@@ -54,30 +54,17 @@ public class Player : MonoBehaviour
             DataCache.LoadAll();
         }
         
-        var stats = DataCache.PlayerStats;
-        if (stats == null)
-        {
-            GameLog.Error(
-                GameLogCategory.Data,
-                "[Player]",
-                GameLog.Join(
-                    "InitFail",
-                    GameLog.KV("reason", "PlayerStatsNull")
-                )
-            );
-            return;
-        }
-        
-        maxHealth = stats.MaxHealth;
+        // Initialize with minimal defaults - real stats come from character selection
+        maxHealth = 100;
         health = maxHealth;
-        baseDamage = stats.Damage;
-        gold = stats.Gold;
-        maxEnergy = stats.MaxEnergy;
-        energy = maxEnergy;
-        critChance = stats.CritChance;
-        critDamage = stats.CritDamage;
-        baseResistance = stats.BaseResistance;
-        bonusResistance = stats.BonusResistance;
+        baseDamage = 10;
+        gold = 0;
+        maxEnergy = 100;
+        energy = 0;
+        critChance = 5;
+        critDamage = 1.5f;
+        baseResistance = 10;
+        bonusResistance = 0;
 
         GameLog.System(GameLog.Join(
             "PlayerInit",
@@ -1133,5 +1120,65 @@ public class Player : MonoBehaviour
             GameLog.KV("relics", relics.Count),
             GameLog.KV("charDamage", GetCharacterDamage())
         ), GameLogVerbosity.Verbose);
+    }
+    
+    /// <summary>
+    /// Full reset for starting a new run. Clears all run-specific state.
+    /// Only meta-progression (talents, elemental ascensions) persists - those are managed externally.
+    /// </summary>
+    public void ResetForNewRun()
+    {
+        // Reset to minimal defaults - SelectCharacter will set real stats from character JSON
+        maxHealth = 100;
+        health = maxHealth;
+        baseDamage = 10;
+        gold = 0;
+        maxEnergy = 100;
+        energy = 0;
+        critChance = 5;
+        critDamage = 1.5f;
+        baseResistance = 10;
+        bonusResistance = 0;
+        
+        // Clear all run-specific collections
+        relics.Clear();
+        potionInventory.Clear();
+        
+        // Reset temporary bonuses
+        tempCritChanceBonus = 0;
+        tempCritDamageBonus = 0;
+        
+        // Reset skill enchantments (sigils don't carry over)
+        for (int i = 0; i < 5; i++)
+        {
+            skillElements[i] = Element.None;
+            skillCooldowns[i] = 0;
+        }
+        
+        // Clear status effects (shield, block, etc.)
+        statusEffects.ClearAll();
+        
+        // Reset combat tracking
+        combatTurnCount = 0;
+        dirtyStabConsecutiveUses = 0;
+        currentAP = maxAP;
+        
+        // Reset wound/threshold tracking
+        lowestThresholdLevel = -1;
+        
+        // Clear affinity (will be set when character is selected)
+        affinity = Element.None;
+        selectedCharacter = null;
+        
+        // Reset elemental damage bonuses
+        elementalDamage = new ElementalDamage();
+        
+        GameLog.System(GameLog.Join(
+            "NewRunReset",
+            GameLog.KV("hp", $"{health}/{maxHealth}"),
+            GameLog.KV("gold", gold),
+            GameLog.KV("relics", 0),
+            GameLog.KV("potions", 0)
+        ));
     }
 }
