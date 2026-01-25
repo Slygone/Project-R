@@ -16,6 +16,10 @@ public class Player : MonoBehaviour
     private int tempCritChanceBonus = 0;
     private int tempCritDamageBonus = 0;
     
+    // Action Points System
+    private int currentAP;
+    private int maxAP = 10;
+    
     // Wound/Threshold System (Phase 2)
     private const int THRESHOLD_SIZE = 50;
     private int lowestThresholdLevel = -1; // -1 means not initialized yet
@@ -28,12 +32,13 @@ public class Player : MonoBehaviour
     private Element affinity = Element.None;
     private CharacterData selectedCharacter = null;
     
-    private ElementalOrbSystem orbSystem = new ElementalOrbSystem();
-    private bool hasElementPair = false;
     
     // Skill cooldown tracking (index 0-3 = Skill1-4, index 4 = Skill5/Ultimate)
     private int[] skillCooldowns = new int[5];
     private int combatTurnCount = 0;
+    
+    // Skill element enchantments (runtime overrides from sigils)
+    private Element[] skillElements = new Element[5] { Element.None, Element.None, Element.None, Element.None, Element.None };
     
     // Status effects (Shield, Block)
     private StatusEffectManager statusEffects = new StatusEffectManager();
@@ -49,30 +54,17 @@ public class Player : MonoBehaviour
             DataCache.LoadAll();
         }
         
-        var stats = DataCache.PlayerStats;
-        if (stats == null)
-        {
-            GameLog.Error(
-                GameLogCategory.Data,
-                "[Player]",
-                GameLog.Join(
-                    "InitFail",
-                    GameLog.KV("reason", "PlayerStatsNull")
-                )
-            );
-            return;
-        }
-        
-        maxHealth = stats.MaxHealth;
+        // Initialize with minimal defaults - real stats come from character selection
+        maxHealth = 100;
         health = maxHealth;
-        baseDamage = stats.Damage;
-        gold = stats.Gold;
-        maxEnergy = stats.MaxEnergy;
-        energy = maxEnergy;
-        critChance = stats.CritChance;
-        critDamage = stats.CritDamage;
-        baseResistance = stats.BaseResistance;
-        bonusResistance = stats.BonusResistance;
+        baseDamage = 10;
+        gold = 0;
+        maxEnergy = 100;
+        energy = 0;
+        critChance = 5;
+        critDamage = 1.5f;
+        baseResistance = 10;
+        bonusResistance = 0;
 
         GameLog.System(GameLog.Join(
             "PlayerInit",
@@ -104,14 +96,6 @@ public class Player : MonoBehaviour
     
     public int GetTotalDamage()
     {
-        // If player has an orb pair selected, apply dual elemental bonuses
-        if (hasElementPair && orbSystem != null)
-        {
-            int a = elementalDamage.Get(orbSystem.OrbAElement);
-            int b = elementalDamage.Get(orbSystem.OrbBElement);
-            return GetCharacterDamage() + a + b;
-        }
-        // Legacy single-affinity bonus
         return GetCharacterDamage() + GetAffinityBonus();
     }
     public int GetAffinityBonus() => affinity != Element.None ? elementalDamage.Get(affinity) : 0;
@@ -148,14 +132,7 @@ public class Player : MonoBehaviour
     {
         int totalResistance = baseResistance;
         
-        if (hasElementPair && orbSystem != null)
-        {
-            if (attackerAffinity == orbSystem.OrbAElement || attackerAffinity == orbSystem.OrbBElement)
-            {
-                totalResistance += bonusResistance;
-            }
-        }
-        else if (affinity != Element.None && attackerAffinity == affinity)
+        if (affinity != Element.None && attackerAffinity == affinity)
         {
             totalResistance += bonusResistance;
         }
@@ -443,46 +420,6 @@ public class Player : MonoBehaviour
         ), GameLogVerbosity.Verbose);
     }
     
-    public void SetElementPair(ElementPair pair)
-    {
-        orbSystem.SetElementPair(pair.OrbA, pair.OrbB);
-        affinity = pair.OrbA;
-        hasElementPair = true;
-        GameLog.System(GameLog.Join(
-            "ElementPairSet",
-            GameLog.KV("pair", pair.DisplayName),
-            GameLog.KV("a", pair.OrbA),
-            GameLog.KV("b", pair.OrbB)
-        ), GameLogVerbosity.Verbose);
-    }
-    
-    public ElementalOrbSystem GetOrbSystem() => orbSystem;
-    public bool HasElementPair() => hasElementPair;
-    public Element GetOrbAElement() => orbSystem.OrbAElement;
-    public Element GetOrbBElement() => orbSystem.OrbBElement;
-    
-    public void InfuseOrb(bool useOrbA)
-    {
-        orbSystem.InfuseOrb(useOrbA);
-        affinity = orbSystem.GetInfusedElement(useOrbA);
-    }
-    
-    public Element GetInfusedElement(bool useOrbA)
-    {
-        return orbSystem.GetInfusedElement(useOrbA);
-    }
-    
-    public bool HasReactionReady() => orbSystem.HasReactionReady();
-    
-    public float TriggerReactionAndGetMultiplier()
-    {
-        if (!orbSystem.HasReactionReady()) return 1f;
-        
-        float multiplier = orbSystem.GetReactionDamageMultiplier();
-        orbSystem.TriggerReaction();
-        return multiplier;
-    }
-
     public void SelectCharacter(CharacterData character)
     {
         selectedCharacter = character;
@@ -525,6 +462,65 @@ public class Player : MonoBehaviour
     }
     
     public bool IsSkillOnCooldown(int skillIndex) => GetSkillCooldown(skillIndex) > 0;
+    
+    // ========== SKILL ELEMENT ENCHANTMENT SYSTEM ==========
+    
+    public Element GetSkillElement(int skillNumber)
+    {
+        int index = skillNumber - 1;
+        if (index >= 0 && index < 5)
+        {
+            // Return runtime enchantment if set, otherwise return base element from character data
+            if (skillElements[index] != Element.None)
+            {
+                return skillElements[index];
+            }
+            
+            // Fallback to character data element
+            if (selectedCharacter != null)
+            {
+                string elemStr = skillNumber switch
+                {
+                    1 => selectedCharacter.Skill1Element,
+                    2 => selectedCharacter.Skill2Element,
+                    3 => selectedCharacter.Skill3Element,
+                    4 => selectedCharacter.Skill4Element,
+                    5 => selectedCharacter.Skill5Element,
+                    _ => "none"
+                };
+                if (!string.IsNullOrEmpty(elemStr) && elemStr.ToLower() != "none")
+                {
+                    if (System.Enum.TryParse<Element>(elemStr, true, out Element result))
+                    {
+                        return result;
+                    }
+                }
+            }
+        }
+        return Element.None;
+    }
+    
+    public void EnchantSkill(int skillNumber, Element element)
+    {
+        int index = skillNumber - 1;
+        if (index >= 0 && index < 5)
+        {
+            skillElements[index] = element;
+            GameLog.System(GameLog.Join(
+                "SkillEnchant",
+                GameLog.KV("skill", skillNumber),
+                GameLog.KV("element", element)
+            ));
+        }
+    }
+    
+    public void ClearSkillEnchantments()
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            skillElements[i] = Element.None;
+        }
+    }
     
     public bool CanUseUltimate()
     {
@@ -643,6 +639,7 @@ public class Player : MonoBehaviour
         // NOTE: Cooldowns are NOT reset - they persist between combats
         combatTurnCount = 0;
         dirtyStabConsecutiveUses = 0;
+        currentAP = maxAP; // Start combat with full AP
         statusEffects.ClearCombatEffects(); // Keep shield, clear block
         GameLog.System(GameLog.Join(
             "CombatStateReset",
@@ -657,6 +654,33 @@ public class Player : MonoBehaviour
     }
     
     public int GetCombatTurnCount() => combatTurnCount;
+    
+    // ========== ACTION POINTS SYSTEM ==========
+    
+    public int GetCurrentAP() => currentAP;
+    public int GetMaxAP() => maxAP;
+    
+    public bool HasEnoughAP(int cost) => currentAP >= cost;
+    
+    public void SpendAP(int cost)
+    {
+        currentAP -= cost;
+        if (currentAP < 0) currentAP = 0;
+        GameLog.Combat(GameLog.Join(
+            "APSpend",
+            GameLog.KV("cost", cost),
+            GameLog.KV("ap", $"{currentAP}/{maxAP}")
+        ), GameLogVerbosity.Verbose);
+    }
+    
+    public void RefreshAP()
+    {
+        currentAP = maxAP;
+        GameLog.Combat(GameLog.Join(
+            "APRefresh",
+            GameLog.KV("ap", $"{currentAP}/{maxAP}")
+        ), GameLogVerbosity.Verbose);
+    }
     
     // ========== STATUS EFFECTS (SHIELD, BLOCK) ==========
     
@@ -1096,5 +1120,65 @@ public class Player : MonoBehaviour
             GameLog.KV("relics", relics.Count),
             GameLog.KV("charDamage", GetCharacterDamage())
         ), GameLogVerbosity.Verbose);
+    }
+    
+    /// <summary>
+    /// Full reset for starting a new run. Clears all run-specific state.
+    /// Only meta-progression (talents, elemental ascensions) persists - those are managed externally.
+    /// </summary>
+    public void ResetForNewRun()
+    {
+        // Reset to minimal defaults - SelectCharacter will set real stats from character JSON
+        maxHealth = 100;
+        health = maxHealth;
+        baseDamage = 10;
+        gold = 0;
+        maxEnergy = 100;
+        energy = 0;
+        critChance = 5;
+        critDamage = 1.5f;
+        baseResistance = 10;
+        bonusResistance = 0;
+        
+        // Clear all run-specific collections
+        relics.Clear();
+        potionInventory.Clear();
+        
+        // Reset temporary bonuses
+        tempCritChanceBonus = 0;
+        tempCritDamageBonus = 0;
+        
+        // Reset skill enchantments (sigils don't carry over)
+        for (int i = 0; i < 5; i++)
+        {
+            skillElements[i] = Element.None;
+            skillCooldowns[i] = 0;
+        }
+        
+        // Clear status effects (shield, block, etc.)
+        statusEffects.ClearAll();
+        
+        // Reset combat tracking
+        combatTurnCount = 0;
+        dirtyStabConsecutiveUses = 0;
+        currentAP = maxAP;
+        
+        // Reset wound/threshold tracking
+        lowestThresholdLevel = -1;
+        
+        // Clear affinity (will be set when character is selected)
+        affinity = Element.None;
+        selectedCharacter = null;
+        
+        // Reset elemental damage bonuses
+        elementalDamage = new ElementalDamage();
+        
+        GameLog.System(GameLog.Join(
+            "NewRunReset",
+            GameLog.KV("hp", $"{health}/{maxHealth}"),
+            GameLog.KV("gold", gold),
+            GameLog.KV("relics", 0),
+            GameLog.KV("potions", 0)
+        ));
     }
 }

@@ -232,31 +232,9 @@ public class PlayerStatsUI : MonoBehaviour
         sb.AppendLine($"Character: {characterName}");
         
         var affinity = player.GetAffinity();
-        
-        if (player.HasElementPair())
-        {
-            var orbA = player.GetOrbAElement();
-            var orbB = player.GetOrbBElement();
-            string orbAColor = GetElementColor(orbA);
-            string orbBColor = GetElementColor(orbB);
-            sb.AppendLine($"Orb A: <color={orbAColor}>{orbA}</color>");
-            sb.AppendLine($"Orb B: <color={orbBColor}>{orbB}</color>");
-            
-            var orbSystem = player.GetOrbSystem();
-            if (orbSystem.IsOrbAActive || orbSystem.IsOrbBActive)
-            {
-                string markStatus = "";
-                if (orbSystem.IsOrbAActive) markStatus += $"A:{orbSystem.OrbAMark} ";
-                if (orbSystem.IsOrbBActive) markStatus += $"B:{orbSystem.OrbBMark}";
-                sb.AppendLine($"<color=#ffaa55>Marks: {markStatus.Trim()}</color>");
-            }
-        }
-        else
-        {
-            string affinityColor = GetElementColor(affinity);
-            string affinityName = affinity != Element.None ? affinity.ToString() : "None";
-            sb.AppendLine($"Affinity: <color={affinityColor}>{affinityName}</color>");
-        }
+        string affinityColor = GetElementColor(affinity);
+        string affinityName = affinity != Element.None ? affinity.ToString() : "None";
+        sb.AppendLine($"Affinity: <color={affinityColor}>{affinityName}</color>");
         
         // Health & Shield permanent stats
         sb.AppendLine("<color=#ffffff><b>HEALTH</b></color>");
@@ -275,31 +253,16 @@ public class PlayerStatsUI : MonoBehaviour
             int.TryParse(parts[1], out baseMax);
         }
 
-        // Active elemental bonuses depend on player's choice (pair or single affinity)
+        // Active elemental bonuses based on affinity
         int totalBonus = 0;
         sb.AppendLine($"Base Damage: {baseMin}-{baseMax}");
 
-        if (player.HasElementPair())
-        {
-            var elemA = player.GetOrbAElement();
-            var elemB = player.GetOrbBElement();
-            int bonusA = player.GetElementalBonus(elemA);
-            int bonusB = player.GetElementalBonus(elemB);
-            totalBonus = bonusA + bonusB;
-            string colorA = GetElementColor(elemA);
-            string colorB = GetElementColor(elemB);
-            sb.AppendLine($"Bonus <color={colorA}>{elemA}</color> Damage: {bonusA}");
-            sb.AppendLine($"Bonus <color={colorB}>{elemB}</color> Damage: {bonusB}");
-        }
-        else
-        {
-            var aff = player.GetAffinity();
-            int affBonus = aff != Element.None ? player.GetElementalBonus(aff) : 0;
-            totalBonus = affBonus;
-            string affColor = GetElementColor(aff);
-            string affLabel = aff != Element.None ? $"<color={affColor}>{aff}</color>" : "None";
-            sb.AppendLine($"Bonus {affLabel} Damage: {affBonus}");
-        }
+        var aff = player.GetAffinity();
+        int affBonus = aff != Element.None ? player.GetElementalBonus(aff) : 0;
+        totalBonus = affBonus;
+        string affColor = GetElementColor(aff);
+        string affLabel = aff != Element.None ? $"<color={affColor}>{aff}</color>" : "None";
+        sb.AppendLine($"Bonus {affLabel} Damage: {affBonus}");
 
         int totalMinRange = baseMin + totalBonus;
         int totalMaxRange = baseMax + totalBonus;
@@ -363,30 +326,9 @@ public class PlayerStatsUI : MonoBehaviour
         string color = GetElementColor(element);
         string marker = "";
         
-        if (player.HasElementPair())
+        if (element == affinity)
         {
-            bool isA = element == player.GetOrbAElement();
-            bool isB = element == player.GetOrbBElement();
-            if (isA && isB)
-            {
-                marker = " <-A,B"; // edge case if both are same (shouldn't happen with distinct pairs)
-            }
-            else if (isA)
-            {
-                marker = " <-A";
-            }
-            else if (isB)
-            {
-                marker = " <-B";
-            }
-        }
-        else
-        {
-            // Legacy single-affinity indication
-            if (element == affinity)
-            {
-                marker = " <-";
-            }
+            marker = " <-";
         }
         
         return $"<color={color}>{element}:</color> +{bonus}{marker}";
@@ -394,25 +336,8 @@ public class PlayerStatsUI : MonoBehaviour
 
     private string FormatElementResistance(Element element, Player player, Element affinity, int baseRes, int bonusRes)
     {
-        bool getsBonus;
-        string marker = "";
-        if (player.HasElementPair())
-        {
-            bool isA = element == player.GetOrbAElement();
-            bool isB = element == player.GetOrbBElement();
-            getsBonus = isA || isB;
-            if (isA && isB)
-                marker = " <-A,B";
-            else if (isA)
-                marker = " <-A";
-            else if (isB)
-                marker = " <-B";
-        }
-        else
-        {
-            getsBonus = (element == affinity && affinity != Element.None);
-            if (getsBonus) marker = " <-";
-        }
+        bool getsBonus = (element == affinity && affinity != Element.None);
+        string marker = getsBonus ? " <-" : "";
 
         int total = baseRes + (getsBonus ? bonusRes : 0);
         string color = GetElementColor(element);

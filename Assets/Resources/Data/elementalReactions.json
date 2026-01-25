@@ -1,0 +1,29 @@
+{
+  "reactions": [
+    { "id": "Fire_Fire", "name": "Pyroclasm", "damageMultiplier": 1.3 },
+    { "id": "Fire_Ice", "name": "Frostfire", "damageMultiplier": 1.5 },
+    { "id": "Fire_Water", "name": "Smother", "damageMultiplier": 1.25 },
+    { "id": "Fire_Wind", "name": "Inferno", "damageMultiplier": 1.2 },
+    { "id": "Fire_Rock", "name": "Cinderquake", "damageMultiplier": 1.35 },
+    { "id": "Ice_Fire", "name": "Melt", "damageMultiplier": 1.75 },
+    { "id": "Ice_Ice", "name": "Coldsnap", "damageMultiplier": 1.3 },
+    { "id": "Ice_Water", "name": "Freeze", "damageMultiplier": 1.0 },
+    { "id": "Ice_Wind", "name": "Blizzard", "damageMultiplier": 1.2 },
+    { "id": "Ice_Rock", "name": "Glacial Fracture", "damageMultiplier": 1.3 },
+    { "id": "Water_Fire", "name": "Vaporize", "damageMultiplier": 1.5 },
+    { "id": "Water_Ice", "name": "Freeze", "damageMultiplier": 1.0 },
+    { "id": "Water_Water", "name": "Tidal Surge", "damageMultiplier": 1.3 },
+    { "id": "Water_Wind", "name": "Monsoon", "damageMultiplier": 1.2 },
+    { "id": "Water_Rock", "name": "Tsunami", "damageMultiplier": 1.35 },
+    { "id": "Wind_Fire", "name": "Backdraft", "damageMultiplier": 1.3 },
+    { "id": "Wind_Ice", "name": "Howling Blast", "damageMultiplier": 1.25 },
+    { "id": "Wind_Water", "name": "Mist", "damageMultiplier": 1.1 },
+    { "id": "Wind_Wind", "name": "Tornado", "damageMultiplier": 1.2 },
+    { "id": "Wind_Rock", "name": "Stone Gale", "damageMultiplier": 1.25 },
+    { "id": "Rock_Fire", "name": "Magma", "damageMultiplier": 1.5 },
+    { "id": "Rock_Ice", "name": "Icequake", "damageMultiplier": 1.35 },
+    { "id": "Rock_Water", "name": "Mudslide", "damageMultiplier": 1.3 },
+    { "id": "Rock_Wind", "name": "Dust Storm", "damageMultiplier": 1.2 },
+    { "id": "Rock_Rock", "name": "Fortify", "damageMultiplier": 1.3 }
+  ]
+}

@@ -1,0 +1,112 @@
+{
+  "potions": [
+    {
+      "id": "potion_health_small",
+      "displayName": "Small Health Potion",
+      "potionID": 1,
+      "statAffected": "Health",
+      "amount": 25,
+      "rarity": "Common",
+      "description": "Restores 25 health instantly"
+    },
+    {
+      "id": "potion_health_medium",
+      "displayName": "Medium Health Potion",
+      "potionID": 2,
+      "statAffected": "Health",
+      "amount": 50,
+      "rarity": "Uncommon",
+      "description": "Restores 50 health instantly"
+    },
+    {
+      "id": "potion_health_large",
+      "displayName": "Large Health Potion",
+      "potionID": 3,
+      "statAffected": "Health",
+      "amount": 75,
+      "rarity": "Rare",
+      "description": "Restores 75 health instantly"
+    },
+    {
+      "id": "potion_elemental_small",
+      "displayName": "Small Elemental Impact Potion",
+      "potionID": 4,
+      "statAffected": "Elemental Affinity Direct Damage",
+      "amount": 10,
+      "rarity": "Common",
+      "description": "Increases elemental damage by 10 for the current combat"
+    },
+    {
+      "id": "potion_elemental_medium",
+      "displayName": "Medium Elemental Impact Potion",
+      "potionID": 5,
+      "statAffected": "Elemental Affinity Direct Damage",
+      "amount": 20,
+      "rarity": "Uncommon",
+      "description": "Increases elemental damage by 20 for the current combat"
+    },
+    {
+      "id": "potion_elemental_large",
+      "displayName": "Large Elemental Impact Potion",
+      "potionID": 6,
+      "statAffected": "Elemental Affinity Direct Damage",
+      "amount": 40,
+      "rarity": "Rare",
+      "description": "Increases elemental damage by 40 for the current combat"
+    },
+    {
+      "id": "potion_crit_rate_small",
+      "displayName": "Small Crit Rate Potion",
+      "potionID": 7,
+      "statAffected": "Crit Rate",
+      "amount": 5,
+      "rarity": "Common",
+      "description": "Increases critical hit chance by 5% for the current combat"
+    },
+    {
+      "id": "potion_crit_rate_medium",
+      "displayName": "Medium Crit Rate Potion",
+      "potionID": 8,
+      "statAffected": "Crit Rate",
+      "amount": 10,
+      "rarity": "Uncommon",
+      "description": "Increases critical hit chance by 10% for the current combat"
+    },
+    {
+      "id": "potion_crit_rate_large",
+      "displayName": "Large Crit Rate Potion",
+      "potionID": 9,
+      "statAffected": "Crit Rate",
+      "amount": 15,
+      "rarity": "Rare",
+      "description": "Increases critical hit chance by 15% for the current combat"
+    },
+    {
+      "id": "potion_crit_damage_small",
+      "displayName": "Small Crit Damage Potion",
+      "potionID": 10,
+      "statAffected": "Crit Damage",
+      "amount": 10,
+      "rarity": "Common",
+      "description": "Increases critical hit damage by 10% for the current combat"
+    },
+    {
+      "id": "potion_crit_damage_medium",
+      "displayName": "Medium Crit Damage Potion",
+      "potionID": 11,
+      "statAffected": "Crit Damage",
+      "amount": 20,
+      "rarity": "Uncommon",
+      "description": "Increases critical hit damage by 20% for the current combat"
+    },
+    {
+      "id": "potion_crit_damage_large",
+      "displayName": "Large Crit Damage Potion",
+      "potionID": 12,
+      "statAffected": "Crit Damage",
+      "amount": 30,
+      "rarity": "Rare",
+      "description": "Increases critical hit damage by 30% for the current combat"
+    }
+  ]
+}

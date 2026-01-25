@@ -130,11 +130,7 @@ public class MysteryNode : NodeBase
         
         Element playerElement = Element.None;
         
-        if (refs.player.HasElementPair())
-        {
-            playerElement = Random.Range(0, 2) == 0 ? refs.player.GetOrbAElement() : refs.player.GetOrbBElement();
-        }
-        else if (refs.player.HasAffinity())
+        if (refs.player.HasAffinity())
         {
             playerElement = refs.player.GetAffinity();
         }

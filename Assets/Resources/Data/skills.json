@@ -4,7 +4,11 @@
       "id": "skill_slash",
       "displayName": "Slash",
       "description": "Basic sword strike",
-      "cooldownTurns": 1,
+      "cooldownTurns": 0,
+      "apCost": 2,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "SelectedEnemy" },
@@ -23,6 +27,10 @@
       "displayName": "Riposte",
       "description": "Defensive counter that blocks 50% of the next hit",
       "cooldownTurns": 2,
+      "apCost": 3,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "SelectedEnemy" },
@@ -46,6 +54,10 @@
       "displayName": "Bladestorm",
       "description": "Whirlwind attack hitting all enemies",
       "cooldownTurns": 4,
+      "apCost": 4,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "Self" },
@@ -63,7 +75,11 @@
       "id": "skill_bolt",
       "displayName": "Bolt",
       "description": "Quick magic projectile with burning effect",
-      "cooldownTurns": 1,
+      "cooldownTurns": 0,
+      "apCost": 2,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "SelectedEnemy" },
@@ -87,6 +103,10 @@
       "displayName": "Ray",
       "description": "Focused beam hitting all enemies",
       "cooldownTurns": 3,
+      "apCost": 3,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "AllEnemies" },
@@ -105,6 +125,10 @@
       "displayName": "Meteor",
       "description": "Devastating AOE impact that stuns all enemies",
       "cooldownTurns": 4,
+      "apCost": 5,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "Self" },
@@ -127,7 +151,11 @@
       "id": "skill_aimedshot",
       "displayName": "AimedShot",
       "description": "Precise shot with increased critical chance and damage",
-      "cooldownTurns": 1,
+      "cooldownTurns": 0,
+      "apCost": 2,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "Self" },
@@ -151,6 +179,10 @@
       "displayName": "TripleShot",
       "description": "Rapid fire hitting target 3 times",
       "cooldownTurns": 3,
+      "apCost": 3,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "SelectedEnemy" },
@@ -174,6 +206,10 @@
       "displayName": "DoubleUp",
       "description": "Two arrows, one target. If target dies, next target takes 150% damage",
       "cooldownTurns": 5,
+      "apCost": 4,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "Self" },
@@ -197,7 +233,11 @@
       "id": "skill_dirtystab",
       "displayName": "DirtyStab",
       "description": "Underhanded strike. Can chain 3 times with +20% damage per stack. Then 4-turn cooldown.",
-      "cooldownTurns": 1,
+      "cooldownTurns": 0,
+      "apCost": 2,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "SelectedEnemy" },
@@ -216,6 +256,10 @@
       "displayName": "CheapShot",
       "description": "Quick jab that stuns the enemy",
       "cooldownTurns": 3,
+      "apCost": 3,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "SelectedEnemy" },
@@ -239,6 +283,10 @@
       "displayName": "Ambush",
       "description": "Strike from shadows. On kill: CD becomes 2 turns, refund 40% energy",
       "cooldownTurns": 6,
+      "apCost": 5,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "Self" },
@@ -262,7 +310,11 @@
       "id": "skill_shock",
       "displayName": "Shock",
       "description": "Electric jolt",
-      "cooldownTurns": 1,
+      "cooldownTurns": 0,
+      "apCost": 2,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "SelectedEnemy" },
@@ -281,6 +333,10 @@
       "displayName": "Judgement",
       "description": "Divine strike that heals for 20% of damage dealt",
       "cooldownTurns": 2,
+      "apCost": 3,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "SelectedEnemy" },
@@ -304,6 +360,10 @@
       "displayName": "HolyNova",
       "description": "Holy explosion hitting all enemies. Gain shield equal to 70% of damage dealt",
       "cooldownTurns": 4,
+      "apCost": 4,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "Self" },
@@ -327,6 +387,10 @@
       "displayName": "ShieldBash",
       "description": "Bash enemy with shield, dealing damage and reducing their damage",
       "cooldownTurns": 2,
+      "apCost": 2,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "SelectedEnemy" },
@@ -350,6 +414,10 @@
       "displayName": "WarCry",
       "description": "Boost your damage for the next 2 turns",
       "cooldownTurns": 3,
+      "apCost": 2,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "Self" },
@@ -368,6 +436,10 @@
       "displayName": "FrostNova",
       "description": "Freeze nearby enemies, slowing them",
       "cooldownTurns": 2,
+      "apCost": 3,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "AllEnemies" },
@@ -391,6 +463,10 @@
       "displayName": "ArcaneShield",
       "description": "Create a magical barrier that absorbs damage",
       "cooldownTurns": 3,
+      "apCost": 2,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "Self" },
@@ -409,6 +485,10 @@
       "displayName": "PiercingArrow",
       "description": "Arrow that ignores armor, dealing true damage",
       "cooldownTurns": 2,
+      "apCost": 3,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "SelectedEnemy" },
@@ -427,6 +507,10 @@
       "displayName": "EvasiveRoll",
       "description": "Dodge the next attack and counter",
       "cooldownTurns": 3,
+      "apCost": 2,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "Self" },
@@ -445,6 +529,10 @@
       "displayName": "SmokeBomb",
       "description": "Throw smoke to blind enemies, reducing their accuracy",
       "cooldownTurns": 2,
+      "apCost": 2,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "AllEnemies" },
@@ -463,6 +551,10 @@
       "displayName": "Backstab",
       "description": "Strike from behind for critical damage",
       "cooldownTurns": 2,
+      "apCost": 3,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "Self" },
@@ -486,6 +578,10 @@
       "displayName": "DivineShield",
       "description": "Holy protection that shields and heals",
       "cooldownTurns": 3,
+      "apCost": 3,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "Self" },
@@ -509,6 +605,10 @@
       "displayName": "Smite",
       "description": "Call down holy fire on an enemy",
       "cooldownTurns": 2,
+      "apCost": 3,
+      "element": "none",
+      "markChance": 100,
+      "markCount": 1,
       "executions": [
         {
           "target": { "selector": "SelectedEnemy" },

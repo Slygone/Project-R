@@ -18,7 +18,6 @@ public class Referencer : MonoBehaviour
     public ShopUI shopUI;
     public PotionUI potionUI;
     public RestUI restUI;
-    public InfusionUI infusionUI;
     public ReactionQTEPanel reactionQTEPanel;
     public MysteryUI mysteryUI;
     public DefensiveQTE defensiveQTE;
@@ -111,13 +110,6 @@ public class Referencer : MonoBehaviour
             restUI = restObj.AddComponent<RestUI>();
         }
         
-        infusionUI = FindFirstObjectByType<InfusionUI>();
-        if (infusionUI == null)
-        {
-            var infusionObj = new GameObject("InfusionUI");
-            infusionUI = infusionObj.AddComponent<InfusionUI>();
-        }
-        
         reactionQTEPanel = FindFirstObjectByType<ReactionQTEPanel>();
         if (reactionQTEPanel == null)
         {
@@ -132,13 +124,6 @@ public class Referencer : MonoBehaviour
             mysteryUI = mysteryObj.AddComponent<MysteryUI>();
         }
         
-        // Debug overlay for testing (Phase 0)
-        var debugOverlay = FindFirstObjectByType<DebugOverlay>();
-        if (debugOverlay == null)
-        {
-            var debugObj = new GameObject("DebugOverlay");
-            debugObj.AddComponent<DebugOverlay>();
-        }
         
         // Defensive QTE (Phase 3)
         defensiveQTE = FindFirstObjectByType<DefensiveQTE>();

@@ -9,7 +9,6 @@ public class GameManager : MonoBehaviour
     private static bool pairRerollUsed = false;
     private const int MAX_WORLD = 5;
     private bool affinityChosen = false;
-    private bool elementPairChosen = false;
     private bool characterChosen = false;
     
     // Track which character is used for the current run (for ascension award)
@@ -160,65 +159,50 @@ public class GameManager : MonoBehaviour
         currentRunCharacter = character;
         characterChosen = true;
         
-        // Apply character to player
+        // IMPORTANT: Reset player state before applying new character
+        // This clears relics, potions, gold, shields, skill enchantments from previous run
         if (refs != null && refs.player != null)
         {
+            refs.player.ResetForNewRun();
             refs.player.SelectCharacter(character);
         }
         
+        // Reset world and node tracking
+        currentWorld = 1;
+        completedNodes = 0;
+        runXP = 0;
+        runDetonatorXP.Clear();
+        pairRerollUsed = false;
+        UpdateNodeCounter();
+        
         Debug.Log($"[GameManager] Starting run with {character.DisplayName}");
         
-        // Now show orb pair selection
-        StartAffinitySelection();
+        // Skip orb selection - new elemental mark system doesn't use orb pairs
+        SkipAffinitySelection();
     }
     
     public int GetTotalNodesForCurrentWorld() => DataCache.GetWorldEncounter(currentWorld).NodeCount;
 
-    private void StartAffinitySelection()
+    private void SkipAffinitySelection()
     {
-        if (refs != null && refs.playerController != null)
-        {
-            refs.playerController.SetCanMove(false);
-        }
-
-        if (refs != null && refs.affinitySelectionUI != null)
-        {
-            refs.affinitySelectionUI.ShowPairSelection(OnElementPairChosen);
-        }
-        else
-        {
-            Debug.LogError("[GameManager] AffinitySelectionUI not found");
-            elementPairChosen = true;
-            if (refs != null && refs.playerController != null)
-            {
-                refs.playerController.SetCanMove(true);
-            }
-        }
-    }
-    
-    private void OnElementPairChosen(ElementPair pair)
-    {
-        elementPairChosen = true;
+        // New system: No orb pair selection needed
+        // Skills can be enchanted with sigils dropped from enemies
         affinityChosen = true;
-
-        if (refs != null && refs.player != null)
-        {
-            refs.player.SetElementPair(pair);
-        }
-
+        
         if (refs != null && refs.playerController != null)
         {
             refs.playerController.SetCanMove(true);
         }
-
-        if (refs != null && refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
-        {
-            refs.playerStatsUI.UpdateStats();
-        }
-
-        Debug.Log($"[GameManager] Run started with {refs.player.GetCharacter().DisplayName} and {pair.DisplayName} orb pair");
+        
+        Debug.Log($"[GameManager] Run started with {refs.player.GetCharacter().DisplayName} (no orb pair - using new elemental mark system)");
     }
-
+    
+    private void StartAffinitySelection()
+    {
+        // DEPRECATED: Old orb pair selection - now skipped
+        SkipAffinitySelection();
+    }
+    
     private void StartCharacterSelection()
     {
         if (refs != null && refs.characterSelectionUI != null)
@@ -270,7 +254,6 @@ public class GameManager : MonoBehaviour
     }
 
     public bool HasAffinityBeenChosen() => affinityChosen;
-    public bool HasElementPairBeenChosen() => elementPairChosen;
     public bool HasCharacterBeenChosen() => characterChosen;
 
     public void OnNodeCompleted()
@@ -559,7 +542,6 @@ public class GameManager : MonoBehaviour
         completedNodes = 0;
         pairRerollUsed = false;
         affinityChosen = false;
-        elementPairChosen = false;
         characterChosen = false;
         currentRunCharacter = null;
         ResetRunXP();

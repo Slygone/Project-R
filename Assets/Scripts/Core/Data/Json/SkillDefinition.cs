@@ -8,6 +8,10 @@ public class SkillDefinition
     public string displayName;
     public string description;
     public int cooldownTurns;
+    public int apCost = 2; // Action Points cost per use
+    public string element = "none"; // Enchanted element (none, fire, water, lightning, ice, earth)
+    public int markChance = 100; // Chance to apply mark (0-100)
+    public int markCount = 1; // Number of marks to apply
     public List<SkillExecution> executions;
 }
 

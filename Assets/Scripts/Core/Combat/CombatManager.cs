@@ -8,7 +8,6 @@ public class CombatManager : MonoBehaviour
     private List<CombatEnemy> enemies = new List<CombatEnemy>();
     private Player player;
     private CombatUI combatUI;
-    private InfusionUI infusionUI;
     private ReactionQTEPanel qtePanel;
     private bool isPlayerTurn = true;
     private bool combatActive = false;
@@ -58,18 +57,35 @@ public class CombatManager : MonoBehaviour
         var encounter = DataCache.GetWorldEncounter(world);
         int bossCount = encounter.BossEnemy;
         
-        if (DataCache.BossEnemies.Count > 0)
+        // Ensure DataCache is loaded
+        if (!DataCache.IsLoaded)
         {
-            for (int i = 0; i < bossCount; i++)
-            {
-                var bossData = DataCache.BossEnemies[Random.Range(0, DataCache.BossEnemies.Count)];
-                enemies.Add(new CombatEnemy(bossData, world));
-            }
+            DataCache.LoadAll();
+        }
+        
+        if (DataCache.BossEnemies == null || DataCache.BossEnemies.Count == 0)
+        {
+            Debug.LogError($"[CombatManager] No boss enemies loaded! Cannot start boss fight for world {world}");
+            // Don't auto-win - show error state
+            onBossCombatComplete?.Invoke(false);
+            return;
+        }
+        
+        for (int i = 0; i < bossCount; i++)
+        {
+            var bossData = DataCache.BossEnemies[Random.Range(0, DataCache.BossEnemies.Count)];
+            enemies.Add(new CombatEnemy(bossData, world));
         }
 
         combatActive = true;
         isPlayerTurn = true;
         isEndingCombat = false;
+        
+        // Ensure player combat state is reset (sets AP to max, clears per-combat effects)
+        if (player != null)
+        {
+            player.ResetCombatState();
+        }
 
         string bossNames = string.Join(" & ", enemies.ConvertAll(e => e.Name));
         GameLog.Combat(GameLog.Join(
@@ -87,6 +103,9 @@ public class CombatManager : MonoBehaviour
         if (combatUI != null)
         {
             combatUI.ShowCombat(enemies, player, title);
+            // Refresh skill/AP displays to reflect reset state
+            combatUI.UpdateSkillButtons(player);
+            combatUI.UpdateAPDisplay(player);
         }
     }
 
@@ -165,54 +184,30 @@ public class CombatManager : MonoBehaviour
             OnPlayerAttackTarget(target);
         }
     }
+    
+    /// <summary>
+    /// End the player's turn manually (called by End Turn button).
+    /// </summary>
+    public void EndPlayerTurn()
+    {
+        if (!combatActive || !isPlayerTurn) return;
+        
+        GameLog.Combat(GameLog.Join("EndTurnClicked"));
+        
+        isPlayerTurn = false;
+        StartCoroutine(DelayedEnemyTurn());
+    }
 
     public void OnPlayerAttackTarget(CombatEnemy target)
     {
         if (!combatActive || !isPlayerTurn) return;
         if (target == null || !target.IsAlive()) return;
 
-        if (player.HasElementPair())
-        {
-            if (player.HasReactionReady())
-            {
-                TriggerReactionAction(target, 0, true);
-            }
-            else
-            {
-                RequestInfusion(target, 0, true);
-            }
-        }
-        else
-        {
-            ExecuteAttack(target);
-        }
+        // New mark system: Just execute the attack directly
+        // Marks will be applied based on skill element enchantments
+        ExecuteAttack(target);
     }
     
-    private void RequestInfusion(CombatEnemy target, int skillNumber, bool isAttack)
-    {
-        pendingTarget = target;
-        pendingSkillNumber = skillNumber;
-        pendingIsAttack = isAttack;
-        
-        if (infusionUI == null)
-        {
-            infusionUI = FindFirstObjectByType<InfusionUI>();
-        }
-        
-        if (infusionUI != null)
-        {
-            string actionName = isAttack ? "Attack" : GetSkillName(skillNumber);
-            infusionUI.Show(player, actionName, OnInfusionSelected);
-        }
-        else
-        {
-            GameLog.Warn(GameLogCategory.Combat, "[Combat]", "InfusionMissing | action=execute_without_infusion");
-            if (isAttack)
-                ExecuteAttack(target);
-            else
-                ExecuteSkill(skillNumber, target);
-        }
-    }
     
     private string GetSkillName(int skillNumber)
     {
@@ -226,14 +221,6 @@ public class CombatManager : MonoBehaviour
             3 => character.Skill3,
             _ => $"Skill {skillNumber}"
         };
-    }
-    
-    private void OnInfusionSelected(bool useOrbA)
-    {
-        pendingInfusedElement = player.GetInfusedElement(useOrbA);
-        player.InfuseOrb(useOrbA);
-        
-        ExecuteActionWithoutReaction();
     }
     
     private void OnQTEComplete(QTEResult result)
@@ -288,44 +275,61 @@ public class CombatManager : MonoBehaviour
         pendingReactionDetonator = Element.None;
     }
     
+    // DEPRECATED: Old orb-based reaction system - now using new mark system
     private void TriggerReactionAction(CombatEnemy target, int skillNumber, bool isAttack)
     {
+        // This method is no longer used - reactions are now triggered by the mark system
+        // When 6 marks of same element OR 3+3 of different elements are applied to an enemy
+        GameLog.Combat(GameLog.Join("DeprecatedMethod", GameLog.KV("method", "TriggerReactionAction")));
+    }
+    
+    /// <summary>
+    /// New mark-based reaction trigger. Called when marks reach threshold on an enemy.
+    /// </summary>
+    private void TriggerMarkReaction(CombatEnemy target, ReactionTriggerInfo reactionInfo)
+    {
+        if (target == null || reactionInfo == null) return;
+        
         pendingTarget = target;
-        pendingSkillNumber = skillNumber;
-        pendingIsAttack = isAttack;
+        pendingReactionFirstElement = reactionInfo.PrimaryElement;
+        pendingReactionDetonator = reactionInfo.SecondaryElement != Element.None ? reactionInfo.SecondaryElement : reactionInfo.PrimaryElement;
+        pendingInfusedElement = reactionInfo.PrimaryElement;
+        pendingReactionId = reactionInfo.GetReactionId();
         
-        var orbSystem = player.GetOrbSystem();
-        pendingReactionFirstElement = orbSystem.GetFirstElement();
-        pendingReactionDetonator = orbSystem.DetonatorElement;
-        pendingInfusedElement = orbSystem.DetonatorElement;
-        pendingReactionId = orbSystem.GetReactionId();
-        
-        // Get reaction data from CSV via directional ReactionId
+        // Get reaction data from CSV
         var reactionDef = DataCache.GetReactionDef(pendingReactionId);
-        pendingReactionName = reactionDef.Name;
-        pendingReactionMultiplier = reactionDef.DamageMultiplier;
+        if (reactionDef == null)
+        {
+            // Fallback for unknown reactions
+            pendingReactionName = reactionInfo.IsSingleElement ? $"{reactionInfo.PrimaryElement} Burst" : $"{reactionInfo.PrimaryElement}-{reactionInfo.SecondaryElement} Fusion";
+            pendingReactionMultiplier = reactionInfo.IsSingleElement ? 1.5f : 2.0f;
+        }
+        else
+        {
+            pendingReactionName = reactionDef.Name;
+            pendingReactionMultiplier = reactionDef.DamageMultiplier;
+        }
         
-        var effects = DataCache.GetReactionEffects(pendingReactionId);
-        
-        orbSystem.ClearMarks();
+        // Consume the marks
+        target.ConsumeMarksForReaction(reactionInfo);
         
         string attackerName = player != null && player.GetCharacter() != null ? player.GetCharacter().DisplayName : "Player";
         GameLog.Reaction(GameLog.Join(
-            "Trigger",
+            "MarkReactionTrigger",
             GameLog.KV("id", pendingReactionId),
             GameLog.KV("name", pendingReactionName),
             GameLog.KV("mult", pendingReactionMultiplier.ToString("F2")),
-            GameLog.KV("first", pendingReactionFirstElement),
-            GameLog.KV("det", pendingReactionDetonator),
+            GameLog.KV("type", reactionInfo.IsSingleElement ? "single" : "dual"),
+            GameLog.KV("primary", reactionInfo.PrimaryElement),
+            GameLog.KV("secondary", reactionInfo.SecondaryElement),
             GameLog.KV("attacker", attackerName),
-            GameLog.KV("target", pendingTarget != null ? pendingTarget.Name : "null"),
-            GameLog.KV("effects", effects.Count)
+            GameLog.KV("target", target.Name)
         ));
         
-        // Show reaction floating text on target
-        if (combatUI != null && pendingTarget != null)
+        // Show reaction floating text
+        if (combatUI != null)
         {
-            combatUI.ShowReactionToEnemy(pendingTarget, pendingReactionName, pendingReactionMultiplier);
+            combatUI.ShowReactionToEnemy(target, pendingReactionName, pendingReactionMultiplier);
         }
         
         if (qtePanel == null)
@@ -426,8 +430,12 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
-        isPlayerTurn = false;
-        StartCoroutine(DelayedEnemyTurn());
+        // Player can continue using skills - turn does NOT end after attack
+        if (combatUI != null)
+        {
+            combatUI.UpdateSkillButtons(player);
+            combatUI.UpdateAPDisplay(player);
+        }
     }
     
     private void ExecuteAttackWithReaction(CombatEnemy target, float reactionMultiplier, float qteMultiplier, Element? forcedElement, QTEResult qteResult)
@@ -526,8 +534,12 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
-        isPlayerTurn = false;
-        StartCoroutine(DelayedEnemyTurn());
+        // Player can continue using skills - turn does NOT end after reaction
+        if (combatUI != null)
+        {
+            combatUI.UpdateSkillButtons(player);
+            combatUI.UpdateAPDisplay(player);
+        }
     }
 
     public void OnPlayerSkill(int skillNumber)
@@ -570,6 +582,20 @@ public class CombatManager : MonoBehaviour
             return;
         }
         
+        // Check AP cost
+        int apCost = GetSkillAPCost(character, skillNumber);
+        if (!player.HasEnoughAP(apCost))
+        {
+            GameLog.Combat(GameLog.Join(
+                "SkillBlocked",
+                GameLog.KV("skill", skillNumber),
+                GameLog.KV("reason", "ap"),
+                GameLog.KV("need", apCost),
+                GameLog.KV("have", player.GetCurrentAP())
+            ), GameLogVerbosity.Verbose);
+            return;
+        }
+        
         // Check energy for Skill 5 (Ultimate)
         if (skillNumber == 5 && !player.CanUseUltimate())
         {
@@ -583,27 +609,19 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
-        if (player.HasElementPair())
-        {
-            if (player.HasReactionReady())
-            {
-                TriggerReactionAction(target, skillNumber, false);
-            }
-            else
-            {
-                RequestInfusion(target, skillNumber, false);
-            }
-        }
-        else
-        {
-            ExecuteSkill(skillNumber, target);
-        }
+        // New mark system: Just execute the skill directly
+        // Marks will be applied based on skill element enchantments
+        ExecuteSkill(skillNumber, target);
     }
     
     private void ExecuteSkill(int skillNumber, CombatEnemy target, float reactionMultiplier = 1f, Element? forcedElement = null)
     {
         var character = player.GetCharacter();
         if (character == null) return;
+
+        // Spend AP for this skill
+        int apCost = GetSkillAPCost(character, skillNumber);
+        player.SpendAP(apCost);
 
         // Get skill info from character data
         string skillName;
@@ -645,7 +663,9 @@ public class CombatManager : MonoBehaviour
         }
         
         string skillLower = skillName.ToLower();
-        Element attackElement = forcedElement ?? player.GetAffinity();
+        // Get skill's enchanted element (from sigil or base character data)
+        Element skillElement = player.GetSkillElement(skillNumber);
+        Element attackElement = forcedElement ?? (skillElement != Element.None ? skillElement : player.GetAffinity());
         
         // Special handling for skills with unique mechanics
         int hitCount = 1;
@@ -679,13 +699,24 @@ public class CombatManager : MonoBehaviour
         
         // Calculate base damage from CSV percent
         float skillMultiplier = skillDamagePercent / 100f;
-        int baseDamage = Mathf.RoundToInt(player.GetCharacterDamage() * skillMultiplier * dirtyStabBonus);
+        int charDamage = player.GetCharacterDamage();
+        int baseDamageBeforeElement = Mathf.RoundToInt(charDamage * skillMultiplier * dirtyStabBonus);
         
-        // Add elemental bonuses
-        int elementalBonus = player.HasElementPair() 
-            ? player.GetElementalBonus(player.GetOrbAElement()) + player.GetElementalBonus(player.GetOrbBElement())
-            : player.GetAffinityBonus();
-        baseDamage += Mathf.RoundToInt(elementalBonus * skillMultiplier);
+        // Add elemental bonus based on skill's element (from enchantment or base)
+        int elementalBonus = attackElement != Element.None ? player.GetElementalBonus(attackElement) : 0;
+        int elementalBonusScaled = Mathf.RoundToInt(elementalBonus * skillMultiplier);
+        int baseDamage = baseDamageBeforeElement + elementalBonusScaled;
+        
+        GameLog.Combat(GameLog.Join(
+            "DamageCalc",
+            GameLog.KV("charDmg", charDamage),
+            GameLog.KV("skillMult", skillMultiplier.ToString("F2")),
+            GameLog.KV("baseBefore", baseDamageBeforeElement),
+            GameLog.KV("element", attackElement),
+            GameLog.KV("elemBonus", elementalBonus),
+            GameLog.KV("elemScaled", elementalBonusScaled),
+            GameLog.KV("baseFinal", baseDamage)
+        ), GameLogVerbosity.Verbose);
         
         int totalDamageDealt = 0;
         
@@ -779,6 +810,62 @@ public class CombatManager : MonoBehaviour
             GameLog.KV("totalDamage", totalDamageDealt)
         ));
         
+        // ========== ELEMENTAL MARK SYSTEM ==========
+        // Apply elemental marks based on skill data (element, markChance, markCount)
+        if (target != null && target.IsAlive())
+        {
+            Element markElement = player.GetSkillElement(skillNumber);
+            int markChance = GetSkillMarkChance(character, skillNumber);
+            int markCount = GetSkillMarkCount(character, skillNumber);
+            
+            if (markElement != Element.None && markChance > 0 && markCount > 0)
+            {
+                int roll = Random.Range(0, 100);
+                if (roll < markChance)
+                {
+                    bool reactionTriggered = target.AddMarks(markElement, markCount);
+                    
+                    GameLog.Combat(GameLog.Join(
+                        "MarkApply",
+                        GameLog.KV("skill", skillName),
+                        GameLog.KV("element", markElement),
+                        GameLog.KV("chance", $"{markChance}%"),
+                        GameLog.KV("roll", roll),
+                        GameLog.KV("marks", markCount),
+                        GameLog.KV("target", target.Name)
+                    ));
+                    
+                    // Check if reaction was triggered
+                    if (reactionTriggered)
+                    {
+                        var reactionInfo = target.GetReactionTriggerInfo();
+                        if (reactionInfo != null)
+                        {
+                            string reactionId = reactionInfo.GetReactionId();
+                            GameLog.Combat(GameLog.Join(
+                                "ElementalReaction",
+                                GameLog.KV("type", reactionInfo.IsSingleElement ? "single" : "dual"),
+                                GameLog.KV("reaction", reactionId),
+                                GameLog.KV("primary", reactionInfo.PrimaryElement),
+                                GameLog.KV("secondary", reactionInfo.SecondaryElement),
+                                GameLog.KV("target", target.Name)
+                            ));
+                            
+                            // Trigger reaction effect (QTE panel or direct execution)
+                            // Note: marks are consumed inside TriggerMarkReaction
+                            TriggerMarkReaction(target, reactionInfo);
+                        }
+                    }
+                    
+                    // Update enemy UI to show marks
+                    if (combatUI != null)
+                    {
+                        combatUI.UpdateEnemyHealth(target);
+                    }
+                }
+            }
+        }
+        
         // Apply skill-specific effects AFTER damage
         ApplySkillEffects(skillLower, skillEffect, target, totalDamageDealt, attackElement);
         
@@ -823,12 +910,49 @@ public class CombatManager : MonoBehaviour
         {
             combatUI.UpdatePlayerEnergy(player);
             combatUI.UpdateSkillButtons(player);
+            combatUI.UpdateAPDisplay(player);
         }
-
-        isPlayerTurn = false;
         
-        // Add combat pacing delay after player action for floating text readability
-        StartCoroutine(DelayedEnemyTurn());
+        // Player can continue using skills if they have AP - turn does NOT end automatically
+    }
+    
+    private int GetSkillAPCost(CharacterData character, int skillNumber)
+    {
+        switch (skillNumber)
+        {
+            case 1: return character.Skill1APCost;
+            case 2: return character.Skill2APCost;
+            case 3: return character.Skill3APCost;
+            case 4: return character.Skill4APCost;
+            case 5: return character.Skill5APCost;
+            default: return 2;
+        }
+    }
+    
+    private int GetSkillMarkChance(CharacterData character, int skillNumber)
+    {
+        switch (skillNumber)
+        {
+            case 1: return character.Skill1MarkChance;
+            case 2: return character.Skill2MarkChance;
+            case 3: return character.Skill3MarkChance;
+            case 4: return character.Skill4MarkChance;
+            case 5: return character.Skill5MarkChance;
+            default: return 0;
+        }
+    }
+    
+    private int GetSkillMarkCount(CharacterData character, int skillNumber)
+    {
+        switch (skillNumber)
+        {
+            case 1: return character.Skill1MarkCount;
+            case 2: return character.Skill2MarkCount;
+            case 3: return character.Skill3MarkCount;
+            case 4: return character.Skill4MarkCount;
+            case 5: return character.Skill5MarkCount;
+            default: return 0;
+        }
     }
     
     private System.Collections.IEnumerator DelayedEnemyTurn()
@@ -1054,9 +1178,7 @@ public class CombatManager : MonoBehaviour
         // Player Skill Attack Order with Reaction:
         // 1. Base damage = (character damage * skill multiplier) + elemental bonus
         int charDamage = player.GetCharacterDamage();
-        int elementalBonus = player.HasElementPair() 
-            ? player.GetElementalBonus(player.GetOrbAElement()) + player.GetElementalBonus(player.GetOrbBElement())
-            : player.GetAffinityBonus();
+        int elementalBonus = player.GetAffinityBonus();
         float baseDamage = (charDamage * skillMultiplier) + (elementalBonus * skillMultiplier);
         
         // 2. Apply variance (0.90-1.10)
@@ -1170,10 +1292,10 @@ public class CombatManager : MonoBehaviour
         {
             combatUI.UpdatePlayerEnergy(player);
             combatUI.UpdateSkillButtons(player);
+            combatUI.UpdateAPDisplay(player);
         }
 
-        isPlayerTurn = false;
-        StartCoroutine(DelayedEnemyTurn());
+        // Player can continue using skills - turn does NOT end after reaction skill
     }
     
     private float GetSkillMultiplier(string skillName)
@@ -1403,23 +1525,31 @@ public class CombatManager : MonoBehaviour
             pendingDefensiveQTEAttacker = enemy;
         }
 
-        float healPercent = DefensiveQTE.GetHealPercent(qteResult);
-        int healAmount = Mathf.RoundToInt(player.GetMaxHealth() * healPercent);
-        if (healAmount > 0)
+        // Convert DefensiveQTEResult to QTEResult for data lookup
+        QTEResult dataResult = qteResult switch
         {
-            player.Heal(healAmount);
+            DefensiveQTEResult.Perfect => QTEResult.Perfect,
+            DefensiveQTEResult.Good => QTEResult.Good,
+            _ => QTEResult.Bad
+        };
+        
+        // Apply shield based on QTE result (percentage of max HP)
+        int shieldPercent = ReactionQTE.GetQteDefensiveShieldPercent(dataResult);
+        int shieldAmount = Mathf.RoundToInt(player.GetMaxHealth() * (shieldPercent / 100f));
+        if (shieldAmount > 0)
+        {
+            player.AddShield(shieldAmount);
             GameLog.Combat(GameLog.Join(
-                "Heal",
+                "ShieldGain",
                 GameLog.KV("who", "Player"),
-                GameLog.KV("amount", healAmount),
+                GameLog.KV("amount", shieldAmount),
                 GameLog.KV("source", $"DefensiveQTE:{qteResult}")
             ));
             
             if (combatUI != null)
             {
                 combatUI.UpdatePlayerHealth(player);
-                // Show heal floating text from QTE
-                combatUI.ShowHealToPlayer(healAmount);
+                combatUI.ShowShieldGainToPlayer(shieldAmount);
             }
         }
 
@@ -1427,7 +1557,7 @@ public class CombatManager : MonoBehaviour
             "DefensiveQTE",
             GameLog.KV("attacker", enemy.Name),
             GameLog.KV("result", qteResult),
-            GameLog.KV("healed", healAmount)
+            GameLog.KV("shieldGained", shieldAmount)
         ), GameLogVerbosity.Verbose);
 
         if (pendingDefensiveQTEDamage > 0)
@@ -1525,10 +1655,14 @@ public class CombatManager : MonoBehaviour
         
         // Tick down cooldowns at start of player's turn
         player.TickCooldowns();
+        
+        // Refresh AP at start of player's turn
+        player.RefreshAP();
 
         if (combatUI != null)
         {
             combatUI.SetPlayerTurn(true);
+            combatUI.UpdateAPDisplay(player);
         }
     }
 
@@ -1543,6 +1677,9 @@ public class CombatManager : MonoBehaviour
 
     private bool AllEnemiesDead()
     {
+        // Guard: if no enemies were spawned, don't consider it a victory
+        if (enemies.Count == 0) return false;
+        
         foreach (var enemy in enemies)
         {
             if (enemy.IsAlive()) return false;
@@ -1576,64 +1713,58 @@ public class CombatManager : MonoBehaviour
             GameLog.KV("type", currentCombatType)
         ));
 
-        // Re-enable player free roam at combat end
-        var pcEnd = FindFirstObjectByType<PlayerController>();
-        if (pcEnd != null) pcEnd.SetCanMove(true);
-
-        if (currentCombatType == CombatType.Boss)
-        {
-            if (combatUI != null)
-            {
-                combatUI.HideCombat();
-            }
-            onBossCombatComplete?.Invoke(victory);
-            onBossCombatComplete = null;
-            return;
-        }
-
         if (victory)
         {
-            // XP System: grant XP based on combat type (Phase 1)
-            int xpReward = currentCombatType switch
+            // Calculate total rewards from all defeated enemies
+            int totalXP = 0;
+            int totalGold = 0;
+            bool dropsSigil = false;
+            bool dropsRelic = false;
+            
+            foreach (var enemy in enemies)
             {
-                CombatType.Elite => 3,
-                CombatType.Boss => 5,
-                _ => 1
-            };
-            GameManager.AddRunXP(xpReward);
-            
-            // Note: Elemental Ascension XP is now awarded per-kill via AwardDetonatorXPForKill()
-            
-            // Gold reward still granted
-            int goldReward = Random.Range(1, 11);
-            
-            if (currentCombatType == CombatType.Elite)
-            {
-                goldReward *= 2;
+                totalXP += enemy.RewardXP;
+                // Roll gold within the enemy's gold range
+                totalGold += Random.Range(enemy.RewardGoldMin, enemy.RewardGoldMax + 1);
                 
-                var mysteryNode = currentNode as MysteryNode;
-                if (mysteryNode != null && mysteryNode.IsEliteFight())
+                // Roll for sigil drop
+                if (enemy.SigilChance > 0 && Random.Range(0, 100) < enemy.SigilChance)
                 {
-                    mysteryNode.GiveEliteRewards();
-                    
-                    if (combatUI != null)
-                    {
-                        combatUI.HideCombat();
-                    }
-                    
-                    if (currentNode != null)
-                    {
-                        currentNode.OnNodeCompleted();
-                    }
-                    currentNode = null;
-                    return;
+                    dropsSigil = true;
+                }
+                
+                // Roll for relic drop
+                if (enemy.RelicChance > 0 && Random.Range(0, 100) < enemy.RelicChance)
+                {
+                    dropsRelic = true;
                 }
             }
-
+            
+            GameManager.AddRunXP(totalXP);
+            
+            GameLog.Combat(GameLog.Join(
+                "CombatRewards",
+                GameLog.KV("type", currentCombatType),
+                GameLog.KV("xp", totalXP),
+                GameLog.KV("gold", totalGold),
+                GameLog.KV("sigil", dropsSigil),
+                GameLog.KV("relic", dropsRelic)
+            ));
+            
+            // Show reward UI for all combat victories
             if (combatUI != null)
             {
-                string lootTitle = currentCombatType == CombatType.Elite ? "ELITE VICTORY!" : "VICTORY!";
-                combatUI.ShowLootPanel(goldReward, xpReward, player, currentNode, lootTitle);
+                bool isElite = currentCombatType == CombatType.Elite;
+                bool isBoss = currentCombatType == CombatType.Boss;
+                combatUI.ShowLootPanel(totalGold, totalXP, player, currentNode, null, isElite, isBoss, dropsSigil, dropsRelic);
+            }
+            
+            // For boss combat, invoke callback after loot is collected (handled in OnLootCollected)
+            if (currentCombatType == CombatType.Boss)
+            {
+                // Store callback to be invoked after loot collection
+                // The callback will be invoked in OnLootCollected
+                return;
             }
         }
         else
@@ -1670,6 +1801,14 @@ public class CombatManager : MonoBehaviour
         // Ensure movement is enabled after loot is collected
         var pcLoot = FindFirstObjectByType<PlayerController>();
         if (pcLoot != null) pcLoot.SetCanMove(true);
+        
+        // Handle boss combat callback after loot collection
+        if (currentCombatType == CombatType.Boss && onBossCombatComplete != null)
+        {
+            var callback = onBossCombatComplete;
+            onBossCombatComplete = null;
+            callback.Invoke(true);
+        }
     }
 
     public bool IsCombatActive() => combatActive;
