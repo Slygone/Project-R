@@ -141,22 +141,46 @@ public static class DataCache
 
     private static List<RestData> LoadRestOptions()
     {
-        var csv = Resources.Load<TextAsset>("Data/rest");
-        var rows = CSVParser.Parse(csv.text);
+        var json = Resources.Load<TextAsset>("Data/rest");
+        if (json == null)
+        {
+            throw new System.Exception("Missing rest.json. Expected at Resources/Data/rest.json");
+        }
+        
+        var wrapper = JsonUtility.FromJson<RestListWrapper>(json.text);
+        if (wrapper == null || wrapper.restOptions == null)
+        {
+            throw new System.Exception("Failed to parse rest.json or restOptions is null");
+        }
+        
         var list = new List<RestData>();
-
-        foreach (var row in rows)
+        foreach (var r in wrapper.restOptions)
         {
             list.Add(new RestData
             {
-                DisplayName = CSVParser.ParseString(row, "DisplayName"),
-                RestID = CSVParser.ParseInt(row, "RestID"),
-                StatAffected = CSVParser.ParseString(row, "Stat Affected"),
-                Amount = CSVParser.ParseInt(row, "Amount")
+                DisplayName = r.displayName,
+                RestID = r.restId,
+                StatAffected = r.statAffected,
+                Amount = r.amount
             });
         }
 
         return list;
+    }
+    
+    [System.Serializable]
+    private class RestListWrapper
+    {
+        public RestJsonEntry[] restOptions;
+    }
+    
+    [System.Serializable]
+    private class RestJsonEntry
+    {
+        public string displayName;
+        public int restId;
+        public string statAffected;
+        public int amount;
     }
 
     private static List<CharacterData> LoadCharactersFromJson()
@@ -177,11 +201,15 @@ public static class DataCache
         var json = Resources.Load<TextAsset>("Data/potions");
         if (json == null)
         {
-            Debug.LogError("[DataCache] potions.json not found");
-            return new List<PotionData>();
+            throw new System.Exception("Missing potions.json. Expected at Resources/Data/potions.json");
         }
         
         var wrapper = JsonUtility.FromJson<PotionListWrapper>(json.text);
+        if (wrapper == null || wrapper.potions == null)
+        {
+            throw new System.Exception("Failed to parse potions.json or potions is null");
+        }
+        
         var list = new List<PotionData>();
         
         foreach (var p in wrapper.potions)
@@ -191,8 +219,9 @@ public static class DataCache
                 Id = p.id,
                 DisplayName = p.displayName,
                 PotionID = p.potionID,
-                StatAffected = p.statAffected,
-                Amount = p.amount,
+                EffectId = p.effectId,
+                EffectValue = p.effectValue,
+                Target = p.target,
                 Rarity = p.rarity,
                 Description = p.description
             });
@@ -206,11 +235,15 @@ public static class DataCache
         var json = Resources.Load<TextAsset>("Data/relics");
         if (json == null)
         {
-            Debug.LogError("[DataCache] relics.json not found");
-            return new List<RelicData>();
+            throw new System.Exception("Missing relics.json. Expected at Resources/Data/relics.json");
         }
         
         var wrapper = JsonUtility.FromJson<RelicListWrapper>(json.text);
+        if (wrapper == null || wrapper.relics == null)
+        {
+            throw new System.Exception("Failed to parse relics.json or relics is null");
+        }
+        
         var list = new List<RelicData>();
         
         foreach (var r in wrapper.relics)
@@ -220,8 +253,9 @@ public static class DataCache
                 Id = r.id,
                 DisplayName = r.displayName,
                 RelicID = r.relicID,
-                StatAffected = r.statAffected,
-                Amount = r.amount,
+                EffectId = r.effectId,
+                EffectValue = r.effectValue,
+                EffectParam = r.effectParam,
                 Rarity = r.rarity,
                 Description = r.description
             });
@@ -243,8 +277,9 @@ public static class DataCache
         public string id;
         public string displayName;
         public int potionID;
-        public string statAffected;
-        public int amount;
+        public string effectId;
+        public int effectValue;
+        public string target;
         public string rarity;
         public string description;
     }
@@ -261,8 +296,9 @@ public static class DataCache
         public string id;
         public string displayName;
         public int relicID;
-        public string statAffected;
-        public int amount;
+        public string effectId;
+        public int effectValue;
+        public string effectParam;
         public string rarity;
         public string description;
     }
@@ -272,50 +308,53 @@ public static class DataCache
         QTEOffensiveMultipliers = new Dictionary<string, float>();
         QTEDefensiveShield = new Dictionary<string, int>();
         
-        var json = Resources.Load<TextAsset>("Data/effects");
-        if (json == null)
+        // Load Offensive QTE from separate file
+        var offensiveJson = Resources.Load<TextAsset>("Data/qteOffensive");
+        if (offensiveJson == null)
         {
-            throw new System.Exception("Missing effects.json. Expected a TextAsset at Resources/Data/effects.json.");
+            throw new System.Exception("Missing qteOffensive.json. Expected at Resources/Data/qteOffensive.json");
         }
         
-        var wrapper = JsonUtility.FromJson<EffectsWrapper>(json.text);
-        if (wrapper == null || wrapper.qteEffects == null)
+        var offensiveWrapper = JsonUtility.FromJson<QTEOffensiveWrapper>(offensiveJson.text);
+        if (offensiveWrapper == null || offensiveWrapper.qteResults == null || offensiveWrapper.qteResults.Length == 0)
         {
-            throw new System.Exception("effects.json missing qteEffects section.");
+            throw new System.Exception("qteOffensive.json is empty or malformed.");
         }
         
-        if (wrapper.qteEffects.offensive == null || wrapper.qteEffects.offensive.Length == 0)
-        {
-            throw new System.Exception("effects.json qteEffects.offensive is empty or missing.");
-        }
-        
-        if (wrapper.qteEffects.defensive == null || wrapper.qteEffects.defensive.Length == 0)
-        {
-            throw new System.Exception("effects.json qteEffects.defensive is empty or missing.");
-        }
-        
-        foreach (var qte in wrapper.qteEffects.offensive)
+        foreach (var qte in offensiveWrapper.qteResults)
         {
             QTEOffensiveMultipliers[qte.result] = qte.multiplier;
         }
         
-        foreach (var qte in wrapper.qteEffects.defensive)
+        // Load Defensive QTE from separate file
+        var defensiveJson = Resources.Load<TextAsset>("Data/qteDefensive");
+        if (defensiveJson == null)
+        {
+            throw new System.Exception("Missing qteDefensive.json. Expected at Resources/Data/qteDefensive.json");
+        }
+        
+        var defensiveWrapper = JsonUtility.FromJson<QTEDefensiveWrapper>(defensiveJson.text);
+        if (defensiveWrapper == null || defensiveWrapper.qteResults == null || defensiveWrapper.qteResults.Length == 0)
+        {
+            throw new System.Exception("qteDefensive.json is empty or malformed.");
+        }
+        
+        foreach (var qte in defensiveWrapper.qteResults)
         {
             QTEDefensiveShield[qte.result] = qte.shieldPercent;
         }
     }
     
     [System.Serializable]
-    private class EffectsWrapper
+    private class QTEOffensiveWrapper
     {
-        public QTEEffectsData qteEffects;
+        public QTEOffensiveEntry[] qteResults;
     }
     
     [System.Serializable]
-    private class QTEEffectsData
+    private class QTEDefensiveWrapper
     {
-        public QTEOffensiveEntry[] offensive;
-        public QTEDefensiveEntry[] defensive;
+        public QTEDefensiveEntry[] qteResults;
     }
     
     [System.Serializable]
@@ -340,15 +379,13 @@ public static class DataCache
         
         if (json == null)
         {
-            Debug.LogWarning("[DataCache] elementalReactions.json not found");
-            return dict;
+            throw new System.Exception("Missing elementalReactions.json. Expected at Resources/Data/elementalReactions.json");
         }
 
         var wrapper = JsonUtility.FromJson<ReactionListWrapper>(json.text);
         if (wrapper == null || wrapper.reactions == null)
         {
-            Debug.LogWarning("[DataCache] Failed to parse elementalReactions.json");
-            return dict;
+            throw new System.Exception("Failed to parse elementalReactions.json or reactions is null");
         }
         
         foreach (var r in wrapper.reactions)
@@ -359,7 +396,8 @@ public static class DataCache
             {
                 ReactionId = r.id,
                 Name = r.name,
-                DamageMultiplier = r.damageMultiplier
+                EffectId = r.effectId,
+                EffectValue = r.effectValue
             };
         }
 
@@ -377,52 +415,67 @@ public static class DataCache
     {
         public string id;
         public string name;
-        public float damageMultiplier;
+        public string effectId;
+        public int effectValue;
     }
     
     private static Dictionary<string, List<ReactionEffectData>> LoadReactionEffects()
     {
-        var csv = Resources.Load<TextAsset>("Data/elementalReactionEffects");
+        var json = Resources.Load<TextAsset>("Data/reactionEffects");
         var dict = new Dictionary<string, List<ReactionEffectData>>();
         
-        if (csv == null)
+        if (json == null)
         {
-            Debug.LogWarning("[DataCache] elementalReactionEffects.csv not found");
-            return dict;
+            throw new System.Exception("Missing reactionEffects.json. Expected at Resources/Data/reactionEffects.json");
         }
 
-        var rows = CSVParser.Parse(csv.text);
-        foreach (var row in rows)
+        var wrapper = JsonUtility.FromJson<ReactionEffectsWrapper>(json.text);
+        if (wrapper == null || wrapper.reactionEffects == null)
         {
-            string reactionId = CSVParser.ParseString(row, "ReactionId", "");
-            if (string.IsNullOrEmpty(reactionId)) continue;
+            throw new System.Exception("Failed to parse reactionEffects.json or reactionEffects is null");
+        }
+        
+        foreach (var e in wrapper.reactionEffects)
+        {
+            if (string.IsNullOrEmpty(e.reactionId)) continue;
             
             var effect = new ReactionEffectData
             {
-                ReactionId = reactionId,
-                Order = CSVParser.ParseInt(row, "Order", 0),
-                EffectType = CSVParser.ParseString(row, "EffectType", ""),
-                Target = CSVParser.ParseString(row, "Target", "Enemy"),
-                Value = CSVParser.ParseString(row, "Value", ""),
-                DurationTurns = CSVParser.ParseInt(row, "DurationTurns", 0),
-                ChancePct = CSVParser.ParseInt(row, "ChancePct", 100),
-                Notes = CSVParser.ParseString(row, "Notes", "")
+                ReactionId = e.reactionId,
+                EffectType = e.effectType,
+                Target = e.target,
+                Value = e.value,
+                DurationTurns = e.durationTurns,
+                ChancePct = e.chancePct,
+                Notes = e.notes
             };
             
-            if (!dict.ContainsKey(reactionId))
+            if (!dict.ContainsKey(e.reactionId))
             {
-                dict[reactionId] = new List<ReactionEffectData>();
+                dict[e.reactionId] = new List<ReactionEffectData>();
             }
-            dict[reactionId].Add(effect);
+            dict[e.reactionId].Add(effect);
         }
         
-        // Sort each list by Order
-        foreach (var kvp in dict)
-        {
-            kvp.Value.Sort((a, b) => a.Order.CompareTo(b.Order));
-        }
-
         return dict;
+    }
+    
+    [System.Serializable]
+    private class ReactionEffectsWrapper
+    {
+        public ReactionEffectJsonEntry[] reactionEffects;
+    }
+    
+    [System.Serializable]
+    private class ReactionEffectJsonEntry
+    {
+        public string reactionId;
+        public string effectType;
+        public string target;
+        public string value;
+        public int durationTurns;
+        public int chancePct;
+        public string notes;
     }
 
     public static float GetQTEOffensiveMultiplier(QTEResult result)
@@ -445,20 +498,25 @@ public static class DataCache
         throw new System.Exception($"QTE defensive shield not found for result: {key}");
     }
 
-    // Get reaction definition by directional ReactionId (e.g., "Ice_Fire" for Ice then Fire)
+    /// <summary>
+    /// Get reaction definition by directional ReactionId (e.g., "Ice_Fire" for Ice then Fire).
+    /// Returns null if not found.
+    /// </summary>
     public static ReactionData GetReactionDef(string reactionId)
     {
-        if (string.IsNullOrEmpty(reactionId)) return GetDefaultReactionDef();
+        if (string.IsNullOrEmpty(reactionId)) return null;
         
         if (Reactions != null && Reactions.TryGetValue(reactionId, out var reaction))
         {
             return reaction;
         }
         
-        return GetDefaultReactionDef();
+        return null;
     }
     
-    // Get reaction effects by ReactionId (returns empty list if none)
+    /// <summary>
+    /// Get reaction effects by ReactionId (returns empty list if none).
+    /// </summary>
     public static List<ReactionEffectData> GetReactionEffects(string reactionId)
     {
         if (string.IsNullOrEmpty(reactionId)) return new List<ReactionEffectData>();
@@ -471,66 +529,80 @@ public static class DataCache
         return new List<ReactionEffectData>();
     }
     
-    private static ReactionData GetDefaultReactionDef()
+    // Build ReactionId from two elements (normalized alphabetically so Fire_Ice = Ice_Fire)
+    public static string BuildReactionId(Element elementA, Element elementB)
     {
-        return new ReactionData
-        {
-            ReactionId = "Unknown",
-            Name = "Unknown",
-            DamageMultiplier = 1.0f
-        };
+        if (elementA == Element.None || elementB == Element.None)
+            return null;
+        
+        // Same element reaction (e.g., Fire_Fire)
+        if (elementA == elementB)
+            return $"{elementA}_{elementB}";
+        
+        // Normalize order alphabetically so Fire_Ice = Ice_Fire
+        string a = elementA.ToString();
+        string b = elementB.ToString();
+        return string.Compare(a, b, System.StringComparison.Ordinal) < 0 
+            ? $"{a}_{b}" 
+            : $"{b}_{a}";
     }
     
-    // Build ReactionId from two elements (FirstElement_DetonatorElement)
-    public static string BuildReactionId(Element firstElement, Element detonatorElement)
-    {
-        if (firstElement == Element.None || detonatorElement == Element.None)
-            return null;
-        if (firstElement == detonatorElement)
-            return null;
-        return $"{firstElement}_{detonatorElement}";
-    }
-    
-    // Load elemental tier data (XP thresholds and bonuses per element per level)
     private static Dictionary<string, List<ElementalTierData>> LoadElementalTiers()
     {
         var result = new Dictionary<string, List<ElementalTierData>>();
         
-        var asset = Resources.Load<TextAsset>("Data/elementalTier");
-        if (asset == null)
+        var json = Resources.Load<TextAsset>("Data/elementalTier");
+        if (json == null)
         {
-            Debug.LogWarning("[DataCache] elementalTier.csv not found");
-            return result;
+            throw new System.Exception("Missing elementalTier.json. Expected at Resources/Data/elementalTier.json");
         }
         
-        var rows = CSVParser.Parse(asset.text);
-        foreach (var row in rows)
+        var wrapper = JsonUtility.FromJson<ElementalTierWrapper>(json.text);
+        if (wrapper == null || wrapper.elementalTiers == null)
         {
-            string element = CSVParser.ParseString(row, "Element");
-            if (string.IsNullOrEmpty(element)) continue;
+            throw new System.Exception("Failed to parse elementalTier.json or elementalTiers is null");
+        }
+        
+        foreach (var t in wrapper.elementalTiers)
+        {
+            if (string.IsNullOrEmpty(t.element)) continue;
             
             var tierData = new ElementalTierData
             {
-                Element = element,
-                Level = CSVParser.ParseInt(row, "Level"),
-                XPRequiredToReachLevel = CSVParser.ParseInt(row, "XPRequiredToReachLevel"),
-                Bonus = CSVParser.ParseString(row, "Bonus")
+                Element = t.element,
+                Level = t.level,
+                XPRequiredToReachLevel = t.xpRequired,
+                Bonus = t.bonus
             };
             
-            if (!result.ContainsKey(element))
+            if (!result.ContainsKey(t.element))
             {
-                result[element] = new List<ElementalTierData>();
+                result[t.element] = new List<ElementalTierData>();
             }
-            result[element].Add(tierData);
+            result[t.element].Add(tierData);
         }
         
-        // Sort each element's tiers by level
         foreach (var kvp in result)
         {
             kvp.Value.Sort((a, b) => a.Level.CompareTo(b.Level));
         }
         
         return result;
+    }
+    
+    [System.Serializable]
+    private class ElementalTierWrapper
+    {
+        public ElementalTierJsonEntry[] elementalTiers;
+    }
+    
+    [System.Serializable]
+    private class ElementalTierJsonEntry
+    {
+        public string element;
+        public int level;
+        public int xpRequired;
+        public string bonus;
     }
     
     /// <summary>
@@ -568,7 +640,7 @@ public static class DataCache
     }
     
     /// <summary>
-    /// Get the max level for an element from CSV data.
+    /// Get the max level for an element from JSON data.
     /// </summary>
     public static int GetElementMaxLevel(string element)
     {
@@ -581,7 +653,7 @@ public static class DataCache
     }
     
     /// <summary>
-    /// Get list of all elements from CSV data.
+    /// Get list of all elements from JSON data.
     /// </summary>
     public static List<string> GetAllElements()
     {
@@ -594,72 +666,74 @@ public static class DataCache
     {
         var dict = new Dictionary<int, WorldEncounterData>();
         
-        var csv = Resources.Load<TextAsset>("Data/worldEncounter");
-        if (csv == null)
+        var json = Resources.Load<TextAsset>("Data/worldEncounter");
+        if (json == null)
         {
-            Debug.LogWarning("[DataCache] worldEncounter.csv not found, using defaults");
-            // Provide defaults for 5 worlds
-            for (int w = 1; w <= 5; w++)
-            {
-                dict[w] = new WorldEncounterData
-                {
-                    World = w,
-                    NodeCount = 10 + (w - 1) * 2,
-                    CombatNodeCount = 20,
-                    RestNodeCount = 5,
-                    ShopNodeCount = 3,
-                    EliteNodeCount = 10,
-                    RegularEnemy = w,
-                    EliteEnemy = w,
-                    BossEnemy = w
-                };
-            }
-            return dict;
+            throw new System.Exception("Missing worldEncounter.json. Expected at Resources/Data/worldEncounter.json");
         }
         
-        var rows = CSVParser.Parse(csv.text);
-        foreach (var row in rows)
+        var wrapper = JsonUtility.FromJson<WorldEncounterWrapper>(json.text);
+        if (wrapper == null || wrapper.worldEncounters == null)
         {
-            int world = CSVParser.ParseInt(row, "World");
-            if (world <= 0) continue;
+            throw new System.Exception("Failed to parse worldEncounter.json or worldEncounters is null");
+        }
+        
+        foreach (var w in wrapper.worldEncounters)
+        {
+            if (w.world <= 0) continue;
             
-            dict[world] = new WorldEncounterData
+            dict[w.world] = new WorldEncounterData
             {
-                World = world,
-                NodeCount = CSVParser.ParseInt(row, "NodeCount", 10),
-                CombatNodeCount = CSVParser.ParseInt(row, "CombatNodeCount", 20),
-                RestNodeCount = CSVParser.ParseInt(row, "RestNodeCount", 5),
-                ShopNodeCount = CSVParser.ParseInt(row, "ShopNodeCount", 3),
-                EliteNodeCount = CSVParser.ParseInt(row, "EliteNodeCount", 10),
-                RegularEnemy = CSVParser.ParseInt(row, "RegularEnemy", 1),
-                EliteEnemy = CSVParser.ParseInt(row, "EliteEnemy", 1),
-                BossEnemy = CSVParser.ParseInt(row, "BossEnemy", 1)
+                World = w.world,
+                NodeCount = w.nodeCount,
+                CombatNodeCount = w.combatNodeCount,
+                RestNodeCount = w.restNodeCount,
+                ShopNodeCount = w.shopNodeCount,
+                EliteNodeCount = w.eliteNodeCount,
+                RegularEnemy = w.regularEnemy,
+                EliteEnemy = w.eliteEnemy,
+                BossEnemy = w.bossEnemy
             };
         }
         
         return dict;
     }
     
+    [System.Serializable]
+    private class WorldEncounterWrapper
+    {
+        public WorldEncounterJsonEntry[] worldEncounters;
+    }
+    
+    [System.Serializable]
+    private class WorldEncounterJsonEntry
+    {
+        public int world;
+        public int nodeCount;
+        public int combatNodeCount;
+        public int restNodeCount;
+        public int shopNodeCount;
+        public int eliteNodeCount;
+        public int regularEnemy;
+        public int eliteEnemy;
+        public int bossEnemy;
+    }
+    
     /// <summary>
-    /// Get world encounter data for a specific world. Returns defaults if not found.
+    /// Get world encounter data for a specific world.
     /// </summary>
     public static WorldEncounterData GetWorldEncounter(int world)
     {
-        if (WorldEncounters != null && WorldEncounters.ContainsKey(world))
-            return WorldEncounters[world];
-        
-        // Return defaults
-        return new WorldEncounterData
+        if (WorldEncounters == null)
         {
-            World = world,
-            NodeCount = 10 + (world - 1) * 2,
-            CombatNodeCount = 20,
-            RestNodeCount = 5,
-            ShopNodeCount = 3,
-            EliteNodeCount = 10,
-            RegularEnemy = world,
-            EliteEnemy = world,
-            BossEnemy = world
-        };
+            throw new System.Exception("WorldEncounters not loaded. Call DataCache.LoadAll() first.");
+        }
+        
+        if (!WorldEncounters.ContainsKey(world))
+        {
+            throw new System.Exception($"World encounter data not found for world {world}. Check worldEncounter.json.");
+        }
+        
+        return WorldEncounters[world];
     }
 }

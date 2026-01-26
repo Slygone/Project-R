@@ -1,0 +1,16 @@
+{
+  "restOptions": [
+    {
+      "displayName": "Heal",
+      "restId": 1,
+      "statAffected": "Health",
+      "amount": 20
+    },
+    {
+      "displayName": "Upgrade",
+      "restId": 2,
+      "statAffected": "Damage",
+      "amount": 5
+    }
+  ]
+}

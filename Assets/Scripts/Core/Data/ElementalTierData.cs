@@ -1,8 +1,8 @@
 using System;
 
 /// <summary>
-/// Data model for elemental tier CSV rows.
-/// Schema: Element, Level, XPRequiredToReachLevel, Bonus
+/// Data model for elemental tier data.
+/// Schema: element, level, xpRequired, bonus
 /// </summary>
 [Serializable]
 public class ElementalTierData

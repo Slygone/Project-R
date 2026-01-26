@@ -1,7 +1,0 @@
-ReactionId,Order,EffectType,Target,Value,DurationTurns,ChancePct,Notes
-Fire_Ice,1,Damage,Enemy,1.5,0,100,Melt reaction bonus damage
-Ice_Fire,1,Damage,Enemy,1.5,0,100,Melt reaction bonus damage
-Fire_Lightning,1,DoT,Enemy,10,2,100,Overload DoT effect
-Lightning_Fire,1,DoT,Enemy,10,2,100,Overload DoT effect
-Ice_Lightning,1,Stun,Enemy,0,1,50,Superconduct stun chance
-Lightning_Ice,1,Stun,Enemy,0,1,50,Superconduct stun chance

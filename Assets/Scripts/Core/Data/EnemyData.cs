@@ -15,7 +15,7 @@ public class EnemyData
     public int SigilChance; // 0-100 percent chance to drop sigil
     public int RelicChance; // 0-100 percent chance to drop relic
     
-    // World modifiers parsed from CSV formulas
+    // World modifiers parsed from JSON data
     // Health/Damage use multipliers (e.g., 1.7 means Health * 1.7)
     // BaseResistance uses addend (e.g., 10 means BaseResistance + 10)
     public float World2HealthMultiplier = 1f;

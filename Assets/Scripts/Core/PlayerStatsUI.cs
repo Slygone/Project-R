@@ -276,6 +276,7 @@ public class PlayerStatsUI : MonoBehaviour
         sb.AppendLine($"  {FormatElementBonus(Element.Water, player, affinity)}");
         sb.AppendLine($"  {FormatElementBonus(Element.Wind, player, affinity)}");
         sb.AppendLine($"  {FormatElementBonus(Element.Rock, player, affinity)}");
+        sb.AppendLine($"  {FormatElementBonus(Element.Lightning, player, affinity)}");
         sb.AppendLine();
 
         sb.AppendLine("Resistances:");
@@ -286,6 +287,7 @@ public class PlayerStatsUI : MonoBehaviour
         sb.AppendLine($"  {FormatElementResistance(Element.Water, player, affinity, baseRes, bonusRes)}");
         sb.AppendLine($"  {FormatElementResistance(Element.Wind, player, affinity, baseRes, bonusRes)}");
         sb.AppendLine($"  {FormatElementResistance(Element.Rock, player, affinity, baseRes, bonusRes)}");
+        sb.AppendLine($"  {FormatElementResistance(Element.Lightning, player, affinity, baseRes, bonusRes)}");
 
         statsText.text = sb.ToString();
 
@@ -299,7 +301,7 @@ public class PlayerStatsUI : MonoBehaviour
             var relicSb = new StringBuilder();
             foreach (var relic in relics)
             {
-                relicSb.AppendLine($"• {relic.DisplayName} ({relic.StatAffected} +{relic.Amount})");
+                relicSb.AppendLine($"• {relic.DisplayName}: {relic.Description}");
             }
             relicsText.text = relicSb.ToString();
         }
@@ -316,6 +318,7 @@ public class PlayerStatsUI : MonoBehaviour
             case Element.Water: return "#4488ff";
             case Element.Wind: return "#88ff88";
             case Element.Rock: return "#aa8866";
+            case Element.Lightning: return "#ffdd44";
             default: return "#888888";
         }
     }

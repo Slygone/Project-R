@@ -3,6 +3,7 @@
     {
       "id": "eff_deal_damage",
       "type": "DealDamage",
+      "target": "Enemy",
       "description": "Deal damage to target based on scaling",
       "defaults": {
         "scaling": { "source": "BaseDamage", "multiplier": 1.0 }
@@ -11,6 +12,7 @@
     {
       "id": "eff_energy_delta",
       "type": "ResourceChange",
+      "target": "Player",
       "description": "Modify energy (positive = gain, negative = cost)",
       "defaults": {
         "resource": "Energy",
@@ -20,6 +22,7 @@
     {
       "id": "eff_apply_status",
       "type": "ApplyStatus",
+      "target": "Enemy",
       "description": "Apply a status effect to target",
       "defaults": {
         "statusId": "",
@@ -30,6 +33,7 @@
     {
       "id": "eff_dot",
       "type": "DamageOverTime",
+      "target": "Enemy",
       "description": "Apply damage over time effect",
       "defaults": {
         "percentOfDamage": 30,
@@ -39,6 +43,7 @@
     {
       "id": "eff_lifesteal",
       "type": "Lifesteal",
+      "target": "Player",
       "description": "Heal caster for percentage of damage dealt",
       "defaults": {
         "percentOfDamage": 20
@@ -47,6 +52,7 @@
     {
       "id": "eff_shield_gain",
       "type": "ShieldGain",
+      "target": "Player",
       "description": "Gain shield based on damage dealt",
       "defaults": {
         "percentOfDamage": 70,
@@ -56,6 +62,7 @@
     {
       "id": "eff_temp_crit_bonus",
       "type": "TempCritBonus",
+      "target": "Player",
       "description": "Temporary crit chance and damage bonus for this attack",
       "defaults": {
         "critChanceBonus": 0,
@@ -65,6 +72,7 @@
     {
       "id": "eff_multi_hit",
       "type": "MultiHit",
+      "target": "Enemy",
       "description": "Hit target multiple times",
       "defaults": {
         "hitCount": 1
@@ -73,11 +81,141 @@
     {
       "id": "eff_on_kill_bonus",
       "type": "OnKillBonus",
+      "target": "Player",
       "description": "Bonus effect triggered if target dies",
       "defaults": {
         "bonusDamageToNextTarget": 0,
         "cooldownOverride": null,
         "energyRefundPercent": 0
+      }
+    },
+    {
+      "id": "eff_reaction_damage",
+      "type": "ReactionDamage",
+      "target": "Enemy",
+      "description": "Deal flat damage from elemental reaction",
+      "defaults": {
+        "flatDamage": 50
+      }
+    },
+    {
+      "id": "eff_reaction_dot",
+      "type": "ReactionDoT",
+      "target": "Enemy",
+      "description": "Apply DoT from elemental reaction",
+      "defaults": {
+        "damagePerTurn": 15,
+        "durationTurns": 2
+      }
+    },
+    {
+      "id": "eff_reaction_stun",
+      "type": "ReactionStun",
+      "target": "Enemy",
+      "description": "Stun enemy from elemental reaction",
+      "defaults": {
+        "durationTurns": 1
+      }
+    },
+    {
+      "id": "eff_reaction_heal",
+      "type": "ReactionHeal",
+      "target": "Player",
+      "description": "Heal player from elemental reaction",
+      "defaults": {
+        "healAmount": 25
+      }
+    },
+    {
+      "id": "eff_reaction_shield",
+      "type": "ReactionShield",
+      "target": "Player",
+      "description": "Grant shield to player from elemental reaction",
+      "defaults": {
+        "shieldAmount": 30
+      }
+    },
+    {
+      "id": "eff_reaction_resist_down",
+      "type": "ReactionResistDown",
+      "target": "Enemy",
+      "description": "Reduce enemy resistance from elemental reaction",
+      "defaults": {
+        "resistReduction": 15,
+        "durationTurns": 2
+      }
+    },
+    {
+      "id": "eff_potion_heal",
+      "type": "PotionHeal",
+      "target": "Player",
+      "description": "Restore health to player",
+      "defaults": {
+        "healAmount": 25
+      }
+    },
+    {
+      "id": "eff_potion_elemental_boost",
+      "type": "PotionElementalBoost",
+      "target": "Player",
+      "description": "Increase elemental damage for combat",
+      "defaults": {
+        "amount": 10
+      }
+    },
+    {
+      "id": "eff_potion_crit_rate",
+      "type": "PotionCritRate",
+      "target": "Player",
+      "description": "Increase crit rate for combat",
+      "defaults": {
+        "amount": 5
+      }
+    },
+    {
+      "id": "eff_potion_crit_damage",
+      "type": "PotionCritDamage",
+      "target": "Player",
+      "description": "Increase crit damage for combat",
+      "defaults": {
+        "amount": 10
+      }
+    },
+    {
+      "id": "eff_relic_elemental_damage",
+      "type": "RelicElementalDamage",
+      "target": "Player",
+      "description": "Permanently increase elemental damage",
+      "defaults": {
+        "element": "Fire",
+        "amount": 10
+      }
+    },
+    {
+      "id": "eff_relic_crit_rate",
+      "type": "RelicCritRate",
+      "target": "Player",
+      "description": "Permanently increase crit rate",
+      "defaults": {
+        "amount": 10
+      }
+    },
+    {
+      "id": "eff_relic_crit_damage",
+      "type": "RelicCritDamage",
+      "target": "Player",
+      "description": "Permanently increase crit damage",
+      "defaults": {
+        "amount": 20
+      }
+    },
+    {
+      "id": "eff_relic_max_health",
+      "type": "RelicMaxHealth",
+      "target": "Player",
+      "description": "Permanently increase max health",
+      "defaults": {
+        "amount": 50
       }
     }
   ],
@@ -122,17 +260,5 @@
         "maxStacks": 2
       }
     }
-  ],
-  "qteEffects": {
-    "offensive": [
-      { "result": "Bad", "multiplier": 0.9 },
-      { "result": "Good", "multiplier": 1.0 },
-      { "result": "Perfect", "multiplier": 1.1 }
-    ],
-    "defensive": [
-      { "result": "Bad", "shieldPercent": 1, "description": "Gain 1% max HP as shield" },
-      { "result": "Good", "shieldPercent": 3, "description": "Gain 3% max HP as shield" },
-      { "result": "Perfect", "shieldPercent": 5, "description": "Gain 5% max HP as shield" }
-    ]
-  }
+  ]
 }

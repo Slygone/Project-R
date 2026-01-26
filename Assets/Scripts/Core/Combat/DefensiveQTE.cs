@@ -173,6 +173,7 @@ public class DefensiveQTE : MonoBehaviour
             resultText.text = "";
         
         qtePanel.SetActive(true);
+        Debug.Log("[QTE] Defensive QTE started - skill input BLOCKED");
     }
     
     private void ResolveQTE()
@@ -225,6 +226,7 @@ public class DefensiveQTE : MonoBehaviour
     {
         isActive = false;
         qtePanel.SetActive(false);
+        Debug.Log("[QTE] Defensive QTE completed - skill input RESTORED");
         
         var callback = onComplete;
         onComplete = null;

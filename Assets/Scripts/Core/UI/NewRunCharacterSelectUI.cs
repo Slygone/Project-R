@@ -413,7 +413,7 @@ public class NewRunCharacterSelectUI : MonoBehaviour
         hLayout.childControlHeight = true;
         hLayout.childForceExpandWidth = true;
         
-        // Create element cards from CSV data
+        // Create element cards from JSON data
         var elements = DataCache.GetAllElements();
         foreach (var element in elements)
         {

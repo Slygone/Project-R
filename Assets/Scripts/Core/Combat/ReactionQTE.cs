@@ -20,11 +20,12 @@ public static class ReactionQTE
         return DataCache.GetQTEDefensiveShield(result);
     }
 
-    // New directional lookup by ReactionId
-    public static float GetReactionMultiplier(string reactionId)
+    // Get reaction effect info by ReactionId
+    public static (string effectId, int effectValue) GetReactionEffect(string reactionId)
     {
         var reactionDef = DataCache.GetReactionDef(reactionId);
-        return reactionDef.DamageMultiplier;
+        if (reactionDef == null) return ("eff_reaction_damage", 50);
+        return (reactionDef.EffectId, reactionDef.EffectValue);
     }
 
     public static string GetReactionName(string reactionId)

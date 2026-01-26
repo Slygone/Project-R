@@ -5,5 +5,6 @@ public enum Element
     Ice = 2,
     Water = 3,
     Wind = 4,
-    Rock = 5
+    Rock = 5,
+    Lightning = 6
 }

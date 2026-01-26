@@ -331,7 +331,7 @@ public class ShopUI : MonoBehaviour
         descRect.offsetMin = Vector2.zero;
         descRect.offsetMax = Vector2.zero;
         var descText = descObj.AddComponent<TextMeshProUGUI>();
-        descText.text = $"+{potion.Amount} {potion.StatAffected}";
+        descText.text = potion.Description;
         descText.alignment = TextAlignmentOptions.Center;
         descText.fontSize = 16;
         descText.color = new Color(0.8f, 0.8f, 0.8f);
@@ -439,7 +439,7 @@ public class ShopUI : MonoBehaviour
         descRect.offsetMin = Vector2.zero;
         descRect.offsetMax = Vector2.zero;
         var descText = descObj.AddComponent<TextMeshProUGUI>();
-        descText.text = $"+{relic.Amount} {relic.StatAffected}";
+        descText.text = relic.Description;
         descText.alignment = TextAlignmentOptions.Center;
         descText.fontSize = 14;
         descText.color = new Color(0.8f, 0.8f, 0.8f);
@@ -463,16 +463,19 @@ public class ShopUI : MonoBehaviour
 
     private Color GetRelicColor(RelicData relic)
     {
-        var stat = relic.StatAffected.ToLower().Trim();
-        switch (stat)
+        var param = (relic.EffectParam ?? "").ToLower().Trim();
+        switch (param)
         {
             case "fire": return new Color(0.5f, 0.2f, 0.15f);
             case "ice": return new Color(0.15f, 0.3f, 0.5f);
             case "water": return new Color(0.1f, 0.25f, 0.45f);
             case "wind": return new Color(0.2f, 0.4f, 0.25f);
             case "rock": return new Color(0.35f, 0.28f, 0.2f);
-            case "health": return new Color(0.4f, 0.2f, 0.3f);
-            default: return new Color(0.3f, 0.3f, 0.35f);
+            case "lightning": return new Color(0.5f, 0.4f, 0.15f);
+            case "all": return new Color(0.4f, 0.3f, 0.5f);
+            default:
+                if (relic.EffectId == "eff_relic_max_health") return new Color(0.4f, 0.2f, 0.3f);
+                return new Color(0.3f, 0.3f, 0.35f);
         }
     }
 

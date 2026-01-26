@@ -176,6 +176,7 @@ public static class GameDataLoader
             CritDamage = def.stats.critDamage,
             BaseResistance = def.stats.baseResistance,
             BonusResistance = def.stats.bonusResistance,
+            MaxActionPoints = def.maxActionPoints > 0 ? def.maxActionPoints : 10,
             Skill1 = skill1?.displayName ?? "",
             Skill1DamagePercent = GetSkillDamagePercent(skill1),
             Skill1Effect = GetSkillEffectDescription(skill1),

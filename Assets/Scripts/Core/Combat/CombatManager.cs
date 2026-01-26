@@ -8,6 +8,7 @@ public class CombatManager : MonoBehaviour
     private List<CombatEnemy> enemies = new List<CombatEnemy>();
     private Player player;
     private CombatUI combatUI;
+    private CombatArena combatArena;
     private ReactionQTEPanel qtePanel;
     private bool isPlayerTurn = true;
     private bool combatActive = false;
@@ -19,7 +20,8 @@ public class CombatManager : MonoBehaviour
     private int pendingSkillNumber;
     private bool pendingIsAttack;
     private Element pendingInfusedElement = Element.None;
-    private float pendingReactionMultiplier = 1f;
+    private string pendingReactionEffectId = "";
+    private int pendingReactionEffectValue = 0;
     private string pendingReactionName = "";
     private string pendingReactionId = null;
     private Element pendingReactionFirstElement = Element.None;
@@ -99,9 +101,25 @@ public class CombatManager : MonoBehaviour
         var pcBoss = FindFirstObjectByType<PlayerController>();
         if (pcBoss != null) pcBoss.SetCanMove(false);
 
-        string title = world >= 5 ? "FINAL BOSS FIGHT!" : "BOSS FIGHT!";
-        if (combatUI != null)
+        // Use in-world combat arena if available
+        if (combatArena == null)
         {
+            combatArena = FindFirstObjectByType<CombatArena>();
+        }
+        
+        bool usingInWorldCombat = false;
+        if (combatArena != null && pcBoss != null)
+        {
+            // Seamless in-world combat - move player and spawn enemy visuals
+            Vector3 combatCenter = pcBoss.transform.position;
+            combatArena.EnterCombat(pcBoss.transform, enemies, combatCenter);
+            usingInWorldCombat = true;
+        }
+
+        // Only show old CombatUI panel if NOT using in-world combat
+        if (!usingInWorldCombat && combatUI != null)
+        {
+            string title = world >= 5 ? "FINAL BOSS FIGHT!" : "BOSS FIGHT!";
             combatUI.ShowCombat(enemies, player, title);
             // Refresh skill/AP displays to reflect reset state
             combatUI.UpdateSkillButtons(player);
@@ -165,14 +183,26 @@ public class CombatManager : MonoBehaviour
             GameLog.KV("enemyCount", enemies.Count)
         ));
 
-        if (combatUI != null)
+        // Use in-world combat arena if available
+        if (combatArena == null)
+        {
+            combatArena = FindFirstObjectByType<CombatArena>();
+        }
+        
+        bool usingInWorldCombat = false;
+        if (combatArena != null && pc != null)
+        {
+            // Seamless in-world combat - move player and spawn enemy visuals
+            Vector3 combatCenter = node != null ? node.transform.position : pc.transform.position;
+            combatArena.EnterCombat(pc.transform, enemies, combatCenter);
+            usingInWorldCombat = true;
+        }
+
+        // Only show old CombatUI panel if NOT using in-world combat
+        if (!usingInWorldCombat && combatUI != null)
         {
             string title = currentCombatType == CombatType.Elite ? "ELITE ENCOUNTER!" : null;
             combatUI.ShowCombat(enemies, player, title);
-        }
-        else
-        {
-            GameLog.Error(GameLogCategory.Combat, "[Combat]", "CombatStartError | reason=combat_ui_null");
         }
     }
 
@@ -238,11 +268,11 @@ public class CombatManager : MonoBehaviour
         
         if (pendingIsAttack)
         {
-            ExecuteAttackWithReaction(pendingTarget, pendingReactionMultiplier, qteMultiplier, pendingInfusedElement, result);
+            ExecuteAttackWithReaction(pendingTarget, pendingReactionEffectId, pendingReactionEffectValue, qteMultiplier, pendingInfusedElement, result);
         }
         else
         {
-            ExecuteSkillWithReaction(pendingSkillNumber, pendingTarget, pendingReactionMultiplier, qteMultiplier, pendingInfusedElement, result);
+            ExecuteSkillWithReaction(pendingSkillNumber, pendingTarget, pendingReactionEffectId, pendingReactionEffectValue, qteMultiplier, pendingInfusedElement, result);
         }
         
         ClearPendingAction();
@@ -268,7 +298,8 @@ public class CombatManager : MonoBehaviour
         pendingSkillNumber = 0;
         pendingIsAttack = false;
         pendingInfusedElement = Element.None;
-        pendingReactionMultiplier = 1f;
+        pendingReactionEffectId = "";
+        pendingReactionEffectValue = 0;
         pendingReactionName = "";
         pendingReactionId = null;
         pendingReactionFirstElement = Element.None;
@@ -296,18 +327,20 @@ public class CombatManager : MonoBehaviour
         pendingInfusedElement = reactionInfo.PrimaryElement;
         pendingReactionId = reactionInfo.GetReactionId();
         
-        // Get reaction data from CSV
+        // Get reaction data from JSON
         var reactionDef = DataCache.GetReactionDef(pendingReactionId);
         if (reactionDef == null)
         {
             // Fallback for unknown reactions
             pendingReactionName = reactionInfo.IsSingleElement ? $"{reactionInfo.PrimaryElement} Burst" : $"{reactionInfo.PrimaryElement}-{reactionInfo.SecondaryElement} Fusion";
-            pendingReactionMultiplier = reactionInfo.IsSingleElement ? 1.5f : 2.0f;
+            pendingReactionEffectId = "eff_reaction_damage";
+            pendingReactionEffectValue = reactionInfo.IsSingleElement ? 50 : 75;
         }
         else
         {
             pendingReactionName = reactionDef.Name;
-            pendingReactionMultiplier = reactionDef.DamageMultiplier;
+            pendingReactionEffectId = reactionDef.EffectId;
+            pendingReactionEffectValue = reactionDef.EffectValue;
         }
         
         // Consume the marks
@@ -318,7 +351,8 @@ public class CombatManager : MonoBehaviour
             "MarkReactionTrigger",
             GameLog.KV("id", pendingReactionId),
             GameLog.KV("name", pendingReactionName),
-            GameLog.KV("mult", pendingReactionMultiplier.ToString("F2")),
+            GameLog.KV("effectId", pendingReactionEffectId),
+            GameLog.KV("effectValue", pendingReactionEffectValue),
             GameLog.KV("type", reactionInfo.IsSingleElement ? "single" : "dual"),
             GameLog.KV("primary", reactionInfo.PrimaryElement),
             GameLog.KV("secondary", reactionInfo.SecondaryElement),
@@ -329,7 +363,7 @@ public class CombatManager : MonoBehaviour
         // Show reaction floating text
         if (combatUI != null)
         {
-            combatUI.ShowReactionToEnemy(target, pendingReactionName, pendingReactionMultiplier);
+            combatUI.ShowReactionToEnemy(target, pendingReactionName, pendingReactionEffectValue);
         }
         
         if (qtePanel == null)
@@ -413,15 +447,20 @@ public class CombatManager : MonoBehaviour
             GameLog.KV("hpAfter", hpAfter)
         ));
 
+        ShowDamageToEnemy(target, damage, isCrit);
+        
         if (combatUI != null)
         {
-            combatUI.ShowDamageToEnemy(target, damage, isCrit);
             combatUI.UpdateEnemyHealth(target);
         }
+        
+        // Notify in-world combat arena of damage
+        NotifyEnemyHit(target);
 
         if (!target.IsAlive())
         {
             GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
+            NotifyEnemyDeath(target);
         }
 
         if (AllEnemiesDead())
@@ -438,7 +477,7 @@ public class CombatManager : MonoBehaviour
         }
     }
     
-    private void ExecuteAttackWithReaction(CombatEnemy target, float reactionMultiplier, float qteMultiplier, Element? forcedElement, QTEResult qteResult)
+    private void ExecuteAttackWithReaction(CombatEnemy target, string reactionEffectId, int reactionEffectValue, float qteMultiplier, Element? forcedElement, QTEResult qteResult)
     {
         Element attackElement = forcedElement ?? player.GetAffinity();
 
@@ -469,8 +508,8 @@ public class CombatManager : MonoBehaviour
         float critMultiplier = isCrit ? player.GetCritDamage() : 1f;
         float directAfterCrit = afterOQTE * critMultiplier;
         
-        // 5. Calculate reaction damage using afterOQTE (pre-crit, so crit doesn't inflate reactions)
-        float reactionDamage = afterOQTE * (reactionMultiplier - 1f); // Only the bonus from reaction
+        // 5. Reaction effect value is added as flat damage (scaled by QTE)
+        float reactionDamage = reactionEffectId == "eff_reaction_damage" ? reactionEffectValue * qteMultiplier : 0;
         
         // 6. Total = DirectAfterCrit + ReactionDamage
         float totalDamage = directAfterCrit + reactionDamage;
@@ -479,7 +518,8 @@ public class CombatManager : MonoBehaviour
         GameLog.Combat(GameLog.Join(
             "AttackRoll",
             GameLog.KV("roll", afterVariance),
-            GameLog.KV("reactionMult", reactionMultiplier.ToString("F2")),
+            GameLog.KV("reactionEffectId", reactionEffectId),
+            GameLog.KV("reactionEffectValue", reactionEffectValue),
             GameLog.KV("critRoll", critRoll),
             GameLog.KV("critChance", critChance),
             GameLog.KV("crit", isCrit),
@@ -506,26 +546,32 @@ public class CombatManager : MonoBehaviour
             GameLog.KV("hpAfter", hpAfter)
         ));
 
-        // Apply reaction effects from CSV data (track shield gain for floating text)
+        // Apply reaction effects from JSON data (track shield gain for floating text)
         int shieldBeforeReact = player.GetShield();
         ReactionEffectEngine.ApplyPostHitEffects(pendingReactionId, player, target, damage, attackElement);
 
+        // Show floating text using CombatArena transforms
+        ShowDamageToEnemy(target, damage, isCrit);
+        int shieldAfterReact = player.GetShield();
+        if (shieldAfterReact > shieldBeforeReact)
+        {
+            ShowShieldToPlayer(shieldAfterReact - shieldBeforeReact, FloatingTextType.ShieldGain);
+        }
+        
         if (combatUI != null)
         {
-            combatUI.ShowDamageToEnemy(target, damage, isCrit);
             combatUI.UpdateEnemyHealth(target);
-            int shieldAfterReact = player.GetShield();
-            if (shieldAfterReact > shieldBeforeReact)
-            {
-                combatUI.ShowShieldToPlayer(shieldAfterReact - shieldBeforeReact, FloatingTextType.ShieldGain);
-            }
             combatUI.UpdatePlayerHealth(player); // Update in case of shield effects
         }
+        
+        // Notify in-world combat arena of damage
+        NotifyEnemyHit(target);
 
         if (!target.IsAlive())
         {
             GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
             AwardDetonatorXPForKill(target);
+            NotifyEnemyDeath(target);
         }
 
         if (AllEnemiesDead())
@@ -555,6 +601,10 @@ public class CombatManager : MonoBehaviour
     {
         if (!combatActive || !isPlayerTurn) return;
         if (target == null || !target.IsAlive()) return;
+        
+        // Block skill usage during QTE
+        if (qtePanel != null && qtePanel.IsActive()) return;
+        if (defensiveQTE != null && defensiveQTE.IsActive()) return;
 
         var character = player.GetCharacter();
         if (character == null)
@@ -697,7 +747,7 @@ public class CombatManager : MonoBehaviour
             isAoE = true;
         }
         
-        // Calculate base damage from CSV percent
+        // Calculate base damage from skill percent
         float skillMultiplier = skillDamagePercent / 100f;
         int charDamage = player.GetCharacterDamage();
         int baseDamageBeforeElement = Mathf.RoundToInt(charDamage * skillMultiplier * dirtyStabBonus);
@@ -792,10 +842,7 @@ public class CombatManager : MonoBehaviour
                     GameLog.KV("dmgFinal", finalDamage),
                     GameLog.KV("hpAfter", hpAfter)
                 ), hitCount > 1 ? GameLogVerbosity.Verbose : GameLogVerbosity.Minimal);
-                if (combatUI != null)
-                {
-                    combatUI.ShowDamageToEnemy(target, finalDamage, isCrit);
-                }
+                ShowDamageToEnemy(target, finalDamage, isCrit);
             }
             
             totalDamageDealt += finalDamage;
@@ -874,10 +921,14 @@ public class CombatManager : MonoBehaviour
             combatUI.UpdateEnemyHealth(target);
         }
         
+        // Notify in-world combat arena of damage
+        NotifyEnemyHit(target);
+        
         bool targetKilled = !target.IsAlive();
         if (targetKilled)
         {
             GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
+            NotifyEnemyDeath(target);
         }
 
         // Apply skill cooldown and energy effects BEFORE possible early return
@@ -911,6 +962,12 @@ public class CombatManager : MonoBehaviour
             combatUI.UpdatePlayerEnergy(player);
             combatUI.UpdateSkillButtons(player);
             combatUI.UpdateAPDisplay(player);
+        }
+        
+        // Update CombatArena skill states (for ultimate availability)
+        if (combatArena != null)
+        {
+            combatArena.OnPlayerEnergyChanged();
         }
         
         // Player can continue using skills if they have AP - turn does NOT end automatically
@@ -1032,9 +1089,9 @@ public class CombatManager : MonoBehaviour
             ));
             
             // Show heal floating text
+            ShowHealToPlayer(healAmount);
             if (combatUI != null)
             {
-                combatUI.ShowHealToPlayer(healAmount);
                 combatUI.UpdatePlayerHealth(player);
             }
         }
@@ -1051,9 +1108,9 @@ public class CombatManager : MonoBehaviour
             ));
             
             // Show shield gain floating text
+            ShowShieldToPlayer(shieldAmount, FloatingTextType.ShieldGain);
             if (combatUI != null)
             {
-                combatUI.ShowShieldToPlayer(shieldAmount, FloatingTextType.ShieldGain);
                 combatUI.UpdatePlayerHealth(player);
             }
         }
@@ -1086,6 +1143,11 @@ public class CombatManager : MonoBehaviour
                 combatUI.UpdatePlayerEnergy(player);
                 combatUI.UpdateSkillButtons(player);
             }
+            
+            if (combatArena != null)
+            {
+                combatArena.OnPlayerEnergyChanged();
+            }
         }
         // DoubleUp - If target dies, next target hit for 150% damage
         else if (skillLower == "doubleup")
@@ -1110,9 +1172,9 @@ public class CombatManager : MonoBehaviour
                     GameLog.KV("source", "Skill:DoubleUpChain")
                 ));
                 
+                ShowDamageToEnemy(nextTarget, chainDamage, false);
                 if (combatUI != null)
                 {
-                    combatUI.ShowDamageToEnemy(nextTarget, chainDamage, false);
                     combatUI.UpdateEnemyHealth(nextTarget);
                 }
                 
@@ -1124,7 +1186,7 @@ public class CombatManager : MonoBehaviour
         }
     }
     
-    private void ExecuteSkillWithReaction(int skillNumber, CombatEnemy target, float reactionMultiplier, float qteMultiplier, Element? forcedElement, QTEResult qteResult)
+    private void ExecuteSkillWithReaction(int skillNumber, CombatEnemy target, string reactionEffectId, int reactionEffectValue, float qteMultiplier, Element? forcedElement, QTEResult qteResult)
     {
         var character = player.GetCharacter();
         if (character == null) return;
@@ -1192,8 +1254,8 @@ public class CombatManager : MonoBehaviour
         float critMultiplier = isCrit ? player.GetCritDamage() : 1f;
         float directAfterCrit = afterOQTE * critMultiplier;
         
-        // 5. Calculate reaction damage using afterOQTE (pre-crit, so crit doesn't inflate reactions)
-        float reactionDamage = afterOQTE * (reactionMultiplier - 1f);
+        // 5. Reaction effect value is added as flat damage (scaled by QTE)
+        float reactionDamage = reactionEffectId == "eff_reaction_damage" ? reactionEffectValue * qteMultiplier : 0;
         
         // 6. Total = DirectAfterCrit + ReactionDamage
         float totalDamage = directAfterCrit + reactionDamage;
@@ -1211,9 +1273,9 @@ public class CombatManager : MonoBehaviour
         else
         {
             target.TakeDamage(finalDamage);
+            ShowDamageToEnemy(target, finalDamage, isCrit);
             if (combatUI != null)
             {
-                combatUI.ShowDamageToEnemy(target, finalDamage, isCrit);
                 combatUI.UpdateEnemyHealth(target);
             }
         }
@@ -1225,7 +1287,8 @@ public class CombatManager : MonoBehaviour
             "AttackRoll",
             GameLog.KV("skill", skillName),
             GameLog.KV("roll", afterVariance),
-            GameLog.KV("reactionMult", reactionMultiplier.ToString("F2")),
+            GameLog.KV("reactionEffectId", reactionEffectId),
+            GameLog.KV("reactionEffectValue", reactionEffectValue),
             GameLog.KV("crit", isCrit),
             GameLog.KV("critMult", critMultiplier.ToString("F2")),
             GameLog.KV("preResist", damageBeforeResist)
@@ -1235,14 +1298,15 @@ public class CombatManager : MonoBehaviour
             "Trigger",
             GameLog.KV("id", pendingReactionId ?? "none"),
             GameLog.KV("name", pendingReactionName),
-            GameLog.KV("mult", reactionMultiplier.ToString("F2")),
+            GameLog.KV("effectId", pendingReactionEffectId),
+            GameLog.KV("effectValue", pendingReactionEffectValue),
             GameLog.KV("first", pendingReactionFirstElement),
             GameLog.KV("det", pendingReactionDetonator),
             GameLog.KV("attacker", player != null && player.GetCharacter() != null ? player.GetCharacter().DisplayName : "Player"),
             GameLog.KV("target", target != null ? target.Name : "null")
         ), GameLogVerbosity.Minimal);
 
-        // Apply reaction effects from CSV data (track shield gain for floating text)
+        // Apply reaction effects from JSON data (track shield gain for floating text)
         int shieldBeforeReact2 = player.GetShield();
         ReactionEffectEngine.ApplyPostHitEffects(pendingReactionId, player, target, finalDamage, attackElement);
         
@@ -1251,16 +1315,20 @@ public class CombatManager : MonoBehaviour
             int shieldAfterReact2 = player.GetShield();
             if (shieldAfterReact2 > shieldBeforeReact2)
             {
-                combatUI.ShowShieldToPlayer(shieldAfterReact2 - shieldBeforeReact2, FloatingTextType.ShieldGain);
+                ShowShieldToPlayer(shieldAfterReact2 - shieldBeforeReact2, FloatingTextType.ShieldGain);
             }
             combatUI.UpdatePlayerHealth(player); // Update in case of shield effects
         }
+        
+        // Notify in-world combat arena of damage
+        NotifyEnemyHit(target);
 
         bool targetKilled = !target.IsAlive();
         if (targetKilled)
         {
             GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
             AwardDetonatorXPForKill(target);
+            NotifyEnemyDeath(target);
         }
 
         // Apply skill cooldown and energy effects (skillNumber is 1-indexed, array is 0-indexed)
@@ -1293,6 +1361,12 @@ public class CombatManager : MonoBehaviour
             combatUI.UpdatePlayerEnergy(player);
             combatUI.UpdateSkillButtons(player);
             combatUI.UpdateAPDisplay(player);
+        }
+        
+        // Update CombatArena skill states (for ultimate availability)
+        if (combatArena != null)
+        {
+            combatArena.OnPlayerEnergyChanged();
         }
 
         // Player can continue using skills - turn does NOT end after reaction skill
@@ -1344,10 +1418,10 @@ public class CombatManager : MonoBehaviour
                     GameLog.KV("hpAfter", enemy.Health),
                     GameLog.KV("source", "AoE")
                 ));
+                // Show floating text for each enemy hit by AOE
+                ShowDamageToEnemy(enemy, finalDamage, isCrit);
                 if (combatUI != null)
                 {
-                    // Show floating text for each enemy hit by AOE
-                    combatUI.ShowDamageToEnemy(enemy, finalDamage, isCrit);
                     combatUI.UpdateEnemyHealth(enemy);
                 }
             }
@@ -1546,10 +1620,10 @@ public class CombatManager : MonoBehaviour
                 GameLog.KV("source", $"DefensiveQTE:{qteResult}")
             ));
             
+            ShowShieldToPlayer(shieldAmount, FloatingTextType.ShieldGain);
             if (combatUI != null)
             {
                 combatUI.UpdatePlayerHealth(player);
-                combatUI.ShowShieldGainToPlayer(shieldAmount);
             }
         }
 
@@ -1583,15 +1657,15 @@ public class CombatManager : MonoBehaviour
             {
                 if (dmgInfo.shieldAbsorbed > 0)
                 {
-                    combatUI.ShowShieldToPlayer(dmgInfo.shieldAbsorbed, FloatingTextType.ShieldAbsorb);
+                    ShowShieldToPlayer(dmgInfo.shieldAbsorbed, FloatingTextType.ShieldAbsorb);
                 }
                 if (dmgInfo.shieldBroken)
                 {
-                    combatUI.ShowShieldToPlayer(0, FloatingTextType.ShieldBroken);
+                    ShowShieldToPlayer(0, FloatingTextType.ShieldBroken);
                 }
                 if (dmgInfo.finalDamage > 0)
                 {
-                    combatUI.ShowDamageToPlayer(dmgInfo.finalDamage);
+                    ShowDamageToPlayer(dmgInfo.finalDamage);
                 }
                 combatUI.UpdatePlayerHealth(player);
             }
@@ -1663,6 +1737,12 @@ public class CombatManager : MonoBehaviour
         {
             combatUI.SetPlayerTurn(true);
             combatUI.UpdateAPDisplay(player);
+        }
+        
+        // Reset AP in CombatArena UI
+        if (combatArena != null)
+        {
+            combatArena.OnPlayerTurnStart();
         }
     }
 
@@ -1751,6 +1831,12 @@ public class CombatManager : MonoBehaviour
                 GameLog.KV("relic", dropsRelic)
             ));
             
+            // Hide CombatArena UI before showing loot panel (so it doesn't block input)
+            if (combatArena != null)
+            {
+                combatArena.HideCombatUIForLoot();
+            }
+            
             // Show reward UI for all combat victories
             if (combatUI != null)
             {
@@ -1769,10 +1855,22 @@ public class CombatManager : MonoBehaviour
         }
         else
         {
+            // Exit in-world combat arena on defeat
+            if (combatArena != null)
+            {
+                combatArena.ExitCombat();
+            }
+            
             if (combatUI != null)
             {
                 combatUI.HideCombat();
             }
+            
+            // Re-enable movement on defeat (player can move after game over screen)
+            var pcDefeat = FindFirstObjectByType<PlayerController>();
+            if (pcDefeat != null) pcDefeat.SetCanMove(true);
+            Debug.Log("[CombatManager] Combat ended (defeat) - movement re-enabled");
+            
             GameLog.Combat("PlayerDefeated");
             
             // Notify GameManager of player defeat
@@ -1786,6 +1884,12 @@ public class CombatManager : MonoBehaviour
 
     public void OnLootCollected()
     {
+        // Exit in-world combat arena on victory
+        if (combatArena != null)
+        {
+            combatArena.ExitCombat();
+        }
+        
         if (combatUI != null)
         {
             combatUI.HideCombat();
@@ -1801,6 +1905,7 @@ public class CombatManager : MonoBehaviour
         // Ensure movement is enabled after loot is collected
         var pcLoot = FindFirstObjectByType<PlayerController>();
         if (pcLoot != null) pcLoot.SetCanMove(true);
+        Debug.Log("[CombatManager] Combat ended (victory) - movement re-enabled");
         
         // Handle boss combat callback after loot collection
         if (currentCombatType == CombatType.Boss && onBossCombatComplete != null)
@@ -1816,6 +1921,136 @@ public class CombatManager : MonoBehaviour
     public bool IsEndingCombat() => isEndingCombat;
     public bool IsPlayerTurn() => isPlayerTurn;
     public List<CombatEnemy> GetEnemies() => enemies;
+    
+    /// <summary>
+    /// Notify the in-world combat arena that an enemy was hit (for visual feedback)
+    /// </summary>
+    private void NotifyEnemyHit(CombatEnemy enemy)
+    {
+        if (combatArena == null) return;
+        var unit = combatArena.GetEnemyUnit(enemy);
+        if (unit != null)
+        {
+            unit.FlashDamage();
+        }
+    }
+    
+    /// <summary>
+    /// Notify the in-world combat arena that an enemy died
+    /// </summary>
+    private void NotifyEnemyDeath(CombatEnemy enemy)
+    {
+        if (combatArena == null) return;
+        var unit = combatArena.GetEnemyUnit(enemy);
+        if (unit != null)
+        {
+            unit.PlayDeathAnimation();
+        }
+    }
+    
+    #region Floating Text Helpers
+    
+    /// <summary>
+    /// Show damage floating text on an enemy using CombatArena's world transform
+    /// </summary>
+    private void ShowDamageToEnemy(CombatEnemy enemy, int damage, bool isCrit)
+    {
+        var ftm = FloatingTextManager.Instance;
+        if (ftm == null) return;
+        
+        // Try CombatArena first (in-world combat)
+        if (combatArena != null)
+        {
+            var transform = combatArena.GetEnemyTransform(enemy);
+            if (transform != null)
+            {
+                ftm.ShowDamage(transform, damage, isCrit);
+                return;
+            }
+        }
+        
+        // Fallback to CombatUI (2D panel)
+        if (combatUI != null)
+        {
+            combatUI.ShowDamageToEnemy(enemy, damage, isCrit);
+        }
+    }
+    
+    /// <summary>
+    /// Show damage floating text on player using CombatArena's world transform
+    /// </summary>
+    private void ShowDamageToPlayer(int damage)
+    {
+        var ftm = FloatingTextManager.Instance;
+        if (ftm == null) return;
+        
+        // Try CombatArena first (in-world combat)
+        if (combatArena != null)
+        {
+            var transform = combatArena.GetPlayerTransform();
+            if (transform != null)
+            {
+                ftm.ShowDamageTaken(transform, damage);
+                return;
+            }
+        }
+        
+        // Fallback to CombatUI
+        if (combatUI != null)
+        {
+            combatUI.ShowDamageToPlayer(damage);
+        }
+    }
+    
+    /// <summary>
+    /// Show heal floating text on player
+    /// </summary>
+    private void ShowHealToPlayer(int amount)
+    {
+        var ftm = FloatingTextManager.Instance;
+        if (ftm == null) return;
+        
+        if (combatArena != null)
+        {
+            var transform = combatArena.GetPlayerTransform();
+            if (transform != null)
+            {
+                ftm.ShowHeal(transform, amount);
+                return;
+            }
+        }
+        
+        if (combatUI != null)
+        {
+            combatUI.ShowHealToPlayer(amount);
+        }
+    }
+    
+    /// <summary>
+    /// Show shield floating text on player
+    /// </summary>
+    private void ShowShieldToPlayer(int amount, FloatingTextType type)
+    {
+        var ftm = FloatingTextManager.Instance;
+        if (ftm == null) return;
+        
+        if (combatArena != null)
+        {
+            var transform = combatArena.GetPlayerTransform();
+            if (transform != null)
+            {
+                ftm.ShowShield(transform, amount, type);
+                return;
+            }
+        }
+        
+        if (combatUI != null)
+        {
+            combatUI.ShowShieldToPlayer(amount, type);
+        }
+    }
+    
+    #endregion
     
     /// <summary>
     /// Awards Elemental Ascension XP to the detonator element when an enemy is killed via reaction.

@@ -4,8 +4,8 @@ using UnityEngine;
 public class NodeSpawner : MonoBehaviour
 {
     [SerializeField] private GameObject nodePrefab;
-    [SerializeField] private float spawnRadius = 20f;
-    [SerializeField] private float minDistanceBetweenNodes = 5f;
+    [SerializeField] private float spawnRadius = 30f;  // Increased to accommodate larger spacing
+    [SerializeField] private float minDistanceBetweenNodes = 7.5f;  // 5 player sizes (player ~1.5 units)
 
     private List<Vector3> spawnedPositions = new List<Vector3>();
 

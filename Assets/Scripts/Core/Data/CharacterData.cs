@@ -11,6 +11,7 @@ public class CharacterData
     public float CritDamage;
     public int BaseResistance;
     public int BonusResistance;
+    public int MaxActionPoints;
     
     // Skill 1
     public string Skill1;
@@ -67,7 +68,7 @@ public class CharacterData
     public int Skill5MarkChance;
     public int Skill5MarkCount;
     
-    // Talent Perks (4 tiers, A/B options each) - loaded from CSV
+    // Talent Perks (4 tiers, A/B options each) - loaded from JSON
     public string Perk1a;
     public string Perk1b;
     public string Perk2a;

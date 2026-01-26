@@ -15,6 +15,7 @@
         "bonusResistance": 5
       },
       "gold": 10,
+      "maxActionPoints": 10,
       "skillIds": ["skill_slash", "skill_shield_bash", "skill_war_cry", "skill_riposte", "skill_bladestorm"],
       "perkIds": {
         "tier1": ["Fighter_option_1_a", "Fighter_option_b"],
@@ -38,6 +39,7 @@
         "bonusResistance": 5
       },
       "gold": 10,
+      "maxActionPoints": 10,
       "skillIds": ["skill_bolt", "skill_frost_nova", "skill_arcane_shield", "skill_ray", "skill_meteor"],
       "perkIds": {
         "tier1": ["Mage_option_1_a", "Mage_option_b"],
@@ -61,6 +63,7 @@
         "bonusResistance": 5
       },
       "gold": 10,
+      "maxActionPoints": 10,
       "skillIds": ["skill_aimedshot", "skill_piercing_arrow", "skill_evasive_roll", "skill_tripleshot", "skill_doubleup"],
       "perkIds": {
         "tier1": ["Archer_option_1_a", "Archer_option_b"],
@@ -84,6 +87,7 @@
         "bonusResistance": 5
       },
       "gold": 10,
+      "maxActionPoints": 10,
       "skillIds": ["skill_dirtystab", "skill_smoke_bomb", "skill_backstab", "skill_cheapshot", "skill_ambush"],
       "perkIds": {
         "tier1": ["Rogue_option_1_a", "Rogue_option_b"],
@@ -107,6 +111,7 @@
         "bonusResistance": 5
       },
       "gold": 10,
+      "maxActionPoints": 10,
       "skillIds": ["skill_shock", "skill_divine_shield", "skill_smite", "skill_judgement", "skill_holynova"],
       "perkIds": {
         "tier1": ["Cleric_option_1_a", "Cleric_option_b"],

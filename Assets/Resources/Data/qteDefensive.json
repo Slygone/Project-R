@@ -1,0 +1,7 @@
+{
+  "qteResults": [
+    { "result": "Bad", "shieldPercent": 1, "description": "Gain 1% max HP as shield" },
+    { "result": "Good", "shieldPercent": 3, "description": "Gain 3% max HP as shield" },
+    { "result": "Perfect", "shieldPercent": 5, "description": "Gain 5% max HP as shield" }
+  ]
+}

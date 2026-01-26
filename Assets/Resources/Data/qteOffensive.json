@@ -1,0 +1,7 @@
+{
+  "qteResults": [
+    { "result": "Bad", "multiplier": 0.9 },
+    { "result": "Good", "multiplier": 1.0 },
+    { "result": "Perfect", "multiplier": 1.1 }
+  ]
+}

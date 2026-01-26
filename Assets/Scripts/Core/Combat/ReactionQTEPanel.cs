@@ -218,6 +218,7 @@ public class ReactionQTEPanel : MonoBehaviour
         isActive = true;
         waitingForInput = true;
         showingResult = false;
+        Debug.Log("[QTE] Reaction QTE started - skill input BLOCKED");
 
         GameLog.Reaction(GameLog.Join(
             "QTEStart",
@@ -297,6 +298,7 @@ public class ReactionQTEPanel : MonoBehaviour
         qtePanel.SetActive(false);
         isActive = false;
         showingResult = false;
+        Debug.Log("[QTE] Reaction QTE completed - skill input RESTORED");
         
         onQTEComplete?.Invoke(pendingResult);
     }

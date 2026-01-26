@@ -1,5 +1,5 @@
 /// <summary>
-/// Data structure for world encounter composition loaded from CSV.
+/// Data structure for world encounter composition loaded from JSON.
 /// Controls how many nodes and enemies spawn per world.
 /// </summary>
 public class WorldEncounterData

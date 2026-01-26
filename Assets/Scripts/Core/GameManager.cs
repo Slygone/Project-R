@@ -5,8 +5,6 @@ public class GameManager : MonoBehaviour
 {
     private Referencer refs;
     private int completedNodes = 0;
-    // Pair selection reroll: 1 use per run
-    private static bool pairRerollUsed = false;
     private const int MAX_WORLD = 5;
     private bool affinityChosen = false;
     private bool characterChosen = false;
@@ -65,18 +63,6 @@ public class GameManager : MonoBehaviour
         runDetonatorXP.Clear();
     }
 
-    // Reroll API for AffinitySelectionUI
-    public static bool IsPairRerollAvailable()
-    {
-        return !pairRerollUsed;
-    }
-
-    public static void UsePairReroll()
-    {
-        pairRerollUsed = true;
-        Debug.Log("[GameManager] Pair reroll used for this run");
-    }
-    
     public static void SetLastQTEResult(string result)
     {
         lastQTEResult = result;
@@ -96,7 +82,6 @@ public class GameManager : MonoBehaviour
         runXP = 0;
         runDetonatorXP.Clear();
         lastQTEResult = "None";
-        pairRerollUsed = false;
         UpdateNodeCounter();
         
         // Start with Main Menu instead of jumping to character selection
@@ -172,7 +157,6 @@ public class GameManager : MonoBehaviour
         completedNodes = 0;
         runXP = 0;
         runDetonatorXP.Clear();
-        pairRerollUsed = false;
         UpdateNodeCounter();
         
         Debug.Log($"[GameManager] Starting run with {character.DisplayName}");
@@ -540,7 +524,6 @@ public class GameManager : MonoBehaviour
         // Reset run state
         currentWorld = 1;
         completedNodes = 0;
-        pairRerollUsed = false;
         affinityChosen = false;
         characterChosen = false;
         currentRunCharacter = null;

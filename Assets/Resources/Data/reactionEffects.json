@@ -1,0 +1,25 @@
+{
+  "reactionEffects": [
+    { "reactionId": "Fire_Fire", "effectType": "ApplyDotFromHitPct", "target": "Enemy", "value": "0.15", "durationTurns": 2, "chancePct": 100, "notes": "Burn DoT" },
+    { "reactionId": "Fire_Ice", "effectType": "AddShieldFromHitPct", "target": "Player", "value": "0.10", "durationTurns": 0, "chancePct": 100, "notes": "Steam shield" },
+    { "reactionId": "Fire_Lightning", "effectType": "ApplyDotFromHitPct", "target": "Enemy", "value": "0.25", "durationTurns": 2, "chancePct": 100, "notes": "Plasma burn" },
+    { "reactionId": "Fire_Rock", "effectType": "AddShieldFlat", "target": "Player", "value": "15", "durationTurns": 0, "chancePct": 100, "notes": "Magma shield" },
+    { "reactionId": "Fire_Water", "effectType": "ApplyDotFromHitPct", "target": "Enemy", "value": "0.12", "durationTurns": 2, "chancePct": 100, "notes": "Scald DoT" },
+    { "reactionId": "Fire_Wind", "effectType": "TriggerExistingDotsInstant", "target": "Enemy", "value": "1", "durationTurns": 0, "chancePct": 100, "notes": "Fan flames" },
+    { "reactionId": "Ice_Ice", "effectType": "ResistDeltaPct_Ice", "target": "Player", "value": "15", "durationTurns": 2, "chancePct": 100, "notes": "Ice resist" },
+    { "reactionId": "Ice_Lightning", "effectType": "ApplyStatus", "target": "Enemy", "value": "Shocked", "durationTurns": 1, "chancePct": 75, "notes": "Superconduct" },
+    { "reactionId": "Ice_Rock", "effectType": "AddShieldFlat", "target": "Player", "value": "20", "durationTurns": 0, "chancePct": 100, "notes": "Frost armor" },
+    { "reactionId": "Ice_Water", "effectType": "ApplyStatus", "target": "Enemy", "value": "Frozen", "durationTurns": 1, "chancePct": 50, "notes": "Freeze chance" },
+    { "reactionId": "Ice_Wind", "effectType": "CritChanceBonus", "target": "Player", "value": "0.15", "durationTurns": 0, "chancePct": 100, "notes": "Brittle bonus" },
+    { "reactionId": "Lightning_Lightning", "effectType": "CritChanceBonus", "target": "Player", "value": "0.20", "durationTurns": 0, "chancePct": 100, "notes": "Chain lightning" },
+    { "reactionId": "Lightning_Rock", "effectType": "ApplyDotFromHitPct", "target": "Enemy", "value": "0.20", "durationTurns": 2, "chancePct": 100, "notes": "Shatter shock" },
+    { "reactionId": "Lightning_Water", "effectType": "ApplyDotFromHitPct", "target": "Enemy", "value": "0.30", "durationTurns": 2, "chancePct": 100, "notes": "Electrocute" },
+    { "reactionId": "Lightning_Wind", "effectType": "CritDamageBonus", "target": "Player", "value": "0.25", "durationTurns": 0, "chancePct": 100, "notes": "Storm surge" },
+    { "reactionId": "Rock_Rock", "effectType": "AddShieldFlat", "target": "Player", "value": "30", "durationTurns": 0, "chancePct": 100, "notes": "Stone wall" },
+    { "reactionId": "Rock_Water", "effectType": "ResistAllDeltaPct", "target": "Player", "value": "10", "durationTurns": 2, "chancePct": 100, "notes": "Mud armor" },
+    { "reactionId": "Rock_Wind", "effectType": "ApplyDotFromHitPct", "target": "Enemy", "value": "0.10", "durationTurns": 3, "chancePct": 100, "notes": "Sandstorm" },
+    { "reactionId": "Water_Water", "effectType": "AddShieldFromHitPct", "target": "Player", "value": "0.15", "durationTurns": 0, "chancePct": 100, "notes": "Water shield" },
+    { "reactionId": "Water_Wind", "effectType": "CritDamageBonus", "target": "Player", "value": "0.20", "durationTurns": 0, "chancePct": 100, "notes": "Torrent crit" },
+    { "reactionId": "Wind_Wind", "effectType": "CritChanceBonus", "target": "Player", "value": "0.10", "durationTurns": 0, "chancePct": 100, "notes": "Cyclone" }
+  ]
+}

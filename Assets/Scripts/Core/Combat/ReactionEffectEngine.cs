@@ -45,7 +45,6 @@ public static class ReactionEffectEngine
                     GameLog.Reaction(GameLog.Join(
                         "Effect",
                         GameLog.KV("id", reactionId),
-                        GameLog.KV("order", effect.Order),
                         GameLog.KV("type", effect.EffectType),
                         GameLog.KV("target", effect.Target),
                         GameLog.KV("value", effect.Value),
@@ -134,7 +133,6 @@ public static class ReactionEffectEngine
                     GameLog.Reaction(GameLog.Join(
                         "Effect",
                         GameLog.KV("id", reactionId),
-                        GameLog.KV("order", effect.Order),
                         GameLog.KV("type", effect.EffectType),
                         GameLog.KV("target", effect.Target),
                         GameLog.KV("value", effect.Value),
@@ -159,7 +157,6 @@ public static class ReactionEffectEngine
         GameLog.Reaction(GameLog.Join(
             "Effect",
             GameLog.KV("id", context.ReactionId),
-            GameLog.KV("order", effect.Order),
             GameLog.KV("type", effectType),
             GameLog.KV("target", effect.Target),
             GameLog.KV("value", effect.Value),
@@ -192,7 +189,6 @@ public static class ReactionEffectEngine
         GameLog.Reaction(GameLog.Join(
             "Effect",
             GameLog.KV("id", context.ReactionId),
-            GameLog.KV("order", effect.Order),
             GameLog.KV("type", effectType),
             GameLog.KV("target", target),
             GameLog.KV("value", effect.Value),

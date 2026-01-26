@@ -18,6 +18,11 @@ public class FloatingText : MonoBehaviour
     private Vector3 shakeOffset;
     private bool isActive;
     
+    // Arc animation
+    private float arcDirection; // -1 = left, 1 = right
+    private Vector3 startScreenPos;
+    private bool useArcAnimation = true;
+    
     // Callback when text finishes
     public System.Action<FloatingText> OnComplete;
     
@@ -86,8 +91,12 @@ public class FloatingText : MonoBehaviour
         transform.localScale = Vector3.one * initialScale;
         shakeOffset = Vector3.zero;
         
+        // Randomize arc direction (-1 = left, 1 = right)
+        arcDirection = Random.value > 0.5f ? 1f : -1f;
+        
         // Initial position
         UpdatePosition();
+        startScreenPos = transform.position;
         
         gameObject.SetActive(true);
 
@@ -151,8 +160,12 @@ public class FloatingText : MonoBehaviour
         transform.localScale = Vector3.one * initialScale;
         shakeOffset = Vector3.zero;
         
+        // Randomize arc direction (-1 = left, 1 = right)
+        arcDirection = Random.value > 0.5f ? 1f : -1f;
+        
         // Set position
         transform.position = Camera.main.WorldToScreenPoint(worldPosition);
+        startScreenPos = transform.position;
         
         gameObject.SetActive(true);
     }
@@ -171,12 +184,32 @@ public class FloatingText : MonoBehaviour
             return;
         }
         
-        // Update position (float upward)
+        // Update base position from target
         UpdatePosition();
         
-        // Apply float offset (direction: 1 = up, -1 = down)
-        float floatOffset = elapsedTime * style.floatSpeed * style.floatDirection;
-        transform.position += Vector3.up * floatOffset * Time.deltaTime;
+        // Apply arc animation - horizontal arc from center to left/right
+        if (useArcAnimation)
+        {
+            // Arc parameters
+            float arcWidth = 150f;  // Horizontal distance of arc
+            float arcHeight = 80f;  // Maximum height of arc
+            
+            // Calculate arc position using parabolic motion
+            // x moves linearly in arc direction
+            float horizontalOffset = normalizedTime * arcWidth * arcDirection;
+            
+            // y follows a parabola: peaks at middle (t=0.5), returns near start at end
+            float verticalOffset = 4f * arcHeight * normalizedTime * (1f - normalizedTime);
+            
+            // Apply arc offset from start position
+            transform.position = startScreenPos + new Vector3(horizontalOffset, verticalOffset, 0f);
+        }
+        else
+        {
+            // Original linear float behavior
+            float floatOffset = elapsedTime * style.floatSpeed * style.floatDirection;
+            transform.position += Vector3.up * floatOffset * Time.deltaTime;
+        }
         
         // Apply shake
         if (style.shake)

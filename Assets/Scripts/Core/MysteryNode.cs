@@ -73,7 +73,7 @@ public class MysteryNode : NodeBase
             
             if (refs.ui != null)
             {
-                refs.ui.ShowNodePopup($"Mystery Reward!\n\nRelic: {relic.DisplayName}\n({relic.StatAffected} +{relic.Amount})\n\n+{NORMAL_GOLD_REWARD} Gold", this);
+                refs.ui.ShowNodePopup($"Mystery Reward!\n\nRelic: {relic.DisplayName}\n{relic.Description}\n\n+{NORMAL_GOLD_REWARD} Gold", this);
             }
         }
         else
@@ -117,7 +117,7 @@ public class MysteryNode : NodeBase
         string rewardText = "Elite Victory!\n\n";
         foreach (var relic in relicsGiven)
         {
-            rewardText += $"• {relic.DisplayName}\n  ({relic.StatAffected} +{relic.Amount})\n";
+            rewardText += $"• {relic.DisplayName}\n  {relic.Description}\n";
         }
         rewardText += $"\n+{goldReward} Gold";
         
@@ -145,7 +145,7 @@ public class MysteryNode : NodeBase
         
         foreach (var relic in DataCache.Relics)
         {
-            if (relic.StatAffected.ToLower().Contains(elementName))
+            if ((relic.EffectParam ?? "").ToLower().Contains(elementName))
             {
                 matchingRelics.Add(relic);
             }

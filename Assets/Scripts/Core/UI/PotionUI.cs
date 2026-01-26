@@ -276,29 +276,27 @@ public class PotionUI : MonoBehaviour
 
     private string GetPotionTooltipText(PotionData potion)
     {
-        var stat = potion.StatAffected.ToLower().Trim();
         string effect = "";
         string usage = "";
         
-        if (stat.Contains("health"))
+        switch (potion.EffectId)
         {
-            effect = $"<color=#90EE90>Restores {potion.Amount} HP</color>";
-            usage = "Use: Anytime";
-        }
-        else if (stat.Contains("elemental"))
-        {
-            effect = $"<color=#DDA0DD>Deals {potion.Amount} damage</color>\n<color=#888>(Random element)</color>";
-            usage = "<color=#FF6666>Use: Combat only</color>";
-        }
-        else if (stat.Contains("crit rate"))
-        {
-            effect = $"<color=#FFD700>+{potion.Amount}% Crit Chance</color>";
-            usage = "Lasts: This world";
-        }
-        else if (stat.Contains("crit damage"))
-        {
-            effect = $"<color=#FF69B4>+{potion.Amount}% Crit Damage</color>";
-            usage = "Lasts: This world";
+            case "eff_potion_heal":
+                effect = $"<color=#90EE90>Restores {potion.EffectValue} HP</color>";
+                usage = "Use: Anytime";
+                break;
+            case "eff_potion_elemental_boost":
+                effect = $"<color=#DDA0DD>Deals {potion.EffectValue} damage</color>\n<color=#888>(Random element)</color>";
+                usage = "<color=#FF6666>Use: Combat only</color>";
+                break;
+            case "eff_potion_crit_rate":
+                effect = $"<color=#FFD700>+{potion.EffectValue}% Crit Chance</color>";
+                usage = "Lasts: This world";
+                break;
+            case "eff_potion_crit_damage":
+                effect = $"<color=#FF69B4>+{potion.EffectValue}% Crit Damage</color>";
+                usage = "Lasts: This world";
+                break;
         }
         
         return $"<b>{potion.DisplayName}</b>\n{effect}\n<size=10>{usage}</size>";
@@ -306,30 +304,36 @@ public class PotionUI : MonoBehaviour
 
     private Color GetPotionColor(PotionData potion)
     {
-        var stat = potion.StatAffected.ToLower().Trim();
-        if (stat.Contains("health"))
-            return new Color(0.4f, 0.2f, 0.2f);
-        if (stat.Contains("elemental"))
-            return new Color(0.3f, 0.25f, 0.4f);
-        if (stat.Contains("crit rate"))
-            return new Color(0.4f, 0.35f, 0.2f);
-        if (stat.Contains("crit damage"))
-            return new Color(0.35f, 0.2f, 0.35f);
-        return new Color(0.25f, 0.3f, 0.25f);
+        switch (potion.EffectId)
+        {
+            case "eff_potion_heal":
+                return new Color(0.4f, 0.2f, 0.2f);
+            case "eff_potion_elemental_boost":
+                return new Color(0.3f, 0.25f, 0.4f);
+            case "eff_potion_crit_rate":
+                return new Color(0.4f, 0.35f, 0.2f);
+            case "eff_potion_crit_damage":
+                return new Color(0.35f, 0.2f, 0.35f);
+            default:
+                return new Color(0.25f, 0.3f, 0.25f);
+        }
     }
 
     private string GetPotionEffectText(PotionData potion)
     {
-        var stat = potion.StatAffected.ToLower().Trim();
-        if (stat.Contains("health"))
-            return $"Heal {potion.Amount} HP";
-        if (stat.Contains("elemental"))
-            return $"Deal {potion.Amount} random elemental damage";
-        if (stat.Contains("crit rate"))
-            return $"+{potion.Amount}% Crit Chance (this world)";
-        if (stat.Contains("crit damage"))
-            return $"+{potion.Amount}% Crit Damage (this world)";
-        return $"+{potion.Amount} {potion.StatAffected}";
+        switch (potion.EffectId)
+        {
+            case "eff_potion_heal":
+                return $"Heal {potion.EffectValue} HP";
+            case "eff_potion_elemental_boost":
+                return $"Deal {potion.EffectValue} random elemental damage";
+            case "eff_potion_crit_rate":
+                return $"+{potion.EffectValue}% Crit Chance (this world)";
+            case "eff_potion_crit_damage":
+                return $"+{potion.EffectValue}% Crit Damage (this world)";
+            default:
+                return potion.Description;
+        }
     }
 
     private void OnPotionSlotClicked(int index)
@@ -338,9 +342,8 @@ public class PotionUI : MonoBehaviour
         if (index >= potions.Count) return;
 
         var potion = potions[index];
-        var stat = potion.StatAffected.ToLower().Trim();
 
-        if (stat.Contains("elemental"))
+        if (potion.EffectId == "eff_potion_elemental_boost")
         {
             if (!isInCombat)
             {

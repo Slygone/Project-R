@@ -74,7 +74,7 @@ public class CombatEnemy
 
     private Element GetRandomElement()
     {
-        var elements = new Element[] { Element.Fire, Element.Ice, Element.Water, Element.Wind, Element.Rock };
+        var elements = new Element[] { Element.Fire, Element.Ice, Element.Water, Element.Wind, Element.Rock, Element.Lightning };
         return elements[UnityEngine.Random.Range(0, elements.Length)];
     }
 

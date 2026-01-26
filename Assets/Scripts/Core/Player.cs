@@ -427,11 +427,11 @@ public class Player : MonoBehaviour
         maxEnergy = character.MaxEnergy;
         energy = 0;
         
-        // Sync crit stats from character CSV data
+        // Sync crit stats from character data
         critChance = Mathf.RoundToInt(character.CritChance);
         critDamage = character.CritDamage;
         
-        // Sync resistances from character CSV data
+        // Sync resistances from character data
         baseResistance = character.BaseResistance;
         bonusResistance = character.BonusResistance;
         // Reset cooldowns for all 5 skills
@@ -840,94 +840,68 @@ public class Player : MonoBehaviour
 
     private void ApplyRelicBonus(RelicData relic)
     {
-        var stat = relic.StatAffected.ToLower().Trim();
-        
-        if (stat == "all elements")
+        switch (relic.EffectId)
         {
-            elementalDamage.Add(Element.Fire, relic.Amount);
-            elementalDamage.Add(Element.Ice, relic.Amount);
-            elementalDamage.Add(Element.Water, relic.Amount);
-            elementalDamage.Add(Element.Wind, relic.Amount);
-            elementalDamage.Add(Element.Rock, relic.Amount);
-            GameLog.System(GameLog.Join(
-                "RelicApply",
-                GameLog.KV("type", "AllElements"),
-                GameLog.KV("amount", relic.Amount)
-            ), GameLogVerbosity.Verbose);
-            return;
-        }
-        
-        Element element = ElementalDamage.ParseElement(stat);
-        if (element != Element.None)
-        {
-            elementalDamage.Add(element, relic.Amount);
-            if (element == affinity)
-            {
-                GameLog.System(GameLog.Join(
-                    "RelicApply",
-                    GameLog.KV("type", "Element"),
-                    GameLog.KV("element", element),
-                    GameLog.KV("amount", relic.Amount),
-                    GameLog.KV("matchesAffinity", true)
-                ), GameLogVerbosity.Verbose);
-            }
-            else
-            {
-                GameLog.System(GameLog.Join(
-                    "RelicApply",
-                    GameLog.KV("type", "Element"),
-                    GameLog.KV("element", element),
-                    GameLog.KV("amount", relic.Amount),
-                    GameLog.KV("matchesAffinity", false),
-                    GameLog.KV("affinity", affinity)
-                ), GameLogVerbosity.Verbose);
-            }
-            return;
-        }
-
-        switch (stat)
-        {
-            case "health":
-            case "maxhealth":
-                maxHealth += relic.Amount;
-                health += relic.Amount;
-                GameLog.System(GameLog.Join(
-                    "RelicApply",
-                    GameLog.KV("stat", "MaxHealth"),
-                    GameLog.KV("delta", relic.Amount),
-                    GameLog.KV("hp", $"{health}/{maxHealth}")
-                ), GameLogVerbosity.Verbose);
+            case "eff_relic_elemental_damage":
+                if (relic.EffectParam == "All")
+                {
+                    elementalDamage.Add(Element.Fire, relic.EffectValue);
+                    elementalDamage.Add(Element.Ice, relic.EffectValue);
+                    elementalDamage.Add(Element.Water, relic.EffectValue);
+                    elementalDamage.Add(Element.Wind, relic.EffectValue);
+                    elementalDamage.Add(Element.Rock, relic.EffectValue);
+                    elementalDamage.Add(Element.Lightning, relic.EffectValue);
+                    GameLog.System(GameLog.Join(
+                        "RelicApply",
+                        GameLog.KV("effectId", relic.EffectId),
+                        GameLog.KV("type", "AllElements"),
+                        GameLog.KV("amount", relic.EffectValue)
+                    ), GameLogVerbosity.Verbose);
+                }
+                else
+                {
+                    Element element = ElementalDamage.ParseElement(relic.EffectParam);
+                    if (element != Element.None)
+                    {
+                        elementalDamage.Add(element, relic.EffectValue);
+                        GameLog.System(GameLog.Join(
+                            "RelicApply",
+                            GameLog.KV("effectId", relic.EffectId),
+                            GameLog.KV("element", element),
+                            GameLog.KV("amount", relic.EffectValue)
+                        ), GameLogVerbosity.Verbose);
+                    }
+                }
                 break;
-            case "crit rate":
-            case "critrate":
-            case "critchance":
-                critChance += relic.Amount;
+                
+            case "eff_relic_crit_rate":
+                critChance += relic.EffectValue;
                 GameLog.System(GameLog.Join(
                     "RelicApply",
-                    GameLog.KV("stat", "CritChance"),
-                    GameLog.KV("delta", relic.Amount),
+                    GameLog.KV("effectId", relic.EffectId),
+                    GameLog.KV("delta", relic.EffectValue),
                     GameLog.KV("now", critChance)
                 ), GameLogVerbosity.Verbose);
                 break;
-            case "crit damage":
-            case "critdamage":
-                critDamage += relic.Amount / 100f;
+                
+            case "eff_relic_crit_damage":
+                critDamage += relic.EffectValue / 100f;
                 GameLog.System(GameLog.Join(
                     "RelicApply",
-                    GameLog.KV("stat", "CritDamage"),
-                    GameLog.KV("deltaPct", relic.Amount),
+                    GameLog.KV("effectId", relic.EffectId),
+                    GameLog.KV("deltaPct", relic.EffectValue),
                     GameLog.KV("now", critDamage.ToString("F2"))
                 ), GameLogVerbosity.Verbose);
                 break;
-            case "energy":
-            case "maxenergy":
-                maxEnergy += relic.Amount;
-                energy += relic.Amount;
+                
+            case "eff_relic_max_health":
+                maxHealth += relic.EffectValue;
+                health += relic.EffectValue;
                 GameLog.System(GameLog.Join(
                     "RelicApply",
-                    GameLog.KV("stat", "MaxEnergy"),
-                    GameLog.KV("delta", relic.Amount),
-                    GameLog.KV("energy", $"{energy}/{maxEnergy}")
+                    GameLog.KV("effectId", relic.EffectId),
+                    GameLog.KV("delta", relic.EffectValue),
+                    GameLog.KV("hp", $"{health}/{maxHealth}")
                 ), GameLogVerbosity.Verbose);
                 break;
         }
@@ -988,28 +962,27 @@ public class Player : MonoBehaviour
         var potion = potionInventory[index];
         potionInventory.RemoveAt(index);
 
-        var stat = potion.StatAffected.ToLower().Trim();
-        switch (stat)
+        switch (potion.EffectId)
         {
-            case "health":
-                Heal(potion.Amount);
+            case "eff_potion_heal":
+                Heal(potion.EffectValue);
                 GameLog.Combat(GameLog.Join(
                     "PotionUse",
                     GameLog.KV("potion", potion.DisplayName),
-                    GameLog.KV("type", "Heal"),
-                    GameLog.KV("amount", potion.Amount)
+                    GameLog.KV("effectId", potion.EffectId),
+                    GameLog.KV("amount", potion.EffectValue)
                 ), GameLogVerbosity.Normal);
                 break;
-            case "elemental afinity direct damage":
+            case "eff_potion_elemental_boost":
                 if (target != null && target.IsAlive())
                 {
                     Element element = elementOverride != Element.None ? elementOverride : GetRandomElement();
-                    int damage = target.ApplyResistance(potion.Amount, element);
+                    int damage = target.ApplyResistance(potion.EffectValue, element);
                     target.TakeDamage(damage);
                     GameLog.Combat(GameLog.Join(
                         "PotionUse",
                         GameLog.KV("potion", potion.DisplayName),
-                        GameLog.KV("type", "Damage"),
+                        GameLog.KV("effectId", potion.EffectId),
                         GameLog.KV("element", element),
                         GameLog.KV("target", target.Name),
                         GameLog.KV("amount", damage)
@@ -1030,23 +1003,23 @@ public class Player : MonoBehaviour
                     return false;
                 }
                 break;
-            case "crit rate":
-                tempCritChanceBonus += potion.Amount;
+            case "eff_potion_crit_rate":
+                tempCritChanceBonus += potion.EffectValue;
                 GameLog.Status(GameLog.Join(
                     "PotionUse",
                     GameLog.KV("potion", potion.DisplayName),
-                    GameLog.KV("type", "CritChance"),
-                    GameLog.KV("delta", potion.Amount),
+                    GameLog.KV("effectId", potion.EffectId),
+                    GameLog.KV("delta", potion.EffectValue),
                     GameLog.KV("now", GetCritChance())
                 ), GameLogVerbosity.Normal);
                 break;
-            case "crit damage":
-                tempCritDamageBonus += potion.Amount;
+            case "eff_potion_crit_damage":
+                tempCritDamageBonus += potion.EffectValue;
                 GameLog.Status(GameLog.Join(
                     "PotionUse",
                     GameLog.KV("potion", potion.DisplayName),
-                    GameLog.KV("type", "CritDamage"),
-                    GameLog.KV("deltaPct", potion.Amount),
+                    GameLog.KV("effectId", potion.EffectId),
+                    GameLog.KV("deltaPct", potion.EffectValue),
                     GameLog.KV("now", GetCritDamage().ToString("F2"))
                 ), GameLogVerbosity.Normal);
                 break;
@@ -1056,8 +1029,8 @@ public class Player : MonoBehaviour
                     "[Player]",
                     GameLog.Join(
                         "PotionUseFail",
-                        GameLog.KV("reason", "UnknownStat"),
-                        GameLog.KV("stat", potion.StatAffected)
+                        GameLog.KV("reason", "UnknownEffectId"),
+                        GameLog.KV("effectId", potion.EffectId)
                     )
                 );
                 return false;
@@ -1069,8 +1042,7 @@ public class Player : MonoBehaviour
     public bool IsElementalPotion(int index)
     {
         if (index < 0 || index >= potionInventory.Count) return false;
-        var stat = potionInventory[index].StatAffected.ToLower().Trim();
-        return stat.Contains("elemental");
+        return potionInventory[index].EffectId == "eff_potion_elemental_boost";
     }
 
     public PotionData GetPotion(int index)

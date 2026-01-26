@@ -9,6 +9,7 @@ public class CharacterDefinition
     public int characterId;
     public CharacterStats stats;
     public int gold;
+    public int maxActionPoints;
     public List<string> skillIds;
     public PerkIds perkIds;
 }

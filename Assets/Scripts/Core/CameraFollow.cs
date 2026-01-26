@@ -9,6 +9,7 @@ public class CameraFollow : MonoBehaviour
 
     private Vector3 velocity;
     private bool offsetInitialized;
+    private bool followEnabled = true;
 
     void Start()
     {
@@ -23,6 +24,9 @@ public class CameraFollow : MonoBehaviour
 
     void LateUpdate()
     {
+        // Don't follow if disabled (e.g. during combat)
+        if (!followEnabled) return;
+        
         if (target == null)
         {
             TryResolveTarget();
@@ -37,6 +41,31 @@ public class CameraFollow : MonoBehaviour
 
         Vector3 desiredPosition = target.position + offset;
         transform.position = Vector3.SmoothDamp(transform.position, desiredPosition, ref velocity, smoothTime);
+    }
+    
+    /// <summary>
+    /// Enable camera following (normal free roam behavior)
+    /// </summary>
+    public void EnableFollow()
+    {
+        followEnabled = true;
+    }
+    
+    /// <summary>
+    /// Disable camera following (for combat - camera stays in place)
+    /// </summary>
+    public void DisableFollow()
+    {
+        followEnabled = false;
+    }
+    
+    /// <summary>
+    /// Move camera to look at a specific world position (used for combat centering)
+    /// </summary>
+    public void SetCombatPosition(Vector3 centerPosition)
+    {
+        transform.position = centerPosition + offset;
+        velocity = Vector3.zero; // Reset velocity so it doesn't drift
     }
 
     private void TryResolveTarget()
