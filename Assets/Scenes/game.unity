@@ -477,7 +477,7 @@ Transform:
   m_GameObject: {fileID: 330585543}
   serializedVersion: 2
   m_LocalRotation: {x: 0.38268343, y: 0, z: 0, w: 0.92387956}
-  m_LocalPosition: {x: 0, y: 20, z: -15}
+  m_LocalPosition: {x: 0, y: 15, z: -15}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -730,6 +730,65 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 505316927}
   m_CullTransparentMesh: 1
+--- !u!1 &523135528
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 523135530}
+  - component: {fileID: 523135529}
+  m_Layer: 0
+  m_Name: CombatArena
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &523135529
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 523135528}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 66de449b2773322408ef12c2fd4febb9, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::CombatArena
+  playerCombatPosition: {x: -14, y: 0.75, z: 0}
+  enemyCombatPosition: {x: 14, y: 0.75, z: 0}
+  enemyVerticalSpacing: 3
+  playerCombatScale: {x: 1.5, y: 2.5, z: 1.5}
+  playerNameplateHeight: 4
+  transitionDuration: 0.5
+  enemyScale: 1.95
+  enemyColors:
+  - {r: 0.8, g: 0.2, b: 0.2, a: 1}
+  - {r: 0.2, g: 0.6, b: 0.8, a: 1}
+  - {r: 0.2, g: 0.8, b: 0.3, a: 1}
+  - {r: 0.8, g: 0.6, b: 0.2, a: 1}
+  - {r: 0.6, g: 0.2, b: 0.8, a: 1}
+  idleBobSpeed: 1.5
+  idleBobAmount: 0.25
+--- !u!4 &523135530
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 523135528}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 4.53903, y: 0, z: 14.10759}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &832575517
 GameObject:
   m_ObjectHideFlags: 0
@@ -942,10 +1001,12 @@ MonoBehaviour:
   shopUI: {fileID: 0}
   potionUI: {fileID: 0}
   restUI: {fileID: 0}
-  infusionUI: {fileID: 0}
   reactionQTEPanel: {fileID: 0}
   mysteryUI: {fileID: 0}
   defensiveQTE: {fileID: 0}
+  mainMenuUI: {fileID: 0}
+  newRunCharacterSelectUI: {fileID: 0}
+  characterLoadoutUI: {fileID: 0}
   nodePopupPanel: {fileID: 0}
   victoryPanel: {fileID: 0}
   nodeCounterText: {fileID: 0}
@@ -1853,3 +1914,4 @@ SceneRoots:
   - {fileID: 1768978671}
   - {fileID: 1905090741}
   - {fileID: 1321422682}
+  - {fileID: 523135530}
