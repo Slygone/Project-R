@@ -1902,10 +1902,8 @@ public class CombatManager : MonoBehaviour
 
         currentNode = null;
 
-        // Ensure movement is enabled after loot is collected
-        var pcLoot = FindFirstObjectByType<PlayerController>();
-        if (pcLoot != null) pcLoot.SetCanMove(true);
-        Debug.Log("[CombatManager] Combat ended (victory) - movement re-enabled");
+        // Movement is re-enabled by CombatArena.TransitionFromCombat AFTER transition completes
+        // This prevents player from walking into new combat during exit transition
         
         // Handle boss combat callback after loot collection
         if (currentCombatType == CombatType.Boss && onBossCombatComplete != null)

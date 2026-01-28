@@ -53,6 +53,7 @@ public class CombatArena : MonoBehaviour
     private Transform playerTransform;
     private List<EnemyWorldUnit> spawnedEnemies = new List<EnemyWorldUnit>();
     private bool inCombat = false;
+    private bool isTransitioning = false; // Prevents new combat during exit transition
     
     // Idle animation tracking
     private Vector3 playerCombatBasePos;
@@ -278,6 +279,7 @@ public class CombatArena : MonoBehaviour
     private IEnumerator TransitionFromCombat()
     {
         Debug.Log("[CombatArena] Exiting combat - transitioning back to free roam");
+        isTransitioning = true;
         
         // Destroy player nameplate
         DestroyPlayerNameplate();
@@ -310,12 +312,30 @@ public class CombatArena : MonoBehaviour
         playerTransform.rotation = playerOriginalRotation;
         playerTransform.localScale = playerOriginalScale;
         inCombat = false;
+        isTransitioning = false;
         
         // Re-enable camera follow after exiting combat
         if (cameraFollow != null)
         {
             cameraFollow.EnableFollow();
         }
+        
+        // Re-enable movement AFTER transition completes (not before)
+        var pc = FindFirstObjectByType<PlayerController>();
+        if (pc != null)
+        {
+            pc.SetCanMove(true);
+            Debug.Log("[CombatArena] Transition complete - movement re-enabled");
+        }
+    }
+    
+    /// <summary>
+    /// Returns true if currently in combat or transitioning out of combat.
+    /// Use this to prevent triggering new combat during exit transition.
+    /// </summary>
+    public bool IsInCombatOrTransitioning()
+    {
+        return inCombat || isTransitioning;
     }
     
     private void SpawnEnemyUnits(List<CombatEnemy> enemies)
