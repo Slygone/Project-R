@@ -289,7 +289,7 @@ public class CombatUI : MonoBehaviour
                 var ri = relicRewardButton.GetComponent<Image>();
                 if (ri != null) ri.color = new Color(0.6f, 0.4f, 0.8f, 1f);
                 var rt = relicRewardButton.GetComponentInChildren<TextMeshProUGUI>();
-                if (rt != null) rt.text = $"<color=#96f>\u2726</color>{pendingRelic.DisplayName}<size=16>(Click to collect)</size>";
+                if (rt != null) rt.text = $"<color=#96f>\u2666</color>{pendingRelic.DisplayName}<size=16>(Click to collect)</size>";
                 relicRewardButton.GetComponent<Button>().interactable = true;
                 relicRewardButton.SetActive(true);
             }
@@ -336,7 +336,7 @@ public class CombatUI : MonoBehaviour
         {
             relicRewardButton.GetComponent<Button>().interactable = false;
             var t = relicRewardButton.GetComponentInChildren<TextMeshProUGUI>();
-            if (t != null) t.text = $"<color=#96f>\u2726</color>{pendingRelic.DisplayName}<size=16>(Collected!)</size>";
+            if (t != null) t.text = $"<color=#96f>\u2666</color>{pendingRelic.DisplayName}<size=16>(Collected!)</size>";
         }
     }
 

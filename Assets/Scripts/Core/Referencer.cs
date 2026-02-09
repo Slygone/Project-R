@@ -139,19 +139,17 @@ public class Referencer : MonoBehaviour
             characterLoadoutUI = clObj.AddComponent<CharacterLoadoutUI>();
         }
 
-        var mainCam = Camera.main;
-        if (mainCam != null)
+        // Set up Cinemachine freeroam camera target
+        var cinemachineManager = FindFirstObjectByType<CinemachineCameraManager>();
+        if (cinemachineManager != null)
         {
-            var follow = mainCam.GetComponent<CameraFollow>();
-            if (follow == null)
+            Transform playerTarget = null;
+            if (playerController != null) playerTarget = playerController.transform;
+            else if (player != null) playerTarget = player.transform;
+            
+            if (playerTarget != null)
             {
-                follow = mainCam.gameObject.AddComponent<CameraFollow>();
-            }
-
-            if (follow.target == null)
-            {
-                if (playerController != null) follow.target = playerController.transform;
-                else if (player != null) follow.target = player.transform;
+                cinemachineManager.SetFreeroamTarget(playerTarget);
             }
         }
         

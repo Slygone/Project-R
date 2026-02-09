@@ -754,6 +754,7 @@ public class CombatManager : MonoBehaviour
         
         // ========== ELEMENTAL MARK SYSTEM ==========
         // Apply elemental marks based on skill data (element, markChance, markCount)
+        bool reactionQTETriggered = false;
         if (target != null && target.IsAlive())
         {
             Element markElement = player.GetSkillElement(skillNumber);
@@ -797,6 +798,7 @@ public class CombatManager : MonoBehaviour
                             // Note: marks are consumed inside TriggerMarkReaction
                             pendingSkillNumber = skillNumber;
                             TriggerMarkReaction(target, reactionInfo);
+                            reactionQTETriggered = true;
                         }
                     }
                     
@@ -833,6 +835,16 @@ public class CombatManager : MonoBehaviour
         {
             GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
             NotifyEnemyDeath(target);
+        }
+
+        // When a reaction QTE was triggered, ExecuteSkillWithReaction will handle
+        // cooldown, chain tracking, on-kill effects, and combat-end checks after the QTE resolves.
+        // Do NOT double-apply them here.
+        if (reactionQTETriggered)
+        {
+            // Still update UI and notify arena of the hit
+            if (combatArena != null) combatArena.OnPlayerEnergyChanged();
+            return;
         }
 
         // Apply skill cooldown and energy effects BEFORE possible early return

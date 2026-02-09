@@ -126,7 +126,7 @@ public class EnemyWorldUnit : MonoBehaviour
         nameText.fontStyle = FontStyles.Bold;
         nameText.color = nameplateColor;
         nameText.alignment = TextAlignmentOptions.Center;
-        nameText.enableWordWrapping = false;
+        nameText.textWrappingMode = TextWrappingModes.NoWrap;
         
         // Add outline for readability
         nameText.outlineWidth = 0.4f;

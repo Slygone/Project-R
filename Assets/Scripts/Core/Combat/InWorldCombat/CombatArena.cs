@@ -94,8 +94,8 @@ public class CombatArena : MonoBehaviour
     private Canvas playerWorldCanvas;
     private TextMeshProUGUI playerNameText;
     
-    // Camera reference for disabling follow during combat
-    private CameraFollow cameraFollow;
+    // Camera manager for switching between freeroam and combat cameras
+    private CinemachineCameraManager cameraManager;
     
     public bool InCombat => inCombat;
     public List<EnemyWorldUnit> SpawnedEnemies => spawnedEnemies;
@@ -195,15 +195,15 @@ public class CombatArena : MonoBehaviour
         currentPlayer = Object.FindFirstObjectByType<Player>();
         combatManager = Object.FindFirstObjectByType<CombatManager>();
         
-        // Disable camera follow and center on combat node
-        if (cameraFollow == null && Camera.main != null)
+        // Switch to combat camera — target the actual arena midpoint, not the node position
+        if (cameraManager == null)
         {
-            cameraFollow = Camera.main.GetComponent<CameraFollow>();
+            cameraManager = Object.FindFirstObjectByType<CinemachineCameraManager>();
         }
-        if (cameraFollow != null)
+        if (cameraManager != null)
         {
-            cameraFollow.DisableFollow();
-            cameraFollow.SetCombatPosition(combatCenter);
+            Vector3 arenaCenter = (playerCombatPosition + enemyCombatPosition) / 2f;
+            cameraManager.EnterCombat(arenaCenter);
         }
         
         // Initialize AP from character data
@@ -314,10 +314,10 @@ public class CombatArena : MonoBehaviour
         inCombat = false;
         isTransitioning = false;
         
-        // Re-enable camera follow after exiting combat
-        if (cameraFollow != null)
+        // Switch back to freeroam camera
+        if (cameraManager != null)
         {
-            cameraFollow.EnableFollow();
+            cameraManager.ExitCombat();
         }
         
         // Re-enable movement AFTER transition completes (not before)
@@ -1406,7 +1406,7 @@ public class CombatArena : MonoBehaviour
         playerNameText.fontStyle = FontStyles.Bold;
         playerNameText.color = Color.white;
         playerNameText.alignment = TextAlignmentOptions.Center;
-        playerNameText.enableWordWrapping = false;
+        playerNameText.textWrappingMode = TextWrappingModes.NoWrap;
         
         // Add outline for readability - same as enemy
         playerNameText.outlineWidth = 0.4f;
