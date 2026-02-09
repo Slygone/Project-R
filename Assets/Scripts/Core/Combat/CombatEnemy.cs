@@ -135,6 +135,29 @@ public class CombatEnemy
         ), GameLogVerbosity.Minimal);
     }
     
+    public void ApplySlow(int duration)
+    {
+        // TODO: Extend StatusEffectType to support Slow when needed
+        GameLog.Status(GameLog.Join(
+            "Apply",
+            GameLog.KV("target", Name),
+            GameLog.KV("type", "Slow"),
+            GameLog.KV("dur", duration)
+        ), GameLogVerbosity.Minimal);
+    }
+    
+    public void ApplyWeak(int duration, float magnitude)
+    {
+        // TODO: Extend StatusEffectType to support Weak when needed
+        GameLog.Status(GameLog.Join(
+            "Apply",
+            GameLog.KV("target", Name),
+            GameLog.KV("type", "Weak"),
+            GameLog.KV("magnitude", magnitude),
+            GameLog.KV("dur", duration)
+        ), GameLogVerbosity.Minimal);
+    }
+    
     /// <summary>
     /// Check if enemy is stunned and consume the stun turn.
     /// Call at START of enemy turn BEFORE any actions.

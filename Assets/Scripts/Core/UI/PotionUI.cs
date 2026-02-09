@@ -15,7 +15,6 @@ public class PotionUI : MonoBehaviour
     private bool isActive = false;
     private Player player;
     private CombatManager combatManager;
-    private CombatUI combatUI;
     private bool isInCombat = false;
 
     void Awake()
@@ -30,7 +29,6 @@ public class PotionUI : MonoBehaviour
         {
             player = refs.player;
             combatManager = refs.combatManager;
-            combatUI = refs.combatUI;
         }
     }
 
@@ -276,44 +274,28 @@ public class PotionUI : MonoBehaviour
 
     private string GetPotionTooltipText(PotionData potion)
     {
-        string effect = "";
-        string usage = "";
-        
-        switch (potion.EffectId)
-        {
-            case "eff_potion_heal":
-                effect = $"<color=#90EE90>Restores {potion.EffectValue} HP</color>";
-                usage = "Use: Anytime";
-                break;
-            case "eff_potion_elemental_boost":
-                effect = $"<color=#DDA0DD>Deals {potion.EffectValue} damage</color>\n<color=#888>(Random element)</color>";
-                usage = "<color=#FF6666>Use: Combat only</color>";
-                break;
-            case "eff_potion_crit_rate":
-                effect = $"<color=#FFD700>+{potion.EffectValue}% Crit Chance</color>";
-                usage = "Lasts: This world";
-                break;
-            case "eff_potion_crit_damage":
-                effect = $"<color=#FF69B4>+{potion.EffectValue}% Crit Damage</color>";
-                usage = "Lasts: This world";
-                break;
-        }
-        
+        string effect = potion.Description ?? "";
+        string usage = SkillEffectEngine.NeedsEnemyTarget(potion.Effects) ? "<color=#FF6666>Use: Combat only</color>" : "Use: Anytime";
         return $"<b>{potion.DisplayName}</b>\n{effect}\n<size=10>{usage}</size>";
     }
 
     private Color GetPotionColor(PotionData potion)
     {
-        switch (potion.EffectId)
+        if (potion.Effects == null || potion.Effects.Count == 0)
+            return new Color(0.25f, 0.3f, 0.25f);
+        
+        string firstEffect = potion.Effects[0].effectId;
+        switch (firstEffect)
         {
-            case "eff_potion_heal":
+            case "eff_heal":
                 return new Color(0.4f, 0.2f, 0.2f);
-            case "eff_potion_elemental_boost":
+            case "eff_deal_damage":
                 return new Color(0.3f, 0.25f, 0.4f);
-            case "eff_potion_crit_rate":
-                return new Color(0.4f, 0.35f, 0.2f);
-            case "eff_potion_crit_damage":
-                return new Color(0.35f, 0.2f, 0.35f);
+            case "eff_stat_bonus":
+                string stat = potion.Effects[0].stat ?? "";
+                if (stat == "critChance") return new Color(0.4f, 0.35f, 0.2f);
+                if (stat == "critDamage") return new Color(0.35f, 0.2f, 0.35f);
+                return new Color(0.25f, 0.3f, 0.25f);
             default:
                 return new Color(0.25f, 0.3f, 0.25f);
         }
@@ -321,19 +303,7 @@ public class PotionUI : MonoBehaviour
 
     private string GetPotionEffectText(PotionData potion)
     {
-        switch (potion.EffectId)
-        {
-            case "eff_potion_heal":
-                return $"Heal {potion.EffectValue} HP";
-            case "eff_potion_elemental_boost":
-                return $"Deal {potion.EffectValue} random elemental damage";
-            case "eff_potion_crit_rate":
-                return $"+{potion.EffectValue}% Crit Chance (this world)";
-            case "eff_potion_crit_damage":
-                return $"+{potion.EffectValue}% Crit Damage (this world)";
-            default:
-                return potion.Description;
-        }
+        return potion.Description ?? "Unknown effect";
     }
 
     private void OnPotionSlotClicked(int index)
@@ -343,7 +313,7 @@ public class PotionUI : MonoBehaviour
 
         var potion = potions[index];
 
-        if (potion.EffectId == "eff_potion_elemental_boost")
+        if (SkillEffectEngine.NeedsEnemyTarget(potion.Effects))
         {
             if (!isInCombat)
             {
@@ -362,10 +332,6 @@ public class PotionUI : MonoBehaviour
             var target = aliveEnemies[0];
             if (player.UsePotion(index, target))
             {
-                if (combatUI != null)
-                {
-                    combatUI.UpdateEnemyHealth(target);
-                }
                 RefreshPotionDisplay();
             }
         }

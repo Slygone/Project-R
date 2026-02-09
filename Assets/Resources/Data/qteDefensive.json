@@ -1,7 +1,25 @@
 {
   "qteResults": [
-    { "result": "Bad", "shieldPercent": 1, "description": "Gain 1% max HP as shield" },
-    { "result": "Good", "shieldPercent": 3, "description": "Gain 3% max HP as shield" },
-    { "result": "Perfect", "shieldPercent": 5, "description": "Gain 5% max HP as shield" }
+    {
+      "result": "Bad",
+      "description": "Gain 1% max HP as shield",
+      "effects": [
+        { "effectId": "eff_shield_gain", "target": "Self", "percentOfMaxHealth": 1 }
+      ]
+    },
+    {
+      "result": "Good",
+      "description": "Gain 3% max HP as shield",
+      "effects": [
+        { "effectId": "eff_shield_gain", "target": "Self", "percentOfMaxHealth": 3 }
+      ]
+    },
+    {
+      "result": "Perfect",
+      "description": "Gain 5% max HP as shield",
+      "effects": [
+        { "effectId": "eff_shield_gain", "target": "Self", "percentOfMaxHealth": 5 }
+      ]
+    }
   ]
 }

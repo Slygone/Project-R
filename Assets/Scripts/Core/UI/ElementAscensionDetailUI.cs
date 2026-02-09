@@ -395,16 +395,5 @@ public class ElementAscensionDetailUI : MonoBehaviour
         onClose?.Invoke();
     }
     
-    private Color GetElementColor(string element)
-    {
-        return element.ToLower() switch
-        {
-            "fire" => new Color(1f, 0.4f, 0.2f),
-            "ice" => new Color(0.5f, 0.8f, 1f),
-            "water" => new Color(0.3f, 0.5f, 1f),
-            "wind" => new Color(0.5f, 0.9f, 0.5f),
-            "rock" => new Color(0.8f, 0.6f, 0.3f),
-            _ => Color.white
-        };
-    }
+    private Color GetElementColor(string element) => ElementColors.Get(element);
 }

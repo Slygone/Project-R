@@ -160,8 +160,8 @@ public static class DataCache
             {
                 DisplayName = r.displayName,
                 RestID = r.restId,
-                StatAffected = r.statAffected,
-                Amount = r.amount
+                Description = r.description ?? "",
+                Effects = r.effects ?? new List<EffectEntry>()
             });
         }
 
@@ -179,8 +179,8 @@ public static class DataCache
     {
         public string displayName;
         public int restId;
-        public string statAffected;
-        public int amount;
+        public string description;
+        public List<EffectEntry> effects;
     }
 
     private static List<CharacterData> LoadCharactersFromJson()
@@ -219,11 +219,9 @@ public static class DataCache
                 Id = p.id,
                 DisplayName = p.displayName,
                 PotionID = p.potionID,
-                EffectId = p.effectId,
-                EffectValue = p.effectValue,
-                Target = p.target,
                 Rarity = p.rarity,
-                Description = p.description
+                Description = p.description,
+                Effects = p.effects ?? new List<EffectEntry>()
             });
         }
         
@@ -253,11 +251,9 @@ public static class DataCache
                 Id = r.id,
                 DisplayName = r.displayName,
                 RelicID = r.relicID,
-                EffectId = r.effectId,
-                EffectValue = r.effectValue,
-                EffectParam = r.effectParam,
                 Rarity = r.rarity,
-                Description = r.description
+                Description = r.description,
+                Effects = r.effects ?? new List<EffectEntry>()
             });
         }
         
@@ -277,11 +273,9 @@ public static class DataCache
         public string id;
         public string displayName;
         public int potionID;
-        public string effectId;
-        public int effectValue;
-        public string target;
         public string rarity;
         public string description;
+        public List<EffectEntry> effects;
     }
     
     [System.Serializable]
@@ -296,11 +290,9 @@ public static class DataCache
         public string id;
         public string displayName;
         public int relicID;
-        public string effectId;
-        public int effectValue;
-        public string effectParam;
         public string rarity;
         public string description;
+        public List<EffectEntry> effects;
     }
 
     private static void LoadQTEEffects()
@@ -315,7 +307,7 @@ public static class DataCache
             throw new System.Exception("Missing qteOffensive.json. Expected at Resources/Data/qteOffensive.json");
         }
         
-        var offensiveWrapper = JsonUtility.FromJson<QTEOffensiveWrapper>(offensiveJson.text);
+        var offensiveWrapper = JsonUtility.FromJson<QTEWrapper>(offensiveJson.text);
         if (offensiveWrapper == null || offensiveWrapper.qteResults == null || offensiveWrapper.qteResults.Length == 0)
         {
             throw new System.Exception("qteOffensive.json is empty or malformed.");
@@ -323,7 +315,19 @@ public static class DataCache
         
         foreach (var qte in offensiveWrapper.qteResults)
         {
-            QTEOffensiveMultipliers[qte.result] = qte.multiplier;
+            // Extract multiplier from effects array
+            float mult = 1f;
+            if (qte.effects != null)
+            {
+                foreach (var eff in qte.effects)
+                {
+                    if (eff.effectId == "eff_damage_multiplier" && eff.multiplier != 0f)
+                    {
+                        mult = eff.multiplier;
+                    }
+                }
+            }
+            QTEOffensiveMultipliers[qte.result] = mult;
         }
         
         // Load Defensive QTE from separate file
@@ -333,7 +337,7 @@ public static class DataCache
             throw new System.Exception("Missing qteDefensive.json. Expected at Resources/Data/qteDefensive.json");
         }
         
-        var defensiveWrapper = JsonUtility.FromJson<QTEDefensiveWrapper>(defensiveJson.text);
+        var defensiveWrapper = JsonUtility.FromJson<QTEWrapper>(defensiveJson.text);
         if (defensiveWrapper == null || defensiveWrapper.qteResults == null || defensiveWrapper.qteResults.Length == 0)
         {
             throw new System.Exception("qteDefensive.json is empty or malformed.");
@@ -341,35 +345,34 @@ public static class DataCache
         
         foreach (var qte in defensiveWrapper.qteResults)
         {
-            QTEDefensiveShield[qte.result] = qte.shieldPercent;
+            // Extract shieldPercent from effects array
+            int shield = 0;
+            if (qte.effects != null)
+            {
+                foreach (var eff in qte.effects)
+                {
+                    if (eff.effectId == "eff_shield_gain" && eff.percentOfMaxHealth > 0)
+                    {
+                        shield = eff.percentOfMaxHealth;
+                    }
+                }
+            }
+            QTEDefensiveShield[qte.result] = shield;
         }
     }
     
     [System.Serializable]
-    private class QTEOffensiveWrapper
+    private class QTEWrapper
     {
-        public QTEOffensiveEntry[] qteResults;
+        public QTEEntry[] qteResults;
     }
     
     [System.Serializable]
-    private class QTEDefensiveWrapper
-    {
-        public QTEDefensiveEntry[] qteResults;
-    }
-    
-    [System.Serializable]
-    private class QTEOffensiveEntry
+    private class QTEEntry
     {
         public string result;
-        public float multiplier;
-    }
-    
-    [System.Serializable]
-    private class QTEDefensiveEntry
-    {
-        public string result;
-        public int shieldPercent;
         public string description;
+        public List<EffectEntry> effects;
     }
 
     private static Dictionary<string, ReactionData> LoadReactions()

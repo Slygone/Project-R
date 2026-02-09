@@ -4,121 +4,121 @@
       "id": "potion_health_small",
       "displayName": "Small Health Potion",
       "potionID": 1,
-      "effectId": "eff_potion_heal",
-      "effectValue": 25,
-      "target": "Player",
       "rarity": "Common",
-      "description": "Restores 25 health instantly"
+      "description": "Restores 25 health instantly",
+      "effects": [
+        { "effectId": "eff_heal", "target": "Self", "value": 25 }
+      ]
     },
     {
       "id": "potion_health_medium",
       "displayName": "Medium Health Potion",
       "potionID": 2,
-      "effectId": "eff_potion_heal",
-      "effectValue": 50,
-      "target": "Player",
       "rarity": "Uncommon",
-      "description": "Restores 50 health instantly"
+      "description": "Restores 50 health instantly",
+      "effects": [
+        { "effectId": "eff_heal", "target": "Self", "value": 50 }
+      ]
     },
     {
       "id": "potion_health_large",
       "displayName": "Large Health Potion",
       "potionID": 3,
-      "effectId": "eff_potion_heal",
-      "effectValue": 75,
-      "target": "Player",
       "rarity": "Rare",
-      "description": "Restores 75 health instantly"
+      "description": "Restores 75 health instantly",
+      "effects": [
+        { "effectId": "eff_heal", "target": "Self", "value": 75 }
+      ]
     },
     {
       "id": "potion_elemental_small",
       "displayName": "Small Elemental Impact Potion",
       "potionID": 4,
-      "effectId": "eff_potion_elemental_boost",
-      "effectValue": 10,
-      "target": "Player",
       "rarity": "Common",
-      "description": "Increases elemental damage by 10 for the current combat"
+      "description": "Deals 10 elemental damage to an enemy",
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "SelectedEnemy", "value": 10, "useElemental": true }
+      ]
     },
     {
       "id": "potion_elemental_medium",
       "displayName": "Medium Elemental Impact Potion",
       "potionID": 5,
-      "effectId": "eff_potion_elemental_boost",
-      "effectValue": 20,
-      "target": "Player",
       "rarity": "Uncommon",
-      "description": "Increases elemental damage by 20 for the current combat"
+      "description": "Deals 20 elemental damage to an enemy",
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "SelectedEnemy", "value": 20, "useElemental": true }
+      ]
     },
     {
       "id": "potion_elemental_large",
       "displayName": "Large Elemental Impact Potion",
       "potionID": 6,
-      "effectId": "eff_potion_elemental_boost",
-      "effectValue": 40,
-      "target": "Player",
       "rarity": "Rare",
-      "description": "Increases elemental damage by 40 for the current combat"
+      "description": "Deals 40 elemental damage to an enemy",
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "SelectedEnemy", "value": 40, "useElemental": true }
+      ]
     },
     {
       "id": "potion_crit_rate_small",
       "displayName": "Small Crit Rate Potion",
       "potionID": 7,
-      "effectId": "eff_potion_crit_rate",
-      "effectValue": 5,
-      "target": "Player",
       "rarity": "Common",
-      "description": "Increases critical hit chance by 5% for the current combat"
+      "description": "Increases critical hit chance by 5% for the current combat",
+      "effects": [
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "critChance", "value": 5, "duration": -1 }
+      ]
     },
     {
       "id": "potion_crit_rate_medium",
       "displayName": "Medium Crit Rate Potion",
       "potionID": 8,
-      "effectId": "eff_potion_crit_rate",
-      "effectValue": 10,
-      "target": "Player",
       "rarity": "Uncommon",
-      "description": "Increases critical hit chance by 10% for the current combat"
+      "description": "Increases critical hit chance by 10% for the current combat",
+      "effects": [
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "critChance", "value": 10, "duration": -1 }
+      ]
     },
     {
       "id": "potion_crit_rate_large",
       "displayName": "Large Crit Rate Potion",
       "potionID": 9,
-      "effectId": "eff_potion_crit_rate",
-      "effectValue": 15,
-      "target": "Player",
       "rarity": "Rare",
-      "description": "Increases critical hit chance by 15% for the current combat"
+      "description": "Increases critical hit chance by 15% for the current combat",
+      "effects": [
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "critChance", "value": 15, "duration": -1 }
+      ]
     },
     {
       "id": "potion_crit_damage_small",
       "displayName": "Small Crit Damage Potion",
       "potionID": 10,
-      "effectId": "eff_potion_crit_damage",
-      "effectValue": 10,
-      "target": "Player",
       "rarity": "Common",
-      "description": "Increases critical hit damage by 10% for the current combat"
+      "description": "Increases critical hit damage by 10% for the current combat",
+      "effects": [
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "critDamage", "value": 10, "duration": -1 }
+      ]
     },
     {
       "id": "potion_crit_damage_medium",
       "displayName": "Medium Crit Damage Potion",
       "potionID": 11,
-      "effectId": "eff_potion_crit_damage",
-      "effectValue": 20,
-      "target": "Player",
       "rarity": "Uncommon",
-      "description": "Increases critical hit damage by 20% for the current combat"
+      "description": "Increases critical hit damage by 20% for the current combat",
+      "effects": [
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "critDamage", "value": 20, "duration": -1 }
+      ]
     },
     {
       "id": "potion_crit_damage_large",
       "displayName": "Large Crit Damage Potion",
       "potionID": 12,
-      "effectId": "eff_potion_crit_damage",
-      "effectValue": 30,
-      "target": "Player",
       "rarity": "Rare",
-      "description": "Increases critical hit damage by 30% for the current combat"
+      "description": "Increases critical hit damage by 30% for the current combat",
+      "effects": [
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "critDamage", "value": 30, "duration": -1 }
+      ]
     }
   ]
 }

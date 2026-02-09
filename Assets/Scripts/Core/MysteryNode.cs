@@ -145,9 +145,16 @@ public class MysteryNode : NodeBase
         
         foreach (var relic in DataCache.Relics)
         {
-            if ((relic.EffectParam ?? "").ToLower().Contains(elementName))
+            if (relic.Effects != null)
             {
-                matchingRelics.Add(relic);
+                foreach (var eff in relic.Effects)
+                {
+                    if ((eff.element ?? "").ToLower().Contains(elementName))
+                    {
+                        matchingRelics.Add(relic);
+                        break;
+                    }
+                }
             }
         }
         

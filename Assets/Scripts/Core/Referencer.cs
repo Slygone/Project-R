@@ -12,8 +12,6 @@ public class Referencer : MonoBehaviour
     public CombatManager combatManager;
     public CombatUI combatUI;
     public PlayerStatsUI playerStatsUI;
-    public AffinitySelectionUI affinitySelectionUI;
-    public CharacterSelectionUI characterSelectionUI;
     public TooltipUI tooltipUI;
     public ShopUI shopUI;
     public PotionUI potionUI;
@@ -66,20 +64,6 @@ public class Referencer : MonoBehaviour
         {
             var psuiObj = new GameObject("PlayerStatsUI");
             playerStatsUI = psuiObj.AddComponent<PlayerStatsUI>();
-        }
-        
-        affinitySelectionUI = FindFirstObjectByType<AffinitySelectionUI>();
-        if (affinitySelectionUI == null)
-        {
-            var asuiObj = new GameObject("AffinitySelectionUI");
-            affinitySelectionUI = asuiObj.AddComponent<AffinitySelectionUI>();
-        }
-        
-        characterSelectionUI = FindFirstObjectByType<CharacterSelectionUI>();
-        if (characterSelectionUI == null)
-        {
-            var csuiObj = new GameObject("CharacterSelectionUI");
-            characterSelectionUI = csuiObj.AddComponent<CharacterSelectionUI>();
         }
         
         tooltipUI = FindFirstObjectByType<TooltipUI>();

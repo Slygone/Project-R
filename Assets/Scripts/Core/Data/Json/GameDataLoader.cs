@@ -235,13 +235,13 @@ public static class GameDataLoader
     
     private static float GetSkillDamagePercent(SkillDefinition skill)
     {
-        if (skill?.executions == null) return 100f;
+        if (skill?.effects == null) return 100f;
         
-        foreach (var exec in skill.executions)
+        foreach (var eff in skill.effects)
         {
-            if (exec.effectId == "eff_deal_damage" && exec.@params?.scaling != null)
+            if (eff.effectId == "eff_deal_damage" && eff.multiplier != 0f)
             {
-                return exec.@params.scaling.multiplier * 100f;
+                return eff.multiplier * 100f;
             }
         }
         return 100f;
@@ -254,13 +254,13 @@ public static class GameDataLoader
     
     private static int GetSkillEnergyGain(SkillDefinition skill)
     {
-        if (skill?.executions == null) return 0;
+        if (skill?.effects == null) return 0;
         
-        foreach (var exec in skill.executions)
+        foreach (var eff in skill.effects)
         {
-            if (exec.effectId == "eff_energy_delta" && exec.@params != null && exec.@params.amount > 0)
+            if (eff.effectId == "eff_energy_delta" && eff.amount > 0)
             {
-                return exec.@params.amount;
+                return eff.amount;
             }
         }
         return 0;
@@ -268,13 +268,13 @@ public static class GameDataLoader
     
     private static int GetSkillEnergyCost(SkillDefinition skill)
     {
-        if (skill?.executions == null) return 0;
+        if (skill?.effects == null) return 0;
         
-        foreach (var exec in skill.executions)
+        foreach (var eff in skill.effects)
         {
-            if (exec.effectId == "eff_energy_delta" && exec.@params != null && exec.@params.amount < 0)
+            if (eff.effectId == "eff_energy_delta" && eff.amount < 0)
             {
-                return -exec.@params.amount;
+                return -eff.amount;
             }
         }
         return 0;

@@ -786,20 +786,7 @@ public class CombatArena : MonoBehaviour
         }
     }
     
-    private Color GetElementColor(string element)
-    {
-        switch (element.ToLower())
-        {
-            case "fire": return new Color(1f, 0.4f, 0.2f);
-            case "ice": return new Color(0.5f, 0.8f, 1f);
-            case "water": return new Color(0.3f, 0.5f, 1f);
-            case "wind": return new Color(0.5f, 0.9f, 0.5f);
-            case "rock": return new Color(0.7f, 0.5f, 0.3f);
-            case "lightning": return new Color(1f, 1f, 0.3f);
-            case "none": return Color.white;
-            default: return Color.gray;
-        }
-    }
+    private Color GetElementColor(string element) => ElementColors.Get(element);
     
     private string GetElementString(Element element)
     {
@@ -903,6 +890,7 @@ public class CombatArena : MonoBehaviour
     {
         if (combatManager == null || currentPlayer == null) return;
         if (isSelectingTarget) return; // Already selecting target
+        if (combatManager.IsQTEActive()) return; // Block skills during QTE
         
         // Find the skill data to get AP cost
         SkillButtonData skillData = null;

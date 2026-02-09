@@ -6,7 +6,6 @@ public class GameManager : MonoBehaviour
     private Referencer refs;
     private int completedNodes = 0;
     private const int MAX_WORLD = 5;
-    private bool affinityChosen = false;
     private bool characterChosen = false;
     
     // Track which character is used for the current run (for ascension award)
@@ -119,8 +118,7 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.LogWarning("[GameManager] NewRunCharacterSelectUI not found, using legacy selection");
-            StartCharacterSelection();
+            Debug.LogError("[GameManager] NewRunCharacterSelectUI not found! Cannot start character selection.");
         }
     }
     
@@ -169,10 +167,6 @@ public class GameManager : MonoBehaviour
 
     private void SkipAffinitySelection()
     {
-        // New system: No orb pair selection needed
-        // Skills can be enchanted with sigils dropped from enemies
-        affinityChosen = true;
-        
         if (refs != null && refs.playerController != null)
         {
             refs.playerController.SetCanMove(true);
@@ -181,63 +175,6 @@ public class GameManager : MonoBehaviour
         Debug.Log($"[GameManager] Run started with {refs.player.GetCharacter().DisplayName} (no orb pair - using new elemental mark system)");
     }
     
-    private void StartAffinitySelection()
-    {
-        // DEPRECATED: Old orb pair selection - now skipped
-        SkipAffinitySelection();
-    }
-    
-    private void StartCharacterSelection()
-    {
-        if (refs != null && refs.characterSelectionUI != null)
-        {
-            refs.characterSelectionUI.Show(OnCharacterChosen);
-        }
-        else
-        {
-            Debug.LogError("[GameManager] CharacterSelectionUI not found");
-            characterChosen = true;
-            StartAffinitySelection();
-        }
-    }
-
-    private void OnCharacterChosen(CharacterData character)
-    {
-        characterChosen = true;
-
-        if (refs != null && refs.player != null)
-        {
-            refs.player.SelectCharacter(character);
-        }
-
-        Debug.Log($"[GameManager] Character chosen: {character.DisplayName}");
-        
-        StartAffinitySelection();
-    }
-
-    private void OnAffinityChosen(Element element)
-    {
-        affinityChosen = true;
-
-        if (refs != null && refs.player != null)
-        {
-            refs.player.SetAffinity(element);
-        }
-
-        if (refs != null && refs.playerController != null)
-        {
-            refs.playerController.SetCanMove(true);
-        }
-
-        if (refs != null && refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
-        {
-            refs.playerStatsUI.UpdateStats();
-        }
-
-        Debug.Log($"[GameManager] Run started with {refs.player.GetCharacter().DisplayName} and {element} affinity");
-    }
-
-    public bool HasAffinityBeenChosen() => affinityChosen;
     public bool HasCharacterBeenChosen() => characterChosen;
 
     public void OnNodeCompleted()
@@ -277,8 +214,7 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            Debug.LogError("[GameManager] CombatManager or Player not found for boss fight");
-            ShowVictory();
+            Debug.LogError("[GameManager] CombatManager or Player not found for boss fight! Cannot start boss combat.");
         }
     }
 
@@ -345,19 +281,6 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    private void ShowVictory()
-    {
-        if (refs != null && refs.victoryPanel != null)
-        {
-            refs.victoryPanel.SetActive(true);
-        }
-
-        if (refs != null && refs.playerController != null)
-        {
-            refs.playerController.SetCanMove(false);
-        }
-    }
-    
     private void ShowRunComplete()
     {
         if (refs != null && refs.playerController != null)
@@ -524,7 +447,6 @@ public class GameManager : MonoBehaviour
         // Reset run state
         currentWorld = 1;
         completedNodes = 0;
-        affinityChosen = false;
         characterChosen = false;
         currentRunCharacter = null;
         ResetRunXP();

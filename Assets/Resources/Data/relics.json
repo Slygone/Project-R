@@ -3,102 +3,159 @@
     {
       "id": "relic_fire_damage",
       "displayName": "Fire Damage Relic",
-      "relicID": 1,
-      "effectId": "eff_relic_elemental_damage",
-      "effectValue": 10,
-      "effectParam": "Fire",
+      "relicId": 1,
       "rarity": "Common",
-      "description": "Increases Fire damage by 10"
+      "description": "Increases Fire damage by 10",
+      "effects": [
+        {
+          "effectId": "eff_stat_bonus",
+          "target": "Self",
+          "stat": "elementalDamage",
+          "element": "Fire",
+          "value": 10
+        }
+      ]
     },
     {
       "id": "relic_ice_damage",
       "displayName": "Ice Damage Relic",
-      "relicID": 2,
-      "effectId": "eff_relic_elemental_damage",
-      "effectValue": 10,
-      "effectParam": "Ice",
+      "relicId": 2,
       "rarity": "Common",
-      "description": "Increases Ice damage by 10"
+      "description": "Increases Ice damage by 10",
+      "effects": [
+        {
+          "effectId": "eff_stat_bonus",
+          "target": "Self",
+          "stat": "elementalDamage",
+          "element": "Ice",
+          "value": 10
+        }
+      ]
     },
     {
       "id": "relic_water_damage",
       "displayName": "Water Damage Relic",
-      "relicID": 3,
-      "effectId": "eff_relic_elemental_damage",
-      "effectValue": 10,
-      "effectParam": "Water",
+      "relicId": 3,
       "rarity": "Common",
-      "description": "Increases Water damage by 10"
+      "description": "Increases Water damage by 10",
+      "effects": [
+        {
+          "effectId": "eff_stat_bonus",
+          "target": "Self",
+          "stat": "elementalDamage",
+          "element": "Water",
+          "value": 10
+        }
+      ]
     },
     {
       "id": "relic_wind_damage",
       "displayName": "Wind Damage Relic",
-      "relicID": 4,
-      "effectId": "eff_relic_elemental_damage",
-      "effectValue": 10,
-      "effectParam": "Wind",
+      "relicId": 4,
       "rarity": "Common",
-      "description": "Increases Wind damage by 10"
+      "description": "Increases Wind damage by 10",
+      "effects": [
+        {
+          "effectId": "eff_stat_bonus",
+          "target": "Self",
+          "stat": "elementalDamage",
+          "element": "Wind",
+          "value": 10
+        }
+      ]
     },
     {
       "id": "relic_rock_damage",
       "displayName": "Rock Damage Relic",
-      "relicID": 5,
-      "effectId": "eff_relic_elemental_damage",
-      "effectValue": 10,
-      "effectParam": "Rock",
+      "relicId": 5,
       "rarity": "Common",
-      "description": "Increases Rock damage by 10"
+      "description": "Increases Rock damage by 10",
+      "effects": [
+        {
+          "effectId": "eff_stat_bonus",
+          "target": "Self",
+          "stat": "elementalDamage",
+          "element": "Rock",
+          "value": 10
+        }
+      ]
     },
     {
       "id": "relic_lightning_damage",
       "displayName": "Lightning Damage Relic",
-      "relicID": 6,
-      "effectId": "eff_relic_elemental_damage",
-      "effectValue": 10,
-      "effectParam": "Lightning",
+      "relicId": 6,
       "rarity": "Common",
-      "description": "Increases Lightning damage by 10"
+      "description": "Increases Lightning damage by 10",
+      "effects": [
+        {
+          "effectId": "eff_stat_bonus",
+          "target": "Self",
+          "stat": "elementalDamage",
+          "element": "Lightning",
+          "value": 10
+        }
+      ]
     },
     {
       "id": "relic_all_elemental",
       "displayName": "All Elemental Damage Relic",
-      "relicID": 7,
-      "effectId": "eff_relic_elemental_damage",
-      "effectValue": 10,
-      "effectParam": "All",
+      "relicId": 7,
       "rarity": "Rare",
-      "description": "Increases all elemental damage by 10"
+      "description": "Increases all elemental damage by 10",
+      "effects": [
+        {
+          "effectId": "eff_stat_bonus",
+          "target": "Self",
+          "stat": "elementalDamage",
+          "element": "All",
+          "value": 10
+        }
+      ]
     },
     {
       "id": "relic_crit_rate",
       "displayName": "Crit Rate Relic",
-      "relicID": 8,
-      "effectId": "eff_relic_crit_rate",
-      "effectValue": 10,
-      "effectParam": "",
+      "relicId": 8,
       "rarity": "Uncommon",
-      "description": "Increases critical hit chance by 10%"
+      "description": "Increases critical hit chance by 10%",
+      "effects": [
+        {
+          "effectId": "eff_stat_bonus",
+          "target": "Self",
+          "stat": "critChance",
+          "value": 10
+        }
+      ]
     },
     {
       "id": "relic_crit_damage",
       "displayName": "Crit Damage Relic",
-      "relicID": 9,
-      "effectId": "eff_relic_crit_damage",
-      "effectValue": 20,
-      "effectParam": "",
+      "relicId": 9,
       "rarity": "Uncommon",
-      "description": "Increases critical hit damage by 20%"
+      "description": "Increases critical hit damage by 20%",
+      "effects": [
+        {
+          "effectId": "eff_stat_bonus",
+          "target": "Self",
+          "stat": "critDamage",
+          "value": 20
+        }
+      ]
     },
     {
       "id": "relic_bonus_health",
       "displayName": "Bonus Health Relic",
-      "relicID": 10,
-      "effectId": "eff_relic_max_health",
-      "effectValue": 50,
-      "effectParam": "",
+      "relicId": 10,
       "rarity": "Rare",
-      "description": "Increases maximum health by 50"
+      "description": "Increases maximum health by 50",
+      "effects": [
+        {
+          "effectId": "eff_stat_bonus",
+          "target": "Self",
+          "stat": "maxHealth",
+          "value": 50
+        }
+      ]
     }
   ]
 }

@@ -463,20 +463,25 @@ public class ShopUI : MonoBehaviour
 
     private Color GetRelicColor(RelicData relic)
     {
-        var param = (relic.EffectParam ?? "").ToLower().Trim();
-        switch (param)
+        // Derive color from effects array
+        if (relic.Effects != null && relic.Effects.Count > 0)
         {
-            case "fire": return new Color(0.5f, 0.2f, 0.15f);
-            case "ice": return new Color(0.15f, 0.3f, 0.5f);
-            case "water": return new Color(0.1f, 0.25f, 0.45f);
-            case "wind": return new Color(0.2f, 0.4f, 0.25f);
-            case "rock": return new Color(0.35f, 0.28f, 0.2f);
-            case "lightning": return new Color(0.5f, 0.4f, 0.15f);
-            case "all": return new Color(0.4f, 0.3f, 0.5f);
-            default:
-                if (relic.EffectId == "eff_relic_max_health") return new Color(0.4f, 0.2f, 0.3f);
-                return new Color(0.3f, 0.3f, 0.35f);
+            var first = relic.Effects[0];
+            string element = (first.element ?? "").ToLower().Trim();
+            switch (element)
+            {
+                case "fire": return new Color(0.5f, 0.2f, 0.15f);
+                case "ice": return new Color(0.15f, 0.3f, 0.5f);
+                case "water": return new Color(0.1f, 0.25f, 0.45f);
+                case "wind": return new Color(0.2f, 0.4f, 0.25f);
+                case "rock": return new Color(0.35f, 0.28f, 0.2f);
+                case "lightning": return new Color(0.5f, 0.4f, 0.15f);
+                case "all": return new Color(0.4f, 0.3f, 0.5f);
+            }
+            string stat = (first.stat ?? "").ToLower();
+            if (stat == "maxhealth") return new Color(0.4f, 0.2f, 0.3f);
         }
+        return new Color(0.3f, 0.3f, 0.35f);
     }
 
     private void OnPotionClicked(PotionData potion, GameObject btnObj)

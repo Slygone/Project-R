@@ -2,623 +2,648 @@
   "skills": [
     {
       "id": "skill_slash",
-      "displayName": "Slash",
+      "name": "Slash",
       "description": "Basic sword strike",
-      "cooldownTurns": 0,
       "apCost": 2,
+      "cooldown": 0,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.25 } }
+          "target": "SelectedEnemy",
+          "multiplier": 1.25
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 20 }
+          "target": "Self",
+          "amount": 20
         }
       ]
     },
     {
       "id": "skill_riposte",
-      "displayName": "Riposte",
+      "name": "Riposte",
       "description": "Defensive counter that blocks 50% of the next hit",
-      "cooldownTurns": 2,
       "apCost": 3,
+      "cooldown": 2,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.20 } }
+          "target": "SelectedEnemy",
+          "multiplier": 1.20
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_apply_status",
-          "params": { "statusId": "status_riposte_stance", "durationTurns": 1, "magnitude": 50 }
+          "target": "Self",
+          "status": "status_riposte_stance",
+          "duration": 1,
+          "magnitude": 50
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 28 }
+          "target": "Self",
+          "amount": 28
         }
       ]
     },
     {
       "id": "skill_bladestorm",
-      "displayName": "Bladestorm",
-      "description": "Whirlwind attack hitting all enemies",
-      "cooldownTurns": 4,
+      "name": "Bladestorm",
+      "description": "Whirlwind attack hitting all enemies (Ultimate)",
       "apCost": 4,
+      "cooldown": 4,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": -100 }
+          "target": "Self",
+          "amount": -100
         },
         {
-          "target": { "selector": "AllEnemies" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.50 } }
+          "target": "AllEnemies",
+          "multiplier": 1.50
         }
       ]
     },
     {
       "id": "skill_bolt",
-      "displayName": "Bolt",
+      "name": "Bolt",
       "description": "Quick magic projectile with burning effect",
-      "cooldownTurns": 0,
       "apCost": 2,
+      "cooldown": 0,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.20 } }
+          "target": "SelectedEnemy",
+          "multiplier": 1.20
         },
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_dot",
-          "params": { "percentOfDamage": 30, "durationTurns": 2 }
+          "target": "SelectedEnemy",
+          "damagePercent": 30,
+          "duration": 2
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 22 }
+          "target": "Self",
+          "amount": 22
         }
       ]
     },
     {
       "id": "skill_ray",
-      "displayName": "Ray",
+      "name": "Ray",
       "description": "Focused beam hitting all enemies",
-      "cooldownTurns": 3,
       "apCost": 3,
+      "cooldown": 3,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "AllEnemies" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.30 } }
+          "target": "AllEnemies",
+          "multiplier": 1.30
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 30 }
+          "target": "Self",
+          "amount": 30
         }
       ]
     },
     {
       "id": "skill_meteor",
-      "displayName": "Meteor",
-      "description": "Devastating AOE impact that stuns all enemies",
-      "cooldownTurns": 4,
+      "name": "Meteor",
+      "description": "Devastating AOE impact that stuns all enemies (Ultimate)",
       "apCost": 5,
+      "cooldown": 4,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": -120 }
+          "target": "Self",
+          "amount": -120
         },
         {
-          "target": { "selector": "AllEnemies" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.60 } }
+          "target": "AllEnemies",
+          "multiplier": 1.60
         },
         {
-          "target": { "selector": "AllEnemies" },
           "effectId": "eff_apply_status",
-          "params": { "statusId": "status_stun", "durationTurns": 1 }
+          "target": "AllEnemies",
+          "status": "status_stun",
+          "duration": 1
         }
       ]
     },
     {
       "id": "skill_aimedshot",
-      "displayName": "AimedShot",
+      "name": "AimedShot",
       "description": "Precise shot with increased critical chance and damage",
-      "cooldownTurns": 0,
       "apCost": 2,
+      "cooldown": 0,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_temp_crit_bonus",
-          "params": { "critChanceBonus": 20, "critDamageBonus": 20 }
+          "target": "Self",
+          "critChance": 20,
+          "critDamage": 20
         },
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.20 } }
+          "target": "SelectedEnemy",
+          "multiplier": 1.20
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 18 }
+          "target": "Self",
+          "amount": 18
         }
       ]
     },
     {
       "id": "skill_tripleshot",
-      "displayName": "TripleShot",
+      "name": "TripleShot",
       "description": "Rapid fire hitting target 3 times",
-      "cooldownTurns": 3,
       "apCost": 3,
+      "cooldown": 3,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 0.55 } }
+          "target": "SelectedEnemy",
+          "multiplier": 0.55
         },
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_multi_hit",
-          "params": { "hitCount": 3 }
+          "target": "SelectedEnemy",
+          "hitCount": 3
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 26 }
+          "target": "Self",
+          "amount": 26
         }
       ]
     },
     {
       "id": "skill_doubleup",
-      "displayName": "DoubleUp",
-      "description": "Two arrows, one target. If target dies, next target takes 150% damage",
-      "cooldownTurns": 5,
+      "name": "DoubleUp",
+      "description": "Two arrows, one target. If target dies, next target takes 150% damage (Ultimate)",
       "apCost": 4,
+      "cooldown": 5,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": -100 }
+          "target": "Self",
+          "amount": -100
         },
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.10 } }
+          "target": "SelectedEnemy",
+          "multiplier": 1.10
         },
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_on_kill_bonus",
-          "params": { "bonusDamageToNextTargetMultiplier": 1.50 },
-          "when": "OnKill"
+          "target": "Self",
+          "bonusDamageMultiplier": 1.50
         }
       ]
     },
     {
       "id": "skill_dirtystab",
-      "displayName": "DirtyStab",
-      "description": "Underhanded strike. Can chain 3 times with +20% damage per stack. Then 4-turn cooldown.",
-      "cooldownTurns": 0,
+      "name": "DirtyStab",
+      "description": "Underhanded strike. Can chain 3 times with +20% damage per stack.",
       "apCost": 2,
+      "cooldown": 0,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "chainSettings": {
+        "maxChainUses": 3,
+        "stackBonusPerUse": 0.20,
+        "maxStacks": 2,
+        "forceCooldownAfterMaxChain": 4
+      },
+      "effects": [
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.10 }, "stackBonusPerUse": 0.20, "maxStacks": 2, "forceCooldownAfterMaxChain": 4, "maxChainUses": 3 }
+          "target": "SelectedEnemy",
+          "multiplier": 1.10
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 16 }
+          "target": "Self",
+          "amount": 16
         }
       ]
     },
     {
       "id": "skill_cheapshot",
-      "displayName": "CheapShot",
+      "name": "CheapShot",
       "description": "Quick jab that stuns the enemy",
-      "cooldownTurns": 3,
       "apCost": 3,
+      "cooldown": 3,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 0.90 } }
+          "target": "SelectedEnemy",
+          "multiplier": 0.90
         },
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_apply_status",
-          "params": { "statusId": "status_stun", "durationTurns": 1 }
+          "target": "SelectedEnemy",
+          "status": "status_stun",
+          "duration": 1
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 22 }
+          "target": "Self",
+          "amount": 22
         }
       ]
     },
     {
       "id": "skill_ambush",
-      "displayName": "Ambush",
-      "description": "Strike from shadows. On kill: CD becomes 2 turns, refund 40% energy",
-      "cooldownTurns": 6,
+      "name": "Ambush",
+      "description": "Strike from shadows. On kill: CD becomes 2 turns, refund 40% energy (Ultimate)",
       "apCost": 5,
+      "cooldown": 6,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": -90 }
+          "target": "Self",
+          "amount": -90
         },
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.70 } }
+          "target": "SelectedEnemy",
+          "multiplier": 1.70
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_on_kill_bonus",
-          "params": { "cooldownOverride": 2, "energyRefundPercent": 40 },
-          "when": "OnKill"
+          "target": "Self",
+          "cooldownOverride": 2,
+          "energyRefund": 40
         }
       ]
     },
     {
       "id": "skill_shock",
-      "displayName": "Shock",
+      "name": "Shock",
       "description": "Electric jolt",
-      "cooldownTurns": 0,
       "apCost": 2,
+      "cooldown": 0,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.30 } }
+          "target": "SelectedEnemy",
+          "multiplier": 1.30
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 16 }
+          "target": "Self",
+          "amount": 16
         }
       ]
     },
     {
       "id": "skill_judgement",
-      "displayName": "Judgement",
+      "name": "Judgement",
       "description": "Divine strike that heals for 20% of damage dealt",
-      "cooldownTurns": 2,
       "apCost": 3,
+      "cooldown": 2,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.30 } }
+          "target": "SelectedEnemy",
+          "multiplier": 1.30
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_lifesteal",
-          "params": { "percentOfDamage": 20 }
+          "target": "Self",
+          "percent": 20
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 22 }
+          "target": "Self",
+          "amount": 22
         }
       ]
     },
     {
       "id": "skill_holynova",
-      "displayName": "HolyNova",
-      "description": "Holy explosion hitting all enemies. Gain shield equal to 70% of damage dealt",
-      "cooldownTurns": 4,
+      "name": "HolyNova",
+      "description": "Holy explosion hitting all enemies. Gain shield equal to 70% of damage dealt (Ultimate)",
       "apCost": 4,
+      "cooldown": 4,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": -100 }
+          "target": "Self",
+          "amount": -100
         },
         {
-          "target": { "selector": "AllEnemies" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.30 } }
+          "target": "AllEnemies",
+          "multiplier": 1.30
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_shield_gain",
-          "params": { "percentOfDamage": 70, "capPercentMaxHP": 40 }
+          "target": "Self",
+          "percentOfDamage": 70,
+          "capPercent": 40
         }
       ]
     },
     {
       "id": "skill_shield_bash",
-      "displayName": "ShieldBash",
+      "name": "ShieldBash",
       "description": "Bash enemy with shield, dealing damage and reducing their damage",
-      "cooldownTurns": 2,
       "apCost": 2,
+      "cooldown": 2,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 0.80 } }
+          "target": "SelectedEnemy",
+          "multiplier": 0.80
         },
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_apply_status",
-          "params": { "statusId": "status_weak", "durationTurns": 2, "magnitude": 20 }
+          "target": "SelectedEnemy",
+          "status": "status_weak",
+          "duration": 2,
+          "magnitude": 20
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 15 }
+          "target": "Self",
+          "amount": 15
         }
       ]
     },
     {
       "id": "skill_war_cry",
-      "displayName": "WarCry",
+      "name": "WarCry",
       "description": "Boost your damage for the next 2 turns",
-      "cooldownTurns": 3,
       "apCost": 2,
+      "cooldown": 3,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_apply_status",
-          "params": { "statusId": "status_damage_up", "durationTurns": 2, "magnitude": 25 }
+          "target": "Self",
+          "status": "status_damage_up",
+          "duration": 2,
+          "magnitude": 25
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 18 }
+          "target": "Self",
+          "amount": 18
         }
       ]
     },
     {
       "id": "skill_frost_nova",
-      "displayName": "FrostNova",
+      "name": "FrostNova",
       "description": "Freeze nearby enemies, slowing them",
-      "cooldownTurns": 2,
       "apCost": 3,
+      "cooldown": 2,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "AllEnemies" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 0.60 } }
+          "target": "AllEnemies",
+          "multiplier": 0.60
         },
         {
-          "target": { "selector": "AllEnemies" },
           "effectId": "eff_apply_status",
-          "params": { "statusId": "status_slow", "durationTurns": 1 }
+          "target": "AllEnemies",
+          "status": "status_slow",
+          "duration": 1
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 20 }
+          "target": "Self",
+          "amount": 20
         }
       ]
     },
     {
       "id": "skill_arcane_shield",
-      "displayName": "ArcaneShield",
+      "name": "ArcaneShield",
       "description": "Create a magical barrier that absorbs damage",
-      "cooldownTurns": 3,
       "apCost": 2,
+      "cooldown": 3,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_shield_gain",
-          "params": { "flatAmount": 30, "capPercentMaxHP": 40 }
+          "target": "Self",
+          "value": 30,
+          "capPercent": 40
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 15 }
+          "target": "Self",
+          "amount": 15
         }
       ]
     },
     {
       "id": "skill_piercing_arrow",
-      "displayName": "PiercingArrow",
+      "name": "PiercingArrow",
       "description": "Arrow that ignores armor, dealing true damage",
-      "cooldownTurns": 2,
       "apCost": 3,
+      "cooldown": 2,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.00 }, "ignoreArmor": true }
+          "target": "SelectedEnemy",
+          "multiplier": 1.00,
+          "ignoreArmor": true
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 20 }
+          "target": "Self",
+          "amount": 20
         }
       ]
     },
     {
       "id": "skill_evasive_roll",
-      "displayName": "EvasiveRoll",
+      "name": "EvasiveRoll",
       "description": "Dodge the next attack and counter",
-      "cooldownTurns": 3,
       "apCost": 2,
+      "cooldown": 3,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_apply_status",
-          "params": { "statusId": "status_evasion", "durationTurns": 1, "magnitude": 100 }
+          "target": "Self",
+          "status": "status_evasion",
+          "duration": 1,
+          "magnitude": 100
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 12 }
+          "target": "Self",
+          "amount": 12
         }
       ]
     },
     {
       "id": "skill_smoke_bomb",
-      "displayName": "SmokeBomb",
+      "name": "SmokeBomb",
       "description": "Throw smoke to blind enemies, reducing their accuracy",
-      "cooldownTurns": 2,
       "apCost": 2,
+      "cooldown": 2,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "AllEnemies" },
           "effectId": "eff_apply_status",
-          "params": { "statusId": "status_blind", "durationTurns": 1, "magnitude": 50 }
+          "target": "AllEnemies",
+          "status": "status_blind",
+          "duration": 1,
+          "magnitude": 50
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 14 }
+          "target": "Self",
+          "amount": 14
         }
       ]
     },
     {
       "id": "skill_backstab",
-      "displayName": "Backstab",
+      "name": "Backstab",
       "description": "Strike from behind for critical damage",
-      "cooldownTurns": 2,
       "apCost": 3,
+      "cooldown": 2,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_temp_crit_bonus",
-          "params": { "critChanceBonus": 50, "critDamageBonus": 30 }
+          "target": "Self",
+          "critChance": 50,
+          "critDamage": 30
         },
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.15 } }
+          "target": "SelectedEnemy",
+          "multiplier": 1.15
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 18 }
+          "target": "Self",
+          "amount": 18
         }
       ]
     },
     {
       "id": "skill_divine_shield",
-      "displayName": "DivineShield",
+      "name": "DivineShield",
       "description": "Holy protection that shields and heals",
-      "cooldownTurns": 3,
       "apCost": 3,
+      "cooldown": 3,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_shield_gain",
-          "params": { "flatAmount": 25, "capPercentMaxHP": 40 }
+          "target": "Self",
+          "value": 25,
+          "capPercent": 40
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_heal",
-          "params": { "flatAmount": 15 }
+          "target": "Self",
+          "value": 15
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 16 }
+          "target": "Self",
+          "amount": 16
         }
       ]
     },
     {
       "id": "skill_smite",
-      "displayName": "Smite",
+      "name": "Smite",
       "description": "Call down holy fire on an enemy",
-      "cooldownTurns": 2,
       "apCost": 3,
+      "cooldown": 2,
       "element": "none",
       "markChance": 100,
       "markCount": 1,
-      "executions": [
+      "effects": [
         {
-          "target": { "selector": "SelectedEnemy" },
           "effectId": "eff_deal_damage",
-          "params": { "scaling": { "source": "BaseDamage", "multiplier": 1.40 } }
+          "target": "SelectedEnemy",
+          "multiplier": 1.40
         },
         {
-          "target": { "selector": "Self" },
           "effectId": "eff_energy_delta",
-          "params": { "amount": 20 }
+          "target": "Self",
+          "amount": 20
         }
       ]
     }

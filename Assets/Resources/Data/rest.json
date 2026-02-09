@@ -3,14 +3,18 @@
     {
       "displayName": "Heal",
       "restId": 1,
-      "statAffected": "Health",
-      "amount": 20
+      "description": "Restore 20% of max health",
+      "effects": [
+        { "effectId": "eff_heal", "target": "Self", "percentOfMaxHealth": 20 }
+      ]
     },
     {
       "displayName": "Upgrade",
       "restId": 2,
-      "statAffected": "Damage",
-      "amount": 5
+      "description": "Permanently increase base damage by 5",
+      "effects": [
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "damage", "value": 5 }
+      ]
     }
   ]
 }

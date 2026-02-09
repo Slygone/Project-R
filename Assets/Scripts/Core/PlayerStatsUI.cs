@@ -309,19 +309,7 @@ public class PlayerStatsUI : MonoBehaviour
 
     public bool IsOpen() => isOpen;
 
-    private string GetElementColor(Element element)
-    {
-        switch (element)
-        {
-            case Element.Fire: return "#ff4422";
-            case Element.Ice: return "#44ddff";
-            case Element.Water: return "#4488ff";
-            case Element.Wind: return "#88ff88";
-            case Element.Rock: return "#aa8866";
-            case Element.Lightning: return "#ffdd44";
-            default: return "#888888";
-        }
-    }
+    private string GetElementColor(Element element) => ElementColors.GetHex(element);
 
     private string FormatElementBonus(Element element, Player player, Element affinity)
     {
@@ -358,13 +346,13 @@ public class PlayerStatsUI : MonoBehaviour
         if (skillDef != null)
         {
             float damagePercent = 100f;
-            if (skillDef.executions != null)
+            if (skillDef.effects != null)
             {
-                foreach (var exec in skillDef.executions)
+                foreach (var eff in skillDef.effects)
                 {
-                    if (exec.effectId == "eff_deal_damage" && exec.@params?.scaling != null)
+                    if (eff.effectId == "eff_deal_damage" && eff.multiplier != 0f)
                     {
-                        damagePercent = exec.@params.scaling.multiplier * 100f;
+                        damagePercent = eff.multiplier * 100f;
                         break;
                     }
                 }

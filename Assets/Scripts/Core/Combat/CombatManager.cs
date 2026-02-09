@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
 
 public enum CombatType { Normal, Elite, Boss }
@@ -47,11 +47,6 @@ public class CombatManager : MonoBehaviour
         onBossCombatComplete = onBossComplete;
         currentNode = null;
         
-        if (combatUI == null)
-        {
-            combatUI = FindFirstObjectByType<CombatUI>();
-        }
-
         player = playerRef;
         enemies.Clear();
 
@@ -107,23 +102,10 @@ public class CombatManager : MonoBehaviour
             combatArena = FindFirstObjectByType<CombatArena>();
         }
         
-        bool usingInWorldCombat = false;
         if (combatArena != null && pcBoss != null)
         {
-            // Seamless in-world combat - move player and spawn enemy visuals
             Vector3 combatCenter = pcBoss.transform.position;
             combatArena.EnterCombat(pcBoss.transform, enemies, combatCenter);
-            usingInWorldCombat = true;
-        }
-
-        // Only show old CombatUI panel if NOT using in-world combat
-        if (!usingInWorldCombat && combatUI != null)
-        {
-            string title = world >= 5 ? "FINAL BOSS FIGHT!" : "BOSS FIGHT!";
-            combatUI.ShowCombat(enemies, player, title);
-            // Refresh skill/AP displays to reflect reset state
-            combatUI.UpdateSkillButtons(player);
-            combatUI.UpdateAPDisplay(player);
         }
     }
 
@@ -137,11 +119,6 @@ public class CombatManager : MonoBehaviour
             DataCache.LoadAll();
         }
         
-        if (combatUI == null)
-        {
-            combatUI = FindFirstObjectByType<CombatUI>();
-        }
-
         currentNode = node;
         player = playerRef;
         enemies.Clear();
@@ -189,20 +166,10 @@ public class CombatManager : MonoBehaviour
             combatArena = FindFirstObjectByType<CombatArena>();
         }
         
-        bool usingInWorldCombat = false;
         if (combatArena != null && pc != null)
         {
-            // Seamless in-world combat - move player and spawn enemy visuals
             Vector3 combatCenter = node != null ? node.transform.position : pc.transform.position;
             combatArena.EnterCombat(pc.transform, enemies, combatCenter);
-            usingInWorldCombat = true;
-        }
-
-        // Only show old CombatUI panel if NOT using in-world combat
-        if (!usingInWorldCombat && combatUI != null)
-        {
-            string title = currentCombatType == CombatType.Elite ? "ELITE ENCOUNTER!" : null;
-            combatUI.ShowCombat(enemies, player, title);
         }
     }
 
@@ -249,6 +216,8 @@ public class CombatManager : MonoBehaviour
             1 => character.Skill1,
             2 => character.Skill2,
             3 => character.Skill3,
+            4 => character.Skill4,
+            5 => character.Skill5,
             _ => $"Skill {skillNumber}"
         };
     }
@@ -306,14 +275,6 @@ public class CombatManager : MonoBehaviour
         pendingReactionDetonator = Element.None;
     }
     
-    // DEPRECATED: Old orb-based reaction system - now using new mark system
-    private void TriggerReactionAction(CombatEnemy target, int skillNumber, bool isAttack)
-    {
-        // This method is no longer used - reactions are now triggered by the mark system
-        // When 6 marks of same element OR 3+3 of different elements are applied to an enemy
-        GameLog.Combat(GameLog.Join("DeprecatedMethod", GameLog.KV("method", "TriggerReactionAction")));
-    }
-    
     /// <summary>
     /// New mark-based reaction trigger. Called when marks reach threshold on an enemy.
     /// </summary>
@@ -322,6 +283,7 @@ public class CombatManager : MonoBehaviour
         if (target == null || reactionInfo == null) return;
         
         pendingTarget = target;
+        pendingIsAttack = false;
         pendingReactionFirstElement = reactionInfo.PrimaryElement;
         pendingReactionDetonator = reactionInfo.SecondaryElement != Element.None ? reactionInfo.SecondaryElement : reactionInfo.PrimaryElement;
         pendingInfusedElement = reactionInfo.PrimaryElement;
@@ -361,10 +323,7 @@ public class CombatManager : MonoBehaviour
         ));
         
         // Show reaction floating text
-        if (combatUI != null)
-        {
-            combatUI.ShowReactionToEnemy(target, pendingReactionName, pendingReactionEffectValue);
-        }
+        ShowReactionToEnemy(target, pendingReactionName, pendingReactionEffectValue);
         
         if (qtePanel == null)
         {
@@ -449,11 +408,6 @@ public class CombatManager : MonoBehaviour
 
         ShowDamageToEnemy(target, damage, isCrit);
         
-        if (combatUI != null)
-        {
-            combatUI.UpdateEnemyHealth(target);
-        }
-        
         // Notify in-world combat arena of damage
         NotifyEnemyHit(target);
 
@@ -469,12 +423,6 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
-        // Player can continue using skills - turn does NOT end after attack
-        if (combatUI != null)
-        {
-            combatUI.UpdateSkillButtons(player);
-            combatUI.UpdateAPDisplay(player);
-        }
     }
     
     private void ExecuteAttackWithReaction(CombatEnemy target, string reactionEffectId, int reactionEffectValue, float qteMultiplier, Element? forcedElement, QTEResult qteResult)
@@ -558,12 +506,6 @@ public class CombatManager : MonoBehaviour
             ShowShieldToPlayer(shieldAfterReact - shieldBeforeReact, FloatingTextType.ShieldGain);
         }
         
-        if (combatUI != null)
-        {
-            combatUI.UpdateEnemyHealth(target);
-            combatUI.UpdatePlayerHealth(player); // Update in case of shield effects
-        }
-        
         // Notify in-world combat arena of damage
         NotifyEnemyHit(target);
 
@@ -580,12 +522,6 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
-        // Player can continue using skills - turn does NOT end after reaction
-        if (combatUI != null)
-        {
-            combatUI.UpdateSkillButtons(player);
-            combatUI.UpdateAPDisplay(player);
-        }
     }
 
     public void OnPlayerSkill(int skillNumber)
@@ -597,14 +533,20 @@ public class CombatManager : MonoBehaviour
         }
     }
 
+    public bool IsQTEActive()
+    {
+        if (qtePanel != null && qtePanel.IsActive()) return true;
+        if (defensiveQTE != null && defensiveQTE.IsActive()) return true;
+        return false;
+    }
+
     public void OnPlayerSkillTarget(int skillNumber, CombatEnemy target)
     {
         if (!combatActive || !isPlayerTurn) return;
         if (target == null || !target.IsAlive()) return;
         
         // Block skill usage during QTE
-        if (qtePanel != null && qtePanel.IsActive()) return;
-        if (defensiveQTE != null && defensiveQTE.IsActive()) return;
+        if (IsQTEActive()) return;
 
         var character = player.GetCharacter();
         if (character == null)
@@ -673,84 +615,37 @@ public class CombatManager : MonoBehaviour
         int apCost = GetSkillAPCost(character, skillNumber);
         player.SpendAP(apCost);
 
-        // Get skill info from character data
-        string skillName;
-        float skillDamagePercent;
-        string skillEffect;
+        // Look up SkillDefinition from JSON data
+        var skillDef = GetSkillDefinition(skillNumber);
+        string skillName = skillDef != null ? skillDef.displayName : GetSkillName(skillNumber);
+        var effects = skillDef?.effects;
         
-        switch (skillNumber)
+        // Read skill properties from data
+        float skillMultiplier = SkillEffectEngine.GetDamageMultiplier(effects);
+        int hitCount = SkillEffectEngine.GetMultiHitCount(effects);
+        bool isAoE = SkillEffectEngine.IsAoE(effects);
+        var (tempCritBonus, tempCritDmgBonusPct) = SkillEffectEngine.GetTempCritBonus(effects);
+        float tempCritDmgBonus = tempCritDmgBonusPct / 100f;
+        
+        // Chain mechanic from chainSettings (data-driven, per-skill)
+        int skillIndex = skillNumber - 1;
+        float chainBonus = 1f;
+        if (skillDef?.chainSettings != null && skillDef.chainSettings.maxChainUses > 0)
         {
-            case 1:
-                skillName = character.Skill1;
-                skillDamagePercent = character.Skill1DamagePercent;
-                skillEffect = character.Skill1Effect;
-                break;
-            case 2:
-                skillName = character.Skill2;
-                skillDamagePercent = character.Skill2DamagePercent;
-                skillEffect = character.Skill2Effect;
-                break;
-            case 3:
-                skillName = character.Skill3;
-                skillDamagePercent = character.Skill3DamagePercent;
-                skillEffect = character.Skill3Effect;
-                break;
-            case 4:
-                skillName = character.Skill4;
-                skillDamagePercent = character.Skill4DamagePercent;
-                skillEffect = character.Skill4Effect;
-                break;
-            case 5:
-                skillName = character.Skill5;
-                skillDamagePercent = character.Skill5DamagePercent;
-                skillEffect = character.Skill5Effect;
-                break;
-            default:
-                skillName = "Unknown";
-                skillDamagePercent = 100f;
-                skillEffect = "null";
-                break;
+            int stacks = player.GetChainStacks(skillIndex);
+            if (stacks > 0)
+            {
+                int cappedStacks = Mathf.Min(stacks, skillDef.chainSettings.maxStacks);
+                chainBonus = 1f + (cappedStacks * skillDef.chainSettings.stackBonusPerUse);
+            }
         }
         
         string skillLower = skillName.ToLower();
         // Get skill's enchanted element (from sigil or base character data)
         Element skillElement = player.GetSkillElement(skillNumber);
         Element attackElement = forcedElement ?? (skillElement != Element.None ? skillElement : player.GetAffinity());
-        
-        // Special handling for skills with unique mechanics
-        int hitCount = 1;
-        bool isAoE = false;
-        int tempCritBonus = 0;
-        float tempCritDmgBonus = 0f;
-        float dirtyStabBonus = 1f;
-        
-        // Parse skill effects
-        if (skillLower == "tripleshot")
-        {
-            hitCount = 3;
-        }
-        else if (skillLower == "aimedshot")
-        {
-            tempCritBonus = 20;
-            tempCritDmgBonus = 0.2f;
-        }
-        else if (skillLower == "dirtystab")
-        {
-            int stacks = player.GetDirtyStabStacks();
-            if (stacks > 0)
-            {
-                dirtyStabBonus = 1f + (Mathf.Min(stacks, 2) * 0.2f);
-            }
-        }
-        else if (skillEffect != null && skillEffect.ToLower().Contains("aoe"))
-        {
-            isAoE = true;
-        }
-        
-        // Calculate base damage from skill percent
-        float skillMultiplier = skillDamagePercent / 100f;
         int charDamage = player.GetCharacterDamage();
-        int baseDamageBeforeElement = Mathf.RoundToInt(charDamage * skillMultiplier * dirtyStabBonus);
+        int baseDamageBeforeElement = Mathf.RoundToInt(charDamage * skillMultiplier * chainBonus);
         
         // Add elemental bonus based on skill's element (from enchantment or base)
         int elementalBonus = attackElement != Element.None ? player.GetElementalBonus(attackElement) : 0;
@@ -782,7 +677,7 @@ public class CombatManager : MonoBehaviour
                 GameLog.KV("hitCount", hitCount),
                 GameLog.KV("critChanceBonus", tempCritBonus),
                 GameLog.KV("critDmgBonus", tempCritDmgBonus.ToString("F2")),
-                GameLog.KV("dirtyStab", dirtyStabBonus.ToString("F2"))
+                GameLog.KV("chainBonus", chainBonus.ToString("F2"))
             )),
             GameLog.KV("reactionId", reactionMultiplier > 1f ? (pendingReactionId ?? "unknown") : "none")
         ));
@@ -900,26 +795,35 @@ public class CombatManager : MonoBehaviour
                             
                             // Trigger reaction effect (QTE panel or direct execution)
                             // Note: marks are consumed inside TriggerMarkReaction
+                            pendingSkillNumber = skillNumber;
                             TriggerMarkReaction(target, reactionInfo);
                         }
                     }
                     
                     // Update enemy UI to show marks
-                    if (combatUI != null)
-                    {
-                        combatUI.UpdateEnemyHealth(target);
-                    }
+                    
                 }
             }
         }
         
-        // Apply skill-specific effects AFTER damage
-        ApplySkillEffects(skillLower, skillEffect, target, totalDamageDealt, attackElement);
-        
-        if (combatUI != null)
+        // Apply skill post-hit effects via data-driven engine
+        var effectCtx = new SkillEffectEngine.EffectContext
         {
-            combatUI.UpdateEnemyHealth(target);
-        }
+            Player = player,
+            Target = target,
+            AllEnemies = enemies,
+            DamageDealt = totalDamageDealt,
+            AttackElement = attackElement,
+            SkillName = skillName,
+            SkillNumber = skillNumber
+        };
+        var effectResult = SkillEffectEngine.Execute(effects, effectCtx);
+        
+        // Show floating text for effects
+        if (effectResult.HealAmount > 0)
+            ShowHealToPlayer(effectResult.HealAmount);
+        if (effectResult.ShieldGained > 0)
+            ShowShieldToPlayer(effectResult.ShieldGained, FloatingTextType.ShieldGain);
         
         // Notify in-world combat arena of damage
         NotifyEnemyHit(target);
@@ -940,28 +844,42 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
-        // Handle kill effects AFTER cooldown/energy application so overrides (e.g. Ambush) persist
-        if (targetKilled)
+        // Handle on-kill effects from data (e.g., Ambush energy refund, DoubleUp chain)
+        if (targetKilled && effectResult.HasOnKillBonus)
         {
-            HandleKillEffects(skillLower, target, totalDamageDealt);
+            if (effectResult.OnKillEnergyRefundPercent > 0)
+            {
+                int refund = Mathf.RoundToInt(player.GetMaxEnergy() * (effectResult.OnKillEnergyRefundPercent / 100f));
+                player.GainEnergy(refund);
+            }
+            if (effectResult.OnKillCooldownOverride > 0)
+            {
+                player.SetSkillCooldown(skillNumber - 1, effectResult.OnKillCooldownOverride);
+            }
+            if (effectResult.OnKillBonusDamageMultiplier > 0)
+            {
+                var nextTarget = GetFirstAliveEnemy();
+                if (nextTarget != null)
+                {
+                    int chainDamage = Mathf.RoundToInt(totalDamageDealt * effectResult.OnKillBonusDamageMultiplier);
+                    nextTarget.TakeDamage(chainDamage);
+                    ShowDamageToEnemy(nextTarget, chainDamage, false);
+                }
+            }
+            if (combatArena != null) combatArena.OnPlayerEnergyChanged();
         }
         
-        // Track DirtyStab consecutive uses (handles 4-turn CD after 3rd use internally)
-        if (skillLower == "dirtystab")
+        // Track chain skills (data-driven, per-skill)
+        // Using a chain skill: reset all other chains, then increment this one
+        // Using a non-chain skill: reset ALL chains (breaks any active chain)
+        if (skillDef?.chainSettings != null && skillDef.chainSettings.maxChainUses > 0)
         {
-            player.IncrementDirtyStabUse();
+            player.ResetAllChainStacksExcept(skillNumber - 1);
+            player.IncrementChainUse(skillNumber - 1, skillDef.chainSettings);
         }
         else
         {
-            // Reset DirtyStab stacks if using different skill
-            player.ResetDirtyStabStacks();
-        }
-        
-        if (combatUI != null)
-        {
-            combatUI.UpdatePlayerEnergy(player);
-            combatUI.UpdateSkillButtons(player);
-            combatUI.UpdateAPDisplay(player);
+            player.ResetAllChainStacksExcept(-1);
         }
         
         // Update CombatArena skill states (for ultimate availability)
@@ -1022,168 +940,21 @@ public class CombatManager : MonoBehaviour
         EnemyTurn();
     }
     
-    private void ApplySkillEffects(string skillLower, string skillEffect, CombatEnemy target, int damageDealt, Element attackElement)
+    private SkillDefinition GetSkillDefinition(int skillNumber)
     {
-        if (string.IsNullOrEmpty(skillEffect) || skillEffect.ToLower() == "null") return;
+        var charDef = player.GetCharacter();
+        if (charDef == null) return null;
         
-        string effectLower = skillEffect.ToLower();
+        // Map skill number to character's skillIds via GameDataLoader
+        string skillId = null;
+        var characterDef = GameDataLoader.GetCharacterByNumericId(charDef.CharacterID);
+        if (characterDef != null && characterDef.skillIds != null && skillNumber >= 1 && skillNumber - 1 < characterDef.skillIds.Count)
+        {
+            skillId = characterDef.skillIds[skillNumber - 1];
+        }
         
-        // Riposte - Block 50% next hit
-        if (skillLower == "riposte")
-        {
-            player.ApplyBlock(50f);
-        }
-        // Bolt - 30% DoT for 2 turns (stacks up to 3x with 50% carryover)
-        else if (skillLower == "bolt" && effectLower.Contains("dot"))
-        {
-            int dotDamage = Mathf.RoundToInt(damageDealt * 0.30f);
-            target.ApplyDoT(dotDamage, 2, "Bolt");
-            
-            // Show burn status floating text
-            if (combatUI != null)
-            {
-                combatUI.ShowStatusToEnemy(target, "Burn", true);
-            }
-        }
-        // Meteor - Stun all enemies 1 turn
-        else if (skillLower == "meteor" && effectLower.Contains("stun"))
-        {
-            foreach (var enemy in enemies)
-            {
-                if (enemy.IsAlive())
-                {
-                    enemy.ApplyStun(1);
-                    
-                    // Show stun status floating text
-                    if (combatUI != null)
-                    {
-                        combatUI.ShowStatusToEnemy(enemy, "Stunned", true);
-                    }
-                }
-            }
-        }
-        // CheapShot - Stun 1 turn
-        else if (skillLower == "cheapshot" && effectLower.Contains("stun"))
-        {
-            if (target.IsAlive())
-            {
-                target.ApplyStun(1);
-                
-                // Show stun status floating text
-                if (combatUI != null)
-                {
-                    combatUI.ShowStatusToEnemy(target, "Stunned", true);
-                }
-            }
-        }
-        // Judgement - 20% lifesteal
-        else if (skillLower == "judgement" && effectLower.Contains("heal"))
-        {
-            int healAmount = Mathf.RoundToInt(damageDealt * 0.20f);
-            player.Heal(healAmount);
-            GameLog.Combat(GameLog.Join(
-                "Heal",
-                GameLog.KV("who", "Player"),
-                GameLog.KV("amount", healAmount),
-                GameLog.KV("source", "Skill:Judgement")
-            ));
-            
-            // Show heal floating text
-            ShowHealToPlayer(healAmount);
-            if (combatUI != null)
-            {
-                combatUI.UpdatePlayerHealth(player);
-            }
-        }
-        // HolyNova - Shield = 70% of damage dealt (cap 40% MaxHP)
-        else if (skillLower == "holynova" && effectLower.Contains("shield"))
-        {
-            int shieldAmount = Mathf.RoundToInt(damageDealt * 0.70f);
-            player.AddShield(shieldAmount);
-            GameLog.Combat(GameLog.Join(
-                "ShieldGain",
-                GameLog.KV("who", "Player"),
-                GameLog.KV("amount", shieldAmount),
-                GameLog.KV("source", "Skill:HolyNova")
-            ));
-            
-            // Show shield gain floating text
-            ShowShieldToPlayer(shieldAmount, FloatingTextType.ShieldGain);
-            if (combatUI != null)
-            {
-                combatUI.UpdatePlayerHealth(player);
-            }
-        }
-    }
-    
-    private void HandleKillEffects(string skillLower, CombatEnemy killedTarget, int damageDealt)
-    {
-        var character = player.GetCharacter();
-        if (character == null) return;
-        
-        // Ambush - If kill: CD becomes 2 turns and refund 40% energy
-        if (skillLower == "ambush")
-        {
-            // Refund 40% of max energy
-            int refund = Mathf.RoundToInt(player.GetMaxEnergy() * 0.40f);
-            player.GainEnergy(refund);
-            
-            // Set cooldown to 2 turns instead of normal cooldown
-            player.SetSkillCooldown(2, 2);
-
-            GameLog.Combat(GameLog.Join(
-                "KillEffect",
-                GameLog.KV("skill", "Ambush"),
-                GameLog.KV("energyRefund", refund),
-                GameLog.KV("cooldownSet", 2)
-            ));
-
-            if (combatUI != null)
-            {
-                combatUI.UpdatePlayerEnergy(player);
-                combatUI.UpdateSkillButtons(player);
-            }
-            
-            if (combatArena != null)
-            {
-                combatArena.OnPlayerEnergyChanged();
-            }
-        }
-        // DoubleUp - If target dies, next target hit for 150% damage
-        else if (skillLower == "doubleup")
-        {
-            var nextTarget = GetFirstAliveEnemy();
-            if (nextTarget != null)
-            {
-                int chainDamage = Mathf.RoundToInt(damageDealt * 1.50f);
-                int hpBefore = nextTarget.Health;
-                nextTarget.TakeDamage(chainDamage);
-
-                GameLog.Combat(GameLog.Join(
-                    "DamageApply",
-                    GameLog.KV("target", nextTarget.Name),
-                    GameLog.KV("resistTotal", "0%"),
-                    GameLog.KV("shieldBefore", 0),
-                    GameLog.KV("shieldAbsorbed", 0),
-                    GameLog.KV("shieldAfter", 0),
-                    GameLog.KV("hpBefore", hpBefore),
-                    GameLog.KV("dmgFinal", chainDamage),
-                    GameLog.KV("hpAfter", nextTarget.Health),
-                    GameLog.KV("source", "Skill:DoubleUpChain")
-                ));
-                
-                ShowDamageToEnemy(nextTarget, chainDamage, false);
-                if (combatUI != null)
-                {
-                    combatUI.UpdateEnemyHealth(nextTarget);
-                }
-                
-                if (!nextTarget.IsAlive())
-                {
-                    GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", nextTarget.Name), GameLog.KV("source", "DoubleUpChain")));
-                }
-            }
-        }
+        if (string.IsNullOrEmpty(skillId)) return null;
+        return GameDataLoader.GetSkill(skillId);
     }
     
     private void ExecuteSkillWithReaction(int skillNumber, CombatEnemy target, string reactionEffectId, int reactionEffectValue, float qteMultiplier, Element? forcedElement, QTEResult qteResult)
@@ -1191,51 +962,15 @@ public class CombatManager : MonoBehaviour
         var character = player.GetCharacter();
         if (character == null) return;
 
-        // Get skill info from character data
-        string skillName;
-        float skillDamagePercent;
-        string skillEffect;
+        // Look up SkillDefinition from JSON data
+        var skillDef = GetSkillDefinition(skillNumber);
+        string skillName = skillDef != null ? skillDef.displayName : GetSkillName(skillNumber);
+        var effects = skillDef?.effects;
         
-        switch (skillNumber)
-        {
-            case 1:
-                skillName = character.Skill1;
-                skillDamagePercent = character.Skill1DamagePercent;
-                skillEffect = character.Skill1Effect;
-                break;
-            case 2:
-                skillName = character.Skill2;
-                skillDamagePercent = character.Skill2DamagePercent;
-                skillEffect = character.Skill2Effect;
-                break;
-            case 3:
-                skillName = character.Skill3;
-                skillDamagePercent = character.Skill3DamagePercent;
-                skillEffect = character.Skill3Effect;
-                break;
-            case 4:
-                skillName = character.Skill4;
-                skillDamagePercent = character.Skill4DamagePercent;
-                skillEffect = character.Skill4Effect;
-                break;
-            case 5:
-                skillName = character.Skill5;
-                skillDamagePercent = character.Skill5DamagePercent;
-                skillEffect = character.Skill5Effect;
-                break;
-            default:
-                skillName = "Unknown";
-                skillDamagePercent = 100f;
-                skillEffect = "null";
-                break;
-        }
-
-        float skillMultiplier = skillDamagePercent / 100f;
-        string skillLower = skillName.ToLower();
+        float skillMultiplier = SkillEffectEngine.GetDamageMultiplier(effects);
+        bool isAoE = SkillEffectEngine.IsAoE(effects);
+        
         Element attackElement = forcedElement ?? player.GetAffinity();
-        
-        // Check for AoE
-        bool isAoE = skillEffect != null && skillEffect.ToLower().Contains("aoe");
         
         // Player Skill Attack Order with Reaction:
         // 1. Base damage = (character damage * skill multiplier) + elemental bonus
@@ -1268,20 +1003,30 @@ public class CombatManager : MonoBehaviour
         if (isAoE)
         {
             DamageAllEnemies(finalDamage, forcedElement, isCrit);
-            // DamageAllEnemies shows floating text for all enemies
         }
         else
         {
             target.TakeDamage(finalDamage);
             ShowDamageToEnemy(target, finalDamage, isCrit);
-            if (combatUI != null)
-            {
-                combatUI.UpdateEnemyHealth(target);
-            }
         }
         
-        // Apply skill effects
-        ApplySkillEffects(skillLower, skillEffect, target, finalDamage, attackElement);
+        // Apply skill post-hit effects via data-driven engine
+        var effectCtx = new SkillEffectEngine.EffectContext
+        {
+            Player = player,
+            Target = target,
+            AllEnemies = enemies,
+            DamageDealt = finalDamage,
+            AttackElement = attackElement,
+            SkillName = skillName,
+            SkillNumber = skillNumber
+        };
+        var effectResult = SkillEffectEngine.Execute(effects, effectCtx);
+        
+        if (effectResult.HealAmount > 0)
+            ShowHealToPlayer(effectResult.HealAmount);
+        if (effectResult.ShieldGained > 0)
+            ShowShieldToPlayer(effectResult.ShieldGained, FloatingTextType.ShieldGain);
         
         GameLog.Combat(GameLog.Join(
             "AttackRoll",
@@ -1310,14 +1055,10 @@ public class CombatManager : MonoBehaviour
         int shieldBeforeReact2 = player.GetShield();
         ReactionEffectEngine.ApplyPostHitEffects(pendingReactionId, player, target, finalDamage, attackElement);
         
-        if (combatUI != null)
+        int shieldAfterReact2 = player.GetShield();
+        if (shieldAfterReact2 > shieldBeforeReact2)
         {
-            int shieldAfterReact2 = player.GetShield();
-            if (shieldAfterReact2 > shieldBeforeReact2)
-            {
-                ShowShieldToPlayer(shieldAfterReact2 - shieldBeforeReact2, FloatingTextType.ShieldGain);
-            }
-            combatUI.UpdatePlayerHealth(player); // Update in case of shield effects
+            ShowShieldToPlayer(shieldAfterReact2 - shieldBeforeReact2, FloatingTextType.ShieldGain);
         }
         
         // Notify in-world combat arena of damage
@@ -1340,27 +1081,42 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
-        // Handle kill effects AFTER cooldown/energy application so overrides (e.g. Ambush) persist
-        if (targetKilled)
+        // Handle on-kill effects from data
+        if (targetKilled && effectResult.HasOnKillBonus)
         {
-            HandleKillEffects(skillLower, target, finalDamage);
+            if (effectResult.OnKillEnergyRefundPercent > 0)
+            {
+                int refund = Mathf.RoundToInt(player.GetMaxEnergy() * (effectResult.OnKillEnergyRefundPercent / 100f));
+                player.GainEnergy(refund);
+            }
+            if (effectResult.OnKillCooldownOverride > 0)
+            {
+                player.SetSkillCooldown(skillNumber - 1, effectResult.OnKillCooldownOverride);
+            }
+            if (effectResult.OnKillBonusDamageMultiplier > 0)
+            {
+                var nextTarget = GetFirstAliveEnemy();
+                if (nextTarget != null)
+                {
+                    int chainDamage = Mathf.RoundToInt(finalDamage * effectResult.OnKillBonusDamageMultiplier);
+                    nextTarget.TakeDamage(chainDamage);
+                    ShowDamageToEnemy(nextTarget, chainDamage, false);
+                }
+            }
+            if (combatArena != null) combatArena.OnPlayerEnergyChanged();
         }
         
-        // Track DirtyStab
-        if (skillLower == "dirtystab")
+        // Track chain skills (data-driven, per-skill)
+        // Using a chain skill: reset all other chains, then increment this one
+        // Using a non-chain skill: reset ALL chains (breaks any active chain)
+        if (skillDef?.chainSettings != null && skillDef.chainSettings.maxChainUses > 0)
         {
-            player.IncrementDirtyStabUse();
+            player.ResetAllChainStacksExcept(skillNumber - 1);
+            player.IncrementChainUse(skillNumber - 1, skillDef.chainSettings);
         }
         else
         {
-            player.ResetDirtyStabStacks();
-        }
-        
-        if (combatUI != null)
-        {
-            combatUI.UpdatePlayerEnergy(player);
-            combatUI.UpdateSkillButtons(player);
-            combatUI.UpdateAPDisplay(player);
+            player.ResetAllChainStacksExcept(-1);
         }
         
         // Update CombatArena skill states (for ultimate availability)
@@ -1372,29 +1128,6 @@ public class CombatManager : MonoBehaviour
         // Player can continue using skills - turn does NOT end after reaction skill
     }
     
-    private float GetSkillMultiplier(string skillName)
-    {
-        return skillName.ToLower() switch
-        {
-            "slash" => 1.0f,
-            "riposte" => 0.8f,
-            "bladestorm" => 1.5f,
-            "bolt" => 0.9f,
-            "ray" => 1.2f,
-            "meteor" => 2.0f,
-            "aimedshot" => 1.3f,
-            "tripleshot" => 0.5f,
-            "doubleup" => 2.0f,
-            "dirtystab" => 1.1f,
-            "cheapshot" => 0.7f,
-            "ambush" => 1.8f,
-            "shock" => 0.9f,
-            "judgement" => 1.4f,
-            "holynova" => 1.2f,
-            _ => 1.0f
-        };
-    }
-
     private void DamageAllEnemies(int damage, Element? forcedElement = null, bool isCrit = false)
     {
         Element attackElement = forcedElement ?? player.GetAffinity();
@@ -1420,10 +1153,7 @@ public class CombatManager : MonoBehaviour
                 ));
                 // Show floating text for each enemy hit by AOE
                 ShowDamageToEnemy(enemy, finalDamage, isCrit);
-                if (combatUI != null)
-                {
-                    combatUI.UpdateEnemyHealth(enemy);
-                }
+                
             }
         }
     }
@@ -1458,9 +1188,9 @@ public class CombatManager : MonoBehaviour
                 bool isStunned = enemy.CheckAndConsumeStun();
                 
                 // Show stun skip floating text
-                if (isStunned && combatUI != null)
+                if (isStunned)
                 {
-                    combatUI.ShowTurnSkippedToEnemy(enemy, "Stunned!");
+                    ShowTurnSkippedToEnemy(enemy, "Stunned!");
                     yield return new WaitForSeconds(0.3f); // Brief pause for stun text
                 }
                 
@@ -1479,16 +1209,10 @@ public class CombatManager : MonoBehaviour
                 }
                 
                 // Show DoT tick floating text
-                if (dotDamage > 0 && combatUI != null)
+                if (dotDamage > 0)
                 {
-                    combatUI.ShowDoTTickToEnemy(enemy, dotDamage, "Burn");
+                    ShowDoTTickToEnemy(enemy, dotDamage, "Burn");
                     yield return new WaitForSeconds(0.25f); // Brief pause for DoT text
-                }
-                
-                if (combatUI != null)
-                {
-                    // Always update UI to reflect status changes
-                    combatUI.UpdateEnemyHealth(enemy);
                 }
                 
                 // Check if enemy died from DoT
@@ -1621,10 +1345,7 @@ public class CombatManager : MonoBehaviour
             ));
             
             ShowShieldToPlayer(shieldAmount, FloatingTextType.ShieldGain);
-            if (combatUI != null)
-            {
-                combatUI.UpdatePlayerHealth(player);
-            }
+            
         }
 
         GameLog.Combat(GameLog.Join(
@@ -1653,21 +1374,17 @@ public class CombatManager : MonoBehaviour
                 GameLog.KV("hpAfter", player.GetHealth())
             ));
 
-            if (combatUI != null)
+            if (dmgInfo.shieldAbsorbed > 0)
             {
-                if (dmgInfo.shieldAbsorbed > 0)
-                {
-                    ShowShieldToPlayer(dmgInfo.shieldAbsorbed, FloatingTextType.ShieldAbsorb);
-                }
-                if (dmgInfo.shieldBroken)
-                {
-                    ShowShieldToPlayer(0, FloatingTextType.ShieldBroken);
-                }
-                if (dmgInfo.finalDamage > 0)
-                {
-                    ShowDamageToPlayer(dmgInfo.finalDamage);
-                }
-                combatUI.UpdatePlayerHealth(player);
+                ShowShieldToPlayer(dmgInfo.shieldAbsorbed, FloatingTextType.ShieldAbsorb);
+            }
+            if (dmgInfo.shieldBroken)
+            {
+                ShowShieldToPlayer(0, FloatingTextType.ShieldBroken);
+            }
+            if (dmgInfo.finalDamage > 0)
+            {
+                ShowDamageToPlayer(dmgInfo.finalDamage);
             }
         }
 
@@ -1733,11 +1450,7 @@ public class CombatManager : MonoBehaviour
         // Refresh AP at start of player's turn
         player.RefreshAP();
 
-        if (combatUI != null)
-        {
-            combatUI.SetPlayerTurn(true);
-            combatUI.UpdateAPDisplay(player);
-        }
+        
         
         // Reset AP in CombatArena UI
         if (combatArena != null)
@@ -1838,6 +1551,7 @@ public class CombatManager : MonoBehaviour
             }
             
             // Show reward UI for all combat victories
+            if (combatUI == null) combatUI = FindFirstObjectByType<CombatUI>();
             if (combatUI != null)
             {
                 bool isElite = currentCombatType == CombatType.Elite;
@@ -1967,11 +1681,6 @@ public class CombatManager : MonoBehaviour
             }
         }
         
-        // Fallback to CombatUI (2D panel)
-        if (combatUI != null)
-        {
-            combatUI.ShowDamageToEnemy(enemy, damage, isCrit);
-        }
     }
     
     /// <summary>
@@ -1993,11 +1702,6 @@ public class CombatManager : MonoBehaviour
             }
         }
         
-        // Fallback to CombatUI
-        if (combatUI != null)
-        {
-            combatUI.ShowDamageToPlayer(damage);
-        }
     }
     
     /// <summary>
@@ -2014,13 +1718,7 @@ public class CombatManager : MonoBehaviour
             if (transform != null)
             {
                 ftm.ShowHeal(transform, amount);
-                return;
             }
-        }
-        
-        if (combatUI != null)
-        {
-            combatUI.ShowHealToPlayer(amount);
         }
     }
     
@@ -2038,13 +1736,67 @@ public class CombatManager : MonoBehaviour
             if (transform != null)
             {
                 ftm.ShowShield(transform, amount, type);
-                return;
             }
         }
+    }
+    
+    /// <summary>
+    /// Show reaction floating text on an enemy
+    /// </summary>
+    private void ShowReactionToEnemy(CombatEnemy enemy, string reactionName, int effectValue)
+    {
+        var ftm = FloatingTextManager.Instance;
+        if (ftm == null || combatArena == null) return;
         
-        if (combatUI != null)
+        var transform = combatArena.GetEnemyTransform(enemy);
+        if (transform != null)
         {
-            combatUI.ShowShieldToPlayer(amount, type);
+            ftm.ShowReaction(transform, reactionName, 0f, effectValue);
+        }
+    }
+    
+    /// <summary>
+    /// Show status effect floating text on an enemy
+    /// </summary>
+    private void ShowStatusToEnemy(CombatEnemy enemy, string statusName, bool gained)
+    {
+        var ftm = FloatingTextManager.Instance;
+        if (ftm == null || combatArena == null) return;
+        
+        var transform = combatArena.GetEnemyTransform(enemy);
+        if (transform != null)
+        {
+            ftm.ShowStatus(transform, statusName, gained);
+        }
+    }
+    
+    /// <summary>
+    /// Show turn skipped floating text on an enemy
+    /// </summary>
+    private void ShowTurnSkippedToEnemy(CombatEnemy enemy, string reason)
+    {
+        var ftm = FloatingTextManager.Instance;
+        if (ftm == null || combatArena == null) return;
+        
+        var transform = combatArena.GetEnemyTransform(enemy);
+        if (transform != null)
+        {
+            ftm.ShowTurnSkipped(transform, reason);
+        }
+    }
+    
+    /// <summary>
+    /// Show DoT tick floating text on an enemy
+    /// </summary>
+    private void ShowDoTTickToEnemy(CombatEnemy enemy, int damage, string dotName)
+    {
+        var ftm = FloatingTextManager.Instance;
+        if (ftm == null || combatArena == null) return;
+        
+        var transform = combatArena.GetEnemyTransform(enemy);
+        if (transform != null)
+        {
+            ftm.ShowDoTTick(transform, damage, dotName);
         }
     }
     

@@ -43,8 +43,8 @@ public class Player : MonoBehaviour
     // Status effects (Shield, Block)
     private StatusEffectManager statusEffects = new StatusEffectManager();
     
-    // DirtyStab consecutive use tracking
-    private int dirtyStabConsecutiveUses = 0;
+    // Per-skill chain use tracking (for skills with chainSettings)
+    private int[] chainConsecutiveUses = new int[5];
 
     void Awake()
     {
@@ -382,7 +382,7 @@ public class Player : MonoBehaviour
     public void ClearDebuffs()
     {
         statusEffects.ClearDebuffs();
-        dirtyStabConsecutiveUses = 0;
+        for (int i = 0; i < 5; i++) chainConsecutiveUses[i] = 0;
         GameLog.Status(GameLog.Join(
             "ClearDebuffs",
             GameLog.KV("who", "Player")
@@ -408,6 +408,65 @@ public class Player : MonoBehaviour
             GameLog.KV("stat", $"ElementalDamage_{element}"),
             GameLog.KV("delta", amount),
             GameLog.KV("now", elementalDamage.Get(element))
+        ), GameLogVerbosity.Verbose);
+    }
+
+    public void AddElementalDamageBonus(string elementName, int amount)
+    {
+        if (elementName == "All")
+        {
+            foreach (Element el in System.Enum.GetValues(typeof(Element)))
+            {
+                if (el != Element.None) elementalDamage.Add(el, amount);
+            }
+        }
+        else if (System.Enum.TryParse<Element>(elementName, true, out var parsed))
+        {
+            elementalDamage.Add(parsed, amount);
+        }
+    }
+
+    public void AddTempCritChance(int amount)
+    {
+        tempCritChanceBonus += amount;
+    }
+
+    public void AddTempCritDamage(int amount)
+    {
+        tempCritDamageBonus += amount;
+    }
+
+    public void AddPermanentCritChance(int amount)
+    {
+        critChance += amount;
+    }
+
+    public void AddPermanentCritDamage(int amount)
+    {
+        critDamage += amount / 100f;
+    }
+
+    public void AddMaxHealth(int amount)
+    {
+        maxHealth += amount;
+        health += amount;
+    }
+
+    public void ApplyDamageBuff(float magnitude, int duration)
+    {
+        // TODO: Extend StatusEffectType to support DamageUp when needed
+        GameLog.Status(GameLog.Join("ApplyDamageBuff",
+            GameLog.KV("magnitude", magnitude),
+            GameLog.KV("duration", duration)
+        ), GameLogVerbosity.Verbose);
+    }
+
+    public void ApplyEvasion(float magnitude, int duration)
+    {
+        // TODO: Extend StatusEffectType to support Evasion when needed
+        GameLog.Status(GameLog.Join("ApplyEvasion",
+            GameLog.KV("magnitude", magnitude),
+            GameLog.KV("duration", duration)
         ), GameLogVerbosity.Verbose);
     }
 
@@ -533,71 +592,44 @@ public class Player : MonoBehaviour
     public void UseSkillAndApplyEffects(int skillIndex)
     {
         if (selectedCharacter == null) return;
+        if (skillIndex < 0 || skillIndex >= 5) return;
         
-        // Apply cooldown based on skill (skills 1-4 gain energy, skill 5 costs energy)
-        switch (skillIndex)
+        // Look up SkillDefinition directly from JSON for cooldown and energy
+        var charDef = GameDataLoader.GetCharacterByNumericId(selectedCharacter.CharacterID);
+        SkillDefinition skillDef = null;
+        if (charDef != null && charDef.skillIds != null && skillIndex < charDef.skillIds.Count)
         {
-            case 0: // Skill 1
-                skillCooldowns[0] = selectedCharacter.Skill1Cooldown;
-                GainEnergy(selectedCharacter.Skill1EnergyGain);
-                GameLog.Combat(GameLog.Join(
-                    "SkillUse",
-                    GameLog.KV("who", "Player"),
-                    GameLog.KV("skill", 1),
-                    GameLog.KV("cd", skillCooldowns[0]),
-                    GameLog.KV("energyGain", selectedCharacter.Skill1EnergyGain),
-                    GameLog.KV("energy", $"{energy}/{maxEnergy}")
-                ), GameLogVerbosity.Verbose);
-                break;
-            case 1: // Skill 2
-                skillCooldowns[1] = selectedCharacter.Skill2Cooldown;
-                GainEnergy(selectedCharacter.Skill2EnergyGain);
-                GameLog.Combat(GameLog.Join(
-                    "SkillUse",
-                    GameLog.KV("who", "Player"),
-                    GameLog.KV("skill", 2),
-                    GameLog.KV("cd", skillCooldowns[1]),
-                    GameLog.KV("energyGain", selectedCharacter.Skill2EnergyGain),
-                    GameLog.KV("energy", $"{energy}/{maxEnergy}")
-                ), GameLogVerbosity.Verbose);
-                break;
-            case 2: // Skill 3
-                skillCooldowns[2] = selectedCharacter.Skill3Cooldown;
-                GainEnergy(selectedCharacter.Skill3EnergyGain);
-                GameLog.Combat(GameLog.Join(
-                    "SkillUse",
-                    GameLog.KV("who", "Player"),
-                    GameLog.KV("skill", 3),
-                    GameLog.KV("cd", skillCooldowns[2]),
-                    GameLog.KV("energyGain", selectedCharacter.Skill3EnergyGain),
-                    GameLog.KV("energy", $"{energy}/{maxEnergy}")
-                ), GameLogVerbosity.Verbose);
-                break;
-            case 3: // Skill 4
-                skillCooldowns[3] = selectedCharacter.Skill4Cooldown;
-                GainEnergy(selectedCharacter.Skill4EnergyGain);
-                GameLog.Combat(GameLog.Join(
-                    "SkillUse",
-                    GameLog.KV("who", "Player"),
-                    GameLog.KV("skill", 4),
-                    GameLog.KV("cd", skillCooldowns[3]),
-                    GameLog.KV("energyGain", selectedCharacter.Skill4EnergyGain),
-                    GameLog.KV("energy", $"{energy}/{maxEnergy}")
-                ), GameLogVerbosity.Verbose);
-                break;
-            case 4: // Skill 5 (Ultimate)
-                skillCooldowns[4] = selectedCharacter.Skill5Cooldown;
-                SpendEnergy(selectedCharacter.Skill5EnergyCost);
-                GameLog.Combat(GameLog.Join(
-                    "SkillUse",
-                    GameLog.KV("who", "Player"),
-                    GameLog.KV("skill", 5),
-                    GameLog.KV("cd", skillCooldowns[4]),
-                    GameLog.KV("energySpend", selectedCharacter.Skill5EnergyCost),
-                    GameLog.KV("energy", $"{energy}/{maxEnergy}")
-                ), GameLogVerbosity.Verbose);
-                break;
+            skillDef = GameDataLoader.GetSkill(charDef.skillIds[skillIndex]);
         }
+        
+        // Set cooldown directly from JSON skill definition
+        int cooldown = skillDef != null ? skillDef.cooldown : 0;
+        skillCooldowns[skillIndex] = cooldown;
+        
+        
+        
+        // Apply energy: skills 1-4 gain energy, skill 5 costs energy
+        int energyGain = skillDef != null ? SkillEffectEngine.GetEnergyGain(skillDef.effects) : 0;
+        int energyCost = skillDef != null ? SkillEffectEngine.GetEnergyCost(skillDef.effects) : 0;
+        
+        if (energyCost > 0)
+        {
+            SpendEnergy(energyCost);
+        }
+        else if (energyGain > 0)
+        {
+            GainEnergy(energyGain);
+        }
+        
+        GameLog.Combat(GameLog.Join(
+            "SkillUse",
+            GameLog.KV("who", "Player"),
+            GameLog.KV("skill", skillIndex + 1),
+            GameLog.KV("cd", cooldown),
+            GameLog.KV("energyGain", energyGain),
+            GameLog.KV("energyCost", energyCost),
+            GameLog.KV("energy", $"{energy}/{maxEnergy}")
+        ), GameLogVerbosity.Verbose);
     }
     
     public void GainEnergy(int amount)
@@ -638,7 +670,7 @@ public class Player : MonoBehaviour
     {
         // NOTE: Cooldowns are NOT reset - they persist between combats
         combatTurnCount = 0;
-        dirtyStabConsecutiveUses = 0;
+        for (int i = 0; i < 5; i++) chainConsecutiveUses[i] = 0;
         currentAP = maxAP; // Start combat with full AP
         statusEffects.ClearCombatEffects(); // Keep shield, clear block
         GameLog.System(GameLog.Join(
@@ -762,49 +794,59 @@ public class Player : MonoBehaviour
         statusEffects.TickTempResists();
     }
     
-    // ========== DIRTYSTAB TRACKING ==========
-    // Can be used 3 turns in a row. Each consecutive use grants +20% damage (max 2 stacks).
-    // After 3rd consecutive use, goes on 4-turn cooldown and stacks reset.
+    // ========== CHAIN SKILL TRACKING ==========
+    // Generic per-skill chain tracking driven by ChainSettings from JSON.
+    // e.g. DirtyStab: maxChainUses=3, stackBonusPerUse=0.20, maxStacks=2, forceCooldownAfterMaxChain=4
     
-    public int GetDirtyStabStacks() => dirtyStabConsecutiveUses;
+    public int GetChainStacks(int skillIndex) => skillIndex >= 0 && skillIndex < 5 ? chainConsecutiveUses[skillIndex] : 0;
     
-    public void IncrementDirtyStabUse()
+    public void IncrementChainUse(int skillIndex, ChainSettings settings)
     {
-        dirtyStabConsecutiveUses++;
+        if (skillIndex < 0 || skillIndex >= 5 || settings == null) return;
+        
+        chainConsecutiveUses[skillIndex]++;
         GameLog.System(GameLog.Join(
-            "DirtyStab",
-            GameLog.KV("event", "Use"),
-            GameLog.KV("stacks", dirtyStabConsecutiveUses)
+            "ChainUse",
+            GameLog.KV("skill", skillIndex + 1),
+            GameLog.KV("stacks", chainConsecutiveUses[skillIndex])
         ), GameLogVerbosity.Verbose);
         
-        // After 3rd use, apply 4-turn cooldown and reset stacks
-        if (dirtyStabConsecutiveUses >= 3)
+        // After max chain uses, apply forced cooldown from JSON and reset stacks
+        if (chainConsecutiveUses[skillIndex] >= settings.maxChainUses)
         {
-            skillCooldowns[0] = 4; // Force 4-turn cooldown on Skill1 (DirtyStab)
-            dirtyStabConsecutiveUses = 0;
+            skillCooldowns[skillIndex] = settings.forceCooldownAfterMaxChain;
+            chainConsecutiveUses[skillIndex] = 0;
             GameLog.System(GameLog.Join(
-                "DirtyStab",
-                GameLog.KV("event", "CooldownTrigger"),
-                GameLog.KV("cd", 4),
+                "ChainCooldown",
+                GameLog.KV("skill", skillIndex + 1),
+                GameLog.KV("cd", settings.forceCooldownAfterMaxChain),
                 GameLog.KV("stacks", 0)
             ), GameLogVerbosity.Verbose);
         }
     }
     
-    public void ResetDirtyStabStacks()
+    public void ResetChainStacks(int skillIndex)
     {
-        if (dirtyStabConsecutiveUses > 0)
+        if (skillIndex < 0 || skillIndex >= 5) return;
+        if (chainConsecutiveUses[skillIndex] > 0)
         {
             GameLog.System(GameLog.Join(
-                "DirtyStab",
-                GameLog.KV("event", "Reset"),
-                GameLog.KV("was", dirtyStabConsecutiveUses)
+                "ChainReset",
+                GameLog.KV("skill", skillIndex + 1),
+                GameLog.KV("was", chainConsecutiveUses[skillIndex])
             ), GameLogVerbosity.Verbose);
-            dirtyStabConsecutiveUses = 0;
+            chainConsecutiveUses[skillIndex] = 0;
         }
     }
-    
-    public bool IsDirtyStabOnExtendedCooldown() => skillCooldowns[0] == 4 && dirtyStabConsecutiveUses == 0;
+
+    public void ResetAllChainStacksExcept(int exceptSkillIndex)
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            if (i != exceptSkillIndex)
+                ResetChainStacks(i);
+        }
+    }
 
     public void AddGold(int amount)
     {
@@ -840,71 +882,15 @@ public class Player : MonoBehaviour
 
     private void ApplyRelicBonus(RelicData relic)
     {
-        switch (relic.EffectId)
-        {
-            case "eff_relic_elemental_damage":
-                if (relic.EffectParam == "All")
-                {
-                    elementalDamage.Add(Element.Fire, relic.EffectValue);
-                    elementalDamage.Add(Element.Ice, relic.EffectValue);
-                    elementalDamage.Add(Element.Water, relic.EffectValue);
-                    elementalDamage.Add(Element.Wind, relic.EffectValue);
-                    elementalDamage.Add(Element.Rock, relic.EffectValue);
-                    elementalDamage.Add(Element.Lightning, relic.EffectValue);
-                    GameLog.System(GameLog.Join(
-                        "RelicApply",
-                        GameLog.KV("effectId", relic.EffectId),
-                        GameLog.KV("type", "AllElements"),
-                        GameLog.KV("amount", relic.EffectValue)
-                    ), GameLogVerbosity.Verbose);
-                }
-                else
-                {
-                    Element element = ElementalDamage.ParseElement(relic.EffectParam);
-                    if (element != Element.None)
-                    {
-                        elementalDamage.Add(element, relic.EffectValue);
-                        GameLog.System(GameLog.Join(
-                            "RelicApply",
-                            GameLog.KV("effectId", relic.EffectId),
-                            GameLog.KV("element", element),
-                            GameLog.KV("amount", relic.EffectValue)
-                        ), GameLogVerbosity.Verbose);
-                    }
-                }
-                break;
-                
-            case "eff_relic_crit_rate":
-                critChance += relic.EffectValue;
-                GameLog.System(GameLog.Join(
-                    "RelicApply",
-                    GameLog.KV("effectId", relic.EffectId),
-                    GameLog.KV("delta", relic.EffectValue),
-                    GameLog.KV("now", critChance)
-                ), GameLogVerbosity.Verbose);
-                break;
-                
-            case "eff_relic_crit_damage":
-                critDamage += relic.EffectValue / 100f;
-                GameLog.System(GameLog.Join(
-                    "RelicApply",
-                    GameLog.KV("effectId", relic.EffectId),
-                    GameLog.KV("deltaPct", relic.EffectValue),
-                    GameLog.KV("now", critDamage.ToString("F2"))
-                ), GameLogVerbosity.Verbose);
-                break;
-                
-            case "eff_relic_max_health":
-                maxHealth += relic.EffectValue;
-                health += relic.EffectValue;
-                GameLog.System(GameLog.Join(
-                    "RelicApply",
-                    GameLog.KV("effectId", relic.EffectId),
-                    GameLog.KV("delta", relic.EffectValue),
-                    GameLog.KV("hp", $"{health}/{maxHealth}")
-                ), GameLogVerbosity.Verbose);
-                break;
-        }
+        if (relic.Effects == null || relic.Effects.Count == 0) return;
+        
+        var result = SkillEffectEngine.ExecuteRest(relic.Effects, this);
+        
+        GameLog.System(GameLog.Join(
+            "RelicApply",
+            GameLog.KV("relic", relic.DisplayName),
+            GameLog.KV("effectCount", relic.Effects.Count)
+        ), GameLogVerbosity.Verbose);
     }
 
     public List<RelicData> GetRelics() => relics;
@@ -960,81 +946,33 @@ public class Player : MonoBehaviour
         }
 
         var potion = potionInventory[index];
-        potionInventory.RemoveAt(index);
-
-        switch (potion.EffectId)
+        
+        // Check if potion needs a target but none available
+        if (SkillEffectEngine.NeedsEnemyTarget(potion.Effects) && (target == null || !target.IsAlive()))
         {
-            case "eff_potion_heal":
-                Heal(potion.EffectValue);
-                GameLog.Combat(GameLog.Join(
-                    "PotionUse",
+            GameLog.Warn(
+                GameLogCategory.Combat,
+                "[Combat]",
+                GameLog.Join(
+                    "PotionUseFail",
                     GameLog.KV("potion", potion.DisplayName),
-                    GameLog.KV("effectId", potion.EffectId),
-                    GameLog.KV("amount", potion.EffectValue)
-                ), GameLogVerbosity.Normal);
-                break;
-            case "eff_potion_elemental_boost":
-                if (target != null && target.IsAlive())
-                {
-                    Element element = elementOverride != Element.None ? elementOverride : GetRandomElement();
-                    int damage = target.ApplyResistance(potion.EffectValue, element);
-                    target.TakeDamage(damage);
-                    GameLog.Combat(GameLog.Join(
-                        "PotionUse",
-                        GameLog.KV("potion", potion.DisplayName),
-                        GameLog.KV("effectId", potion.EffectId),
-                        GameLog.KV("element", element),
-                        GameLog.KV("target", target.Name),
-                        GameLog.KV("amount", damage)
-                    ), GameLogVerbosity.Normal);
-                }
-                else
-                {
-                    GameLog.Warn(
-                        GameLogCategory.Combat,
-                        "[Combat]",
-                        GameLog.Join(
-                            "PotionUseFail",
-                            GameLog.KV("potion", potion.DisplayName),
-                            GameLog.KV("reason", "NoValidTarget")
-                        )
-                    );
-                    potionInventory.Insert(index, potion);
-                    return false;
-                }
-                break;
-            case "eff_potion_crit_rate":
-                tempCritChanceBonus += potion.EffectValue;
-                GameLog.Status(GameLog.Join(
-                    "PotionUse",
-                    GameLog.KV("potion", potion.DisplayName),
-                    GameLog.KV("effectId", potion.EffectId),
-                    GameLog.KV("delta", potion.EffectValue),
-                    GameLog.KV("now", GetCritChance())
-                ), GameLogVerbosity.Normal);
-                break;
-            case "eff_potion_crit_damage":
-                tempCritDamageBonus += potion.EffectValue;
-                GameLog.Status(GameLog.Join(
-                    "PotionUse",
-                    GameLog.KV("potion", potion.DisplayName),
-                    GameLog.KV("effectId", potion.EffectId),
-                    GameLog.KV("deltaPct", potion.EffectValue),
-                    GameLog.KV("now", GetCritDamage().ToString("F2"))
-                ), GameLogVerbosity.Normal);
-                break;
-            default:
-                GameLog.Warn(
-                    GameLogCategory.System,
-                    "[Player]",
-                    GameLog.Join(
-                        "PotionUseFail",
-                        GameLog.KV("reason", "UnknownEffectId"),
-                        GameLog.KV("effectId", potion.EffectId)
-                    )
-                );
-                return false;
+                    GameLog.KV("reason", "NoValidTarget")
+                )
+            );
+            return false;
         }
+        
+        potionInventory.RemoveAt(index);
+        
+        var result = SkillEffectEngine.ExecutePotion(potion.Effects, this, target, elementOverride);
+        
+        GameLog.Combat(GameLog.Join(
+            "PotionUse",
+            GameLog.KV("potion", potion.DisplayName),
+            GameLog.KV("heal", result.HealAmount),
+            GameLog.KV("damage", result.TotalDamageDealt),
+            GameLog.KV("shield", result.ShieldGained)
+        ), GameLogVerbosity.Normal);
 
         return true;
     }
@@ -1042,7 +980,7 @@ public class Player : MonoBehaviour
     public bool IsElementalPotion(int index)
     {
         if (index < 0 || index >= potionInventory.Count) return false;
-        return potionInventory[index].EffectId == "eff_potion_elemental_boost";
+        return SkillEffectEngine.NeedsEnemyTarget(potionInventory[index].Effects);
     }
 
     public PotionData GetPotion(int index)
@@ -1132,7 +1070,7 @@ public class Player : MonoBehaviour
         
         // Reset combat tracking
         combatTurnCount = 0;
-        dirtyStabConsecutiveUses = 0;
+        for (int i = 0; i < 5; i++) chainConsecutiveUses[i] = 0;
         currentAP = maxAP;
         
         // Reset wound/threshold tracking
