@@ -369,6 +369,41 @@ public class CombatArena : MonoBehaviour
         CreateTargetIndicator();
     }
     
+    /// <summary>
+    /// Called when the enemy list changes mid-combat (e.g., SlimeBoss split).
+    /// Spawns visuals for any new enemies that don't already have a world unit.
+    /// </summary>
+    public void OnEnemiesChanged(List<CombatEnemy> allEnemies)
+    {
+        // Find enemies that don't have a visual unit yet
+        foreach (var enemy in allEnemies)
+        {
+            if (!enemy.IsAlive()) continue;
+            
+            bool hasUnit = false;
+            foreach (var unit in spawnedEnemies)
+            {
+                if (unit != null && unit.CombatEnemy == enemy)
+                {
+                    hasUnit = true;
+                    break;
+                }
+            }
+            
+            if (!hasUnit)
+            {
+                int index = spawnedEnemies.Count;
+                float zOffset = index * enemyVerticalSpacing;
+                Vector3 spawnPos = enemyCombatPosition + new Vector3(0f, 0f, zOffset);
+                var newUnit = CreateEnemyUnit(enemy, spawnPos, index);
+                spawnedEnemies.Add(newUnit);
+                enemyBasePosMap[newUnit] = spawnPos;
+            }
+        }
+        
+        UpdateEnemySelection();
+    }
+    
     private EnemyWorldUnit CreateEnemyUnit(CombatEnemy enemyData, Vector3 position, int index)
     {
         // Create enemy game object with visual representation

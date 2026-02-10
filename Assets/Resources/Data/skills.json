@@ -646,6 +646,363 @@
           "amount": 20
         }
       ]
+    },
+    {
+      "id": "enemy_thug_quick_stab",
+      "name": "Quick Stab",
+      "description": "A quick underhanded stab",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_thug_weaken",
+      "name": "Weaken",
+      "description": "Reduces the player's damage by 50% for 2 turns",
+      "cooldown": 3,
+      "effects": [
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_weaken", "duration": 2, "magnitude": 50 }
+      ]
+    },
+    {
+      "id": "enemy_archer_arrow",
+      "name": "Arrow",
+      "description": "Basic arrow shot",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_archer_piercing_arrow",
+      "name": "Piercing Arrow",
+      "description": "Arrow that ignores resistance and shields",
+      "cooldown": 2,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0, "ignoreArmor": true, "ignoreShield": true }
+      ]
+    },
+    {
+      "id": "enemy_pyro_fireball",
+      "name": "Fireball",
+      "description": "A ball of fire",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_pyro_ignite",
+      "name": "Ignite",
+      "description": "Sets the player ablaze for 3 turns at 0.8x damage per tick",
+      "cooldown": 2,
+      "effects": [
+        { "effectId": "eff_dot", "target": "Player", "multiplier": 0.8, "duration": 3 }
+      ]
+    },
+    {
+      "id": "enemy_wizard_arcane_bolt",
+      "name": "Arcane Bolt",
+      "description": "A bolt of arcane energy",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_wizard_arcane_shield",
+      "name": "Arcane Shield",
+      "description": "Shields the wizard for 25% of max health",
+      "cooldown": 2,
+      "effects": [
+        { "effectId": "eff_enemy_shield", "target": "Self", "percentOfMaxHealth": 25 }
+      ]
+    },
+    {
+      "id": "enemy_frost_frost_nova",
+      "name": "Frost Nova",
+      "description": "A burst of frost energy",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_frost_frost_shield",
+      "name": "Frost Shield",
+      "description": "Increases resistances by 20% for 1 turn. If 20% max health damage is taken while active, breaks and deals 1.5x damage to the player",
+      "cooldown": 2,
+      "effects": [
+        { "effectId": "eff_apply_status", "target": "Self", "status": "status_frost_shield", "duration": 1, "magnitude": 20, "breakThreshold": 20, "breakDamageMultiplier": 1.5 }
+      ]
+    },
+    {
+      "id": "enemy_tide_tidal_wave",
+      "name": "Tidal Wave",
+      "description": "A crashing wave of water",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_tide_monsoon",
+      "name": "Monsoon",
+      "description": "Heals all enemies for 5% of their max health per turn",
+      "cooldown": 2,
+      "effects": [
+        { "effectId": "eff_apply_status", "target": "AllAllies", "status": "status_enemy_hot", "duration": 3, "magnitude": 5 }
+      ]
+    },
+    {
+      "id": "enemy_deserter_slash",
+      "name": "Slash",
+      "description": "A basic sword slash",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_deserter_battle_shout",
+      "name": "Battle Shout",
+      "description": "Increases all enemies damage by 20% for 2 turns",
+      "cooldown": 3,
+      "effects": [
+        { "effectId": "eff_apply_status", "target": "AllAllies", "status": "status_enemy_damage_up", "duration": 2, "magnitude": 20 }
+      ]
+    },
+    {
+      "id": "enemy_shield_shield_slam",
+      "name": "Shield Slam",
+      "description": "A heavy shield bash",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_shield_retaliation",
+      "name": "Retaliation",
+      "description": "Counter-attacks every player attack this turn at 1.0x damage",
+      "cooldown": 4,
+      "effects": [
+        { "effectId": "eff_apply_status", "target": "Self", "status": "status_retaliation", "duration": 1, "magnitude": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_jugg_sunder_smash",
+      "name": "Sunder Smash",
+      "description": "Deals damage and marks the player for 10% increased damage taken for 2 turns, stacks to 50%",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 },
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_vulnerable", "duration": 2, "magnitude": 10, "maxStacks": 30 }
+      ]
+    },
+    {
+      "id": "enemy_jugg_brutal_strikes",
+      "name": "Brutal Strikes",
+      "description": "Attacks 3 times at 0.7x damage each",
+      "cooldown": 2,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 0.7 },
+        { "effectId": "eff_multi_hit", "target": "Player", "hitCount": 3 }
+      ]
+    },
+    {
+      "id": "enemy_spell_spell_blade",
+      "name": "Spell Blade",
+      "description": "Deals damage, 1.5x to shields",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0, "shieldMultiplier": 1.5 }
+      ]
+    },
+    {
+      "id": "enemy_spell_syphon_magic",
+      "name": "Syphon Magic",
+      "description": "Steals all player shield and deals 1.0x damage per shield point stolen",
+      "cooldown": 3,
+      "effects": [
+        { "effectId": "eff_syphon_shield", "target": "Player", "damagePerPoint": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_storm_lightning_cutlass",
+      "name": "Lightning Cutlass",
+      "description": "A swift cutlass strike crackling with lightning",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_storm_null_sigil",
+      "name": "Null Sigil",
+      "description": "Blocks all marks for 2 turns. Deals 0.5x damage per mark blocked",
+      "cooldown": 3,
+      "effects": [
+        { "effectId": "eff_apply_status", "target": "Self", "status": "status_mark_block", "duration": 2, "magnitude": 0.5 }
+      ]
+    },
+    {
+      "id": "enemy_stone_crush",
+      "name": "Crush",
+      "description": "A heavy crushing blow, buffed by Granite Bastion stacks",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_stone_granite_bastion",
+      "name": "Granite Bastion",
+      "description": "Permanent shield for 20% max health. Each stack adds 10% to Crush damage",
+      "cooldown": 2,
+      "effects": [
+        { "effectId": "eff_enemy_shield", "target": "Self", "percentOfMaxHealth": 20 },
+        { "effectId": "eff_apply_status", "target": "Self", "status": "status_granite_bastion", "duration": -1, "magnitude": 10 }
+      ]
+    },
+    {
+      "id": "enemy_slime_slam",
+      "name": "Slam",
+      "description": "A heavy slimy slam",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_slime_weaken",
+      "name": "Weaken",
+      "description": "Weakens the player, reducing damage dealt by 50% for 2 turns",
+      "cooldown": 2,
+      "effects": [
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_weaken", "duration": 2, "magnitude": 50 }
+      ]
+    },
+    {
+      "id": "enemy_slime_sunder",
+      "name": "Sunder",
+      "description": "Sunders the player, reducing shield gain by 50% for 2 turns",
+      "cooldown": 2,
+      "effects": [
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_sunder", "duration": 2, "magnitude": 50 }
+      ]
+    },
+    {
+      "id": "enemy_slime_split",
+      "name": "Split",
+      "description": "The SlimeBoss splits into two smaller slimes",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_split", "target": "Self" }
+      ]
+    },
+    {
+      "id": "enemy_mirror_strike",
+      "name": "Strike",
+      "description": "A basic mirror strike",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 }
+      ]
+    },
+    {
+      "id": "enemy_mirror_shield",
+      "name": "Mirror Shield",
+      "description": "Mirrors the player's shield, gaining 20% max health as shield",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_enemy_shield", "target": "Self", "percentOfMaxHealth": 20 }
+      ]
+    },
+    {
+      "id": "enemy_mirror_reaction",
+      "name": "Mirror Reaction",
+      "description": "Mirrors the player's last elemental reaction",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_mirror_copy", "target": "Player", "copyType": "reaction" }
+      ]
+    },
+    {
+      "id": "enemy_mirror_strike_copy",
+      "name": "Mirror Strike",
+      "description": "Mirrors the player's last attack at 1.2x power",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.2 }
+      ]
+    },
+    {
+      "id": "enemy_hydra_bite",
+      "name": "Hydra Bite",
+      "description": "Bite attack that heals the Hydra for 15% of damage dealt",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 },
+        { "effectId": "eff_lifesteal", "target": "Self", "percent": 15 }
+      ]
+    },
+    {
+      "id": "enemy_hydra_breath",
+      "name": "Hydra Breath",
+      "description": "Burns the player for 3 turns at 0.8x damage per tick",
+      "cooldown": 2,
+      "effects": [
+        { "effectId": "eff_dot", "target": "Player", "multiplier": 0.8, "duration": 3 }
+      ]
+    },
+    {
+      "id": "enemy_hydra_tail",
+      "name": "Hydra Tail",
+      "description": "Stuns the player for 1 turn, weakens and sunders for 2 turns",
+      "cooldown": 4,
+      "effects": [
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_stun", "duration": 1 },
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_weaken", "duration": 2, "magnitude": 30 },
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_sunder", "duration": 2, "magnitude": 30 }
+      ]
+    },
+    {
+      "id": "enemy_champion_strike",
+      "name": "Champion Strike",
+      "description": "A devastating strike at 1.3x damage",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.3 }
+      ]
+    },
+    {
+      "id": "enemy_champion_short_combo",
+      "name": "Short Combo",
+      "description": "3 attacks at 1.2x each. Perfect defensive QTE negates all damage",
+      "cooldown": 2,
+      "effects": [
+        { "effectId": "eff_combo_attack", "target": "Player", "multiplier": 0.8, "hitCount": 3, "perfectNegate": true }
+      ]
+    },
+    {
+      "id": "enemy_champion_long_combo",
+      "name": "Long Combo",
+      "description": "6 attacks at 1.5x each. Perfect defensive QTE negates all damage",
+      "cooldown": 2,
+      "effects": [
+        { "effectId": "eff_combo_attack", "target": "Player", "multiplier": 1.2, "hitCount": 5, "perfectNegate": true }
+      ]
+    },
+    {
+      "id": "enemy_champion_reborn",
+      "name": "Reborn",
+      "description": "Revives with 100% max health and gains 100% more damage. Removes Long Combo cooldown. Once per combat",
+      "cooldown": 0,
+      "effects": [
+        { "effectId": "eff_reborn", "target": "Self", "healthPercent": 100, "damageBonus": 1.0 }
+      ]
     }
   ]
 }

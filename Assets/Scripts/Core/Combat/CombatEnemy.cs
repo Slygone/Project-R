@@ -1,12 +1,23 @@
 using System.Collections.Generic;
 using System.Linq;
 
+/// <summary>
+/// Tracks what the player did on their last turn, used by reactive bosses (MirrorBoss).
+/// </summary>
+public enum PlayerLastAction
+{
+    Attack,
+    Shield,
+    Reaction
+}
+
 public class CombatEnemy
 {
     public string Name;
     public int Health;
     public int MaxHealth;
-    public int Damage; // Base damage value
+    public int Damage; // Base damage value (can be modified by reborn bonus)
+    public int BaseDamage; // Original base damage (before reborn)
     public int EnemyID;
     public int BaseResistance;
     public int BonusResistance;
@@ -20,6 +31,76 @@ public class CombatEnemy
     public int RewardGoldMax;
     public int SigilChance;
     public int RelicChance;
+    
+    // Skill system
+    public string Skill1Id;
+    public string Skill2Id;
+    public int Skill2Cooldown;      // Max cooldown from data
+    public int Skill2CurrentCD;     // Current cooldown remaining (0 = ready)
+    public string Skill3Id;
+    public int Skill3Cooldown;
+    public int Skill3CurrentCD;
+    public string Skill4Id;
+    
+    // Attack pattern (1-indexed skill numbers, repeating cycle)
+    public int[] AttackPattern;
+    private int patternIndex;
+    private int turnCount;
+    
+    // Enemy shield (absorbed before health damage)
+    public int Shield;
+    
+    // Granite Bastion stacks (StoneColossus: each stack adds 10% to Crush)
+    public int GraniteStacks;
+    
+    // Frost Shield state
+    public bool FrostShieldActive;
+    public int FrostShieldResistBonus;      // resistance % bonus while active
+    public int FrostShieldBreakThreshold;   // damage needed to break (% of max health)
+    public float FrostShieldBreakDamageMult; // damage multiplier on break
+    public int FrostShieldDamageTaken;      // damage accumulated this turn
+    
+    // Retaliation state
+    public bool RetaliationActive;
+    public float RetaliationDamageMult;     // damage multiplier for counter-attacks
+    
+    // Mark block state (Null Sigil)
+    public int MarkBlockTurns;              // turns remaining where marks are blocked
+    public float MarkBlockDamageMult;       // damage per mark blocked
+    public int MarksBlocked;                // count of marks blocked this combat
+    
+    // HoT (heal over time) - from Monsoon
+    public int HoTAmount;                   // heal per turn (flat or % based on magnitude)
+    public bool HoTActive;
+    
+    // Damage buff - from Battle Shout / status_enemy_damage_up
+    public float DamageBuffPercent;
+    public int DamageBuffTurns;
+    
+    // Boss: Split mechanic (SlimeBoss)
+    public float SplitThreshold;
+    public string[] SplitInto;
+    public int SplitHealthPercent;
+    public bool HasSplit;
+    
+    // Boss: Reactive pattern (MirrorBoss)
+    public bool ReactivePattern;
+    public int ReactiveOnAttack;
+    public int ReactiveOnShield;
+    public int ReactiveOnReaction;
+    
+    // Boss: Reborn mechanic (FallenChampion)
+    public int RebornHealthPercent;
+    public float RebornDamageBonus;
+    public int[] RebornPattern;
+    public bool HasReborn;
+    public bool IsReborn;
+    
+    // Spawn control
+    public bool SpawnOnly;
+    
+    // Reference to the source EnemyData for spawning sub-enemies
+    public EnemyData SourceData;
     
     // Damage variance range (applied each attack)
     private const float VARIANCE_MIN = 0.90f;
@@ -38,15 +119,18 @@ public class CombatEnemy
     
     public CombatEnemy(EnemyData data, int world)
     {
+        SourceData = data;
         Name = data.DisplayName;
         MaxHealth = data.GetHealth(world);
         Health = MaxHealth;
         Damage = data.GetDamage(world);
+        BaseDamage = Damage;
         EnemyID = data.EnemyID;
         BaseResistance = data.GetBaseResistance(world);
         BonusResistance = data.BonusResistance;
         IsBoss = data.IsBoss;
         IsElite = data.IsElite;
+        SpawnOnly = data.SpawnOnly;
         
         // Load rewards from JSON
         RewardXP = data.RewardXP;
@@ -54,6 +138,38 @@ public class CombatEnemy
         RewardGoldMax = data.RewardGoldMax;
         SigilChance = data.SigilChance;
         RelicChance = data.RelicChance;
+        
+        // Load skill system
+        Skill1Id = data.Skill1Id;
+        Skill2Id = data.Skill2Id;
+        Skill2Cooldown = data.Skill2Cooldown;
+        Skill2CurrentCD = 0;
+        Skill3Id = data.Skill3Id;
+        Skill3Cooldown = data.Skill3Cooldown;
+        Skill3CurrentCD = 0;
+        Skill4Id = data.Skill4Id;
+        
+        // Attack pattern
+        AttackPattern = data.AttackPattern;
+        patternIndex = 0;
+        turnCount = 0;
+        
+        // Boss mechanics
+        SplitThreshold = data.SplitThreshold;
+        SplitInto = data.SplitInto;
+        SplitHealthPercent = data.SplitHealthPercent;
+        HasSplit = false;
+        
+        ReactivePattern = data.ReactivePattern;
+        ReactiveOnAttack = data.ReactiveOnAttack;
+        ReactiveOnShield = data.ReactiveOnShield;
+        ReactiveOnReaction = data.ReactiveOnReaction;
+        
+        RebornHealthPercent = data.RebornHealthPercent;
+        RebornDamageBonus = data.RebornDamageBonus;
+        RebornPattern = data.RebornPattern;
+        HasReborn = false;
+        IsReborn = false;
         
         if (data.IsBoss)
         {
@@ -65,11 +181,332 @@ public class CombatEnemy
         }
     }
     
+    // ========== SKILL SELECTION ==========
+    
+    /// <summary>
+    /// Get the skill ID for the current turn based on attack pattern and cooldowns.
+    /// For regular/elite: first turn uses skill1, then skill2 when off cooldown, else skill1.
+    /// For bosses: follows attackPattern cycle. If pattern skill is on cooldown, uses skill1.
+    /// </summary>
+    public string GetNextSkillId()
+    {
+        turnCount++;
+        
+        // Bosses and enemies with explicit attack patterns
+        if (AttackPattern != null && AttackPattern.Length > 0)
+        {
+            int skillNumber = AttackPattern[patternIndex % AttackPattern.Length];
+            string skillId = GetSkillIdByNumber(skillNumber);
+            
+            // Check if this skill is on cooldown; if so, fall back to skill1
+            if (IsSkillOnCooldown(skillNumber))
+            {
+                return Skill1Id;
+            }
+            
+            return skillId ?? Skill1Id;
+        }
+        
+        // Regular/Elite: first turn is always basic (skill1)
+        if (turnCount == 1)
+        {
+            return Skill1Id;
+        }
+        
+        // After first turn: use special (skill2) when off cooldown
+        if (!string.IsNullOrEmpty(Skill2Id) && Skill2CurrentCD <= 0)
+        {
+            return Skill2Id;
+        }
+        
+        // Fallback to basic
+        return Skill1Id;
+    }
+    
+    /// <summary>
+    /// Advance the attack pattern index after using a skill.
+    /// Also applies cooldown for the used skill.
+    /// </summary>
+    public void OnSkillUsed(string skillId)
+    {
+        // Advance pattern
+        if (AttackPattern != null && AttackPattern.Length > 0)
+        {
+            patternIndex = (patternIndex + 1) % AttackPattern.Length;
+        }
+        
+        // Apply cooldown for the used skill
+        if (skillId == Skill2Id && Skill2Cooldown > 0)
+        {
+            Skill2CurrentCD = Skill2Cooldown;
+        }
+        else if (skillId == Skill3Id && Skill3Cooldown > 0)
+        {
+            Skill3CurrentCD = Skill3Cooldown;
+        }
+    }
+    
+    /// <summary>
+    /// Tick down all skill cooldowns. Call at the start of each enemy turn.
+    /// </summary>
+    public void TickSkillCooldowns()
+    {
+        if (Skill2CurrentCD > 0) Skill2CurrentCD--;
+        if (Skill3CurrentCD > 0) Skill3CurrentCD--;
+    }
+    
+    /// <summary>
+    /// Get skill ID by 1-indexed skill number.
+    /// </summary>
+    public string GetSkillIdByNumber(int skillNumber)
+    {
+        return skillNumber switch
+        {
+            1 => Skill1Id,
+            2 => Skill2Id,
+            3 => Skill3Id,
+            4 => Skill4Id,
+            _ => Skill1Id
+        };
+    }
+    
+    /// <summary>
+    /// Check if a skill by number is on cooldown.
+    /// </summary>
+    public bool IsSkillOnCooldown(int skillNumber)
+    {
+        return skillNumber switch
+        {
+            2 => Skill2CurrentCD > 0,
+            3 => Skill3CurrentCD > 0,
+            _ => false // skill1 and skill4 have no cooldown
+        };
+    }
+    
+    /// <summary>
+    /// For reactive bosses (MirrorBoss): select skill based on player's last action.
+    /// </summary>
+    public string GetReactiveSkillId(PlayerLastAction lastAction)
+    {
+        if (!ReactivePattern) return GetNextSkillId();
+        
+        turnCount++;
+        int skillNumber = lastAction switch
+        {
+            PlayerLastAction.Attack => ReactiveOnAttack,
+            PlayerLastAction.Shield => ReactiveOnShield,
+            PlayerLastAction.Reaction => ReactiveOnReaction,
+            _ => ReactiveOnAttack
+        };
+        
+        string skillId = GetSkillIdByNumber(skillNumber);
+        return skillId ?? Skill1Id;
+    }
+    
+    // ========== ENEMY SHIELD ==========
+    
+    public void AddShield(int amount)
+    {
+        Shield += amount;
+    }
+    
+    /// <summary>
+    /// Apply damage to this enemy, absorbing with shield first.
+    /// Returns actual health damage dealt (after shield absorption).
+    /// </summary>
+    public int TakeDamageWithShield(int amount)
+    {
+        int shieldAbsorbed = 0;
+        if (Shield > 0)
+        {
+            shieldAbsorbed = UnityEngine.Mathf.Min(Shield, amount);
+            Shield -= shieldAbsorbed;
+            amount -= shieldAbsorbed;
+        }
+        
+        // Track damage for Frost Shield break mechanic
+        if (FrostShieldActive)
+        {
+            FrostShieldDamageTaken += shieldAbsorbed + amount;
+        }
+        
+        if (amount > 0)
+        {
+            Health -= amount;
+            if (Health < 0) Health = 0;
+        }
+        
+        return amount; // health damage after shield
+    }
+    
+    // ========== BOSS MECHANICS ==========
+    
+    /// <summary>
+    /// Check if SlimeBoss should split (health <= threshold).
+    /// </summary>
+    public bool ShouldSplit()
+    {
+        if (HasSplit) return false;
+        if (SplitThreshold <= 0f) return false;
+        if (SplitInto == null || SplitInto.Length == 0) return false;
+        return (float)Health / MaxHealth <= SplitThreshold;
+    }
+    
+    /// <summary>
+    /// Mark this enemy as having split.
+    /// </summary>
+    public void MarkAsSplit()
+    {
+        HasSplit = true;
+    }
+    
+    /// <summary>
+    /// Check if FallenChampion should activate Reborn (on death, once per combat).
+    /// </summary>
+    public bool ShouldReborn()
+    {
+        if (HasReborn) return false;
+        if (RebornHealthPercent <= 0) return false;
+        return Health <= 0;
+    }
+    
+    /// <summary>
+    /// Activate Reborn: restore health, boost damage, switch attack pattern.
+    /// </summary>
+    public void ActivateReborn()
+    {
+        HasReborn = true;
+        IsReborn = true;
+        
+        // Restore health
+        Health = UnityEngine.Mathf.RoundToInt(MaxHealth * (RebornHealthPercent / 100f));
+        
+        // Boost damage
+        Damage = UnityEngine.Mathf.RoundToInt(BaseDamage * (1f + RebornDamageBonus));
+        
+        // Switch to reborn attack pattern
+        if (RebornPattern != null && RebornPattern.Length > 0)
+        {
+            AttackPattern = RebornPattern;
+            patternIndex = 0;
+        }
+        
+        // Remove Long Combo cooldown (skill3)
+        Skill3CurrentCD = 0;
+        
+        GameLog.Combat(GameLog.Join(
+            "Reborn",
+            GameLog.KV("enemy", Name),
+            GameLog.KV("health", Health),
+            GameLog.KV("damage", Damage),
+            GameLog.KV("pattern", RebornPattern != null ? string.Join(",", RebornPattern) : "none")
+        ));
+    }
+    
+    /// <summary>
+    /// Check if Frost Shield should break (damage threshold reached).
+    /// Returns break damage to deal to player, or 0 if no break.
+    /// </summary>
+    public int CheckFrostShieldBreak()
+    {
+        if (!FrostShieldActive) return 0;
+        
+        int breakPoint = UnityEngine.Mathf.RoundToInt(MaxHealth * (FrostShieldBreakThreshold / 100f));
+        if (FrostShieldDamageTaken >= breakPoint)
+        {
+            FrostShieldActive = false;
+            FrostShieldDamageTaken = 0;
+            int breakDamage = UnityEngine.Mathf.RoundToInt(Damage * FrostShieldBreakDamageMult);
+            return breakDamage;
+        }
+        return 0;
+    }
+    
+    /// <summary>
+    /// Activate Frost Shield with parameters from skill effect data.
+    /// </summary>
+    public void ActivateFrostShield(int resistBonus, int breakThreshold, float breakDamageMult)
+    {
+        FrostShieldActive = true;
+        FrostShieldResistBonus = resistBonus;
+        FrostShieldBreakThreshold = breakThreshold;
+        FrostShieldBreakDamageMult = breakDamageMult;
+        FrostShieldDamageTaken = 0;
+    }
+    
+    /// <summary>
+    /// Tick Frost Shield expiry (call at end of enemy turn).
+    /// </summary>
+    public void TickFrostShield()
+    {
+        if (FrostShieldActive)
+        {
+            FrostShieldActive = false;
+            FrostShieldDamageTaken = 0;
+        }
+    }
+    
+    /// <summary>
+    /// Tick Retaliation expiry at end of enemy turn.
+    /// </summary>
+    public void TickRetaliation()
+    {
+        RetaliationActive = false;
+        RetaliationDamageMult = 0f;
+    }
+    
+    /// <summary>
+    /// Tick Mark Block turns. Call at start of enemy turn.
+    /// </summary>
+    public void TickMarkBlock()
+    {
+        if (MarkBlockTurns > 0) MarkBlockTurns--;
+    }
+    
+    /// <summary>
+    /// Tick HoT (heal over time). Call during enemy turn. Returns amount healed.
+    /// </summary>
+    public int TickHoT()
+    {
+        if (!HoTActive || HoTAmount <= 0) return 0;
+        int healAmount = UnityEngine.Mathf.RoundToInt(MaxHealth * (HoTAmount / 100f));
+        Health = UnityEngine.Mathf.Min(Health + healAmount, MaxHealth);
+        return healAmount;
+    }
+    
+    /// <summary>
+    /// Tick damage buff duration. Call at start of enemy turn.
+    /// </summary>
+    public void TickDamageBuff()
+    {
+        if (DamageBuffTurns > 0)
+        {
+            DamageBuffTurns--;
+            if (DamageBuffTurns <= 0)
+            {
+                DamageBuffPercent = 0f;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Get the effective damage multiplier including buffs.
+    /// </summary>
+    public float GetDamageMultiplier()
+    {
+        float mult = 1f;
+        if (DamageBuffPercent > 0f)
+        {
+            mult += DamageBuffPercent / 100f;
+        }
+        return mult;
+    }
+    
     // Roll damage with variance (0.90-1.10) applied each attack
     public int RollDamageWithVariance()
     {
         float variance = UnityEngine.Random.Range(VARIANCE_MIN, VARIANCE_MAX);
-        return UnityEngine.Mathf.RoundToInt(Damage * variance);
+        return UnityEngine.Mathf.RoundToInt(Damage * GetDamageMultiplier() * variance);
     }
 
     private Element GetRandomElement()
@@ -80,6 +517,19 @@ public class CombatEnemy
 
     public void TakeDamage(int amount)
     {
+        // Route through shield system if enemy has shield
+        if (Shield > 0)
+        {
+            TakeDamageWithShield(amount);
+            return;
+        }
+        
+        // Track damage for Frost Shield break mechanic
+        if (FrostShieldActive)
+        {
+            FrostShieldDamageTaken += amount;
+        }
+        
         Health -= amount;
         if (Health < 0) Health = 0;
     }
@@ -92,6 +542,15 @@ public class CombatEnemy
         {
             totalResistance += BonusResistance;
         }
+        
+        // Frost Shield resistance bonus
+        if (FrostShieldActive && FrostShieldResistBonus > 0)
+        {
+            totalResistance += FrostShieldResistBonus;
+        }
+        
+        // Temp resist from status effects
+        totalResistance += GetTempResist(attackerAffinity);
         
         return totalResistance;
     }
@@ -231,10 +690,25 @@ public class CombatEnemy
     
     /// <summary>
     /// Add elemental marks to this enemy. Returns true if a reaction was triggered.
+    /// If mark block is active (Null Sigil), marks are blocked and counted for damage.
     /// </summary>
     public bool AddMarks(Element element, int count)
     {
         if (element == Element.None || count <= 0) return false;
+        
+        // Null Sigil: block marks and track them for damage
+        if (MarkBlockTurns > 0)
+        {
+            MarksBlocked += count;
+            GameLog.Combat(GameLog.Join(
+                "MarkBlocked",
+                GameLog.KV("target", Name),
+                GameLog.KV("element", element),
+                GameLog.KV("count", count),
+                GameLog.KV("totalBlocked", MarksBlocked)
+            ));
+            return false;
+        }
         
         if (!elementalMarks.ContainsKey(element))
         {

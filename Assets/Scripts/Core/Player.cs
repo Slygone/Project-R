@@ -45,6 +45,20 @@ public class Player : MonoBehaviour
     
     // Per-skill chain use tracking (for skills with chainSettings)
     private int[] chainConsecutiveUses = new int[5];
+    
+    // Enemy debuff tracking
+    private float weakenPercent;    // % damage reduction (0-100)
+    private int weakenTurns;        // turns remaining
+    private float sunderPercent;    // % shield gain reduction (0-100)
+    private int sunderTurns;        // turns remaining
+    private float vulnerablePercent; // % damage taken increase (stackable)
+    private int vulnerableTurns;    // turns remaining
+    private int vulnerableMaxStacks; // max stackable magnitude
+    private bool isStunned;         // skip next player turn
+    private int stunTurns;          // turns remaining
+    private int playerDoTDamage;    // DoT damage per tick
+    private int playerDoTTurns;     // turns remaining
+    private string playerDoTSource; // source name for logging
 
     void Awake()
     {
@@ -673,6 +687,7 @@ public class Player : MonoBehaviour
         for (int i = 0; i < 5; i++) chainConsecutiveUses[i] = 0;
         currentAP = maxAP; // Start combat with full AP
         statusEffects.ClearCombatEffects(); // Keep shield, clear block
+        ClearAllDebuffs(); // Clear enemy debuffs from previous combat
         GameLog.System(GameLog.Join(
             "CombatStateReset",
             GameLog.KV("energy", $"{energy}/{maxEnergy}"),
@@ -721,6 +736,13 @@ public class Player : MonoBehaviour
     
     public void AddShield(int amount)
     {
+        // Apply Sunder reduction to shield gains
+        float sunderMult = GetSunderMultiplier();
+        if (sunderMult < 1f)
+        {
+            amount = Mathf.RoundToInt(amount * sunderMult);
+        }
+        
         int maxShield = GetMaxShield();
         statusEffects.AddShield(amount, maxShield);
         GameLog.Combat(GameLog.Join(
@@ -1090,5 +1112,205 @@ public class Player : MonoBehaviour
             GameLog.KV("relics", 0),
             GameLog.KV("potions", 0)
         ));
+        
+        // Reset enemy debuffs
+        ClearAllDebuffs();
     }
+    
+    // ========== ENEMY DEBUFF SYSTEM ==========
+    
+    /// <summary>
+    /// Apply Weaken debuff: reduces player damage dealt by magnitude% for duration turns.
+    /// </summary>
+    public void ApplyWeaken(float magnitude, int duration)
+    {
+        weakenPercent = magnitude;
+        weakenTurns = duration;
+    }
+    
+    /// <summary>
+    /// Apply Sunder debuff: reduces player shield gain by magnitude% for duration turns.
+    /// </summary>
+    public void ApplySunder(float magnitude, int duration)
+    {
+        sunderPercent = magnitude;
+        sunderTurns = duration;
+    }
+    
+    /// <summary>
+    /// Apply Vulnerable debuff: increases damage taken by magnitude% for duration turns.
+    /// Stacks additively up to maxStacks total magnitude.
+    /// </summary>
+    public void ApplyVulnerable(float magnitude, int duration, int maxStacks)
+    {
+        vulnerableMaxStacks = maxStacks;
+        vulnerablePercent += magnitude;
+        if (maxStacks > 0 && vulnerablePercent > maxStacks)
+        {
+            vulnerablePercent = maxStacks;
+        }
+        vulnerableTurns = Mathf.Max(vulnerableTurns, duration);
+    }
+    
+    /// <summary>
+    /// Apply Stun debuff: skips the player's next turn(s).
+    /// </summary>
+    public void ApplyStun(int duration)
+    {
+        isStunned = true;
+        stunTurns = duration;
+    }
+    
+    /// <summary>
+    /// Apply DoT to the player: takes damagePerTick each turn for duration turns.
+    /// </summary>
+    public void ApplyDoT(int damagePerTick, int duration, string source)
+    {
+        playerDoTDamage = damagePerTick;
+        playerDoTTurns = duration;
+        playerDoTSource = source;
+    }
+    
+    /// <summary>
+    /// Remove all shield from the player (used by Syphon Magic).
+    /// </summary>
+    public void RemoveAllShield()
+    {
+        statusEffects.SetShield(0, 0);
+    }
+    
+    /// <summary>
+    /// Get the weaken damage reduction multiplier (1.0 = no reduction, 0.5 = 50% reduction).
+    /// </summary>
+    public float GetWeakenMultiplier()
+    {
+        if (weakenTurns > 0 && weakenPercent > 0f)
+        {
+            return 1f - (weakenPercent / 100f);
+        }
+        return 1f;
+    }
+    
+    /// <summary>
+    /// Get the sunder shield gain reduction multiplier (1.0 = no reduction, 0.5 = 50% reduction).
+    /// </summary>
+    public float GetSunderMultiplier()
+    {
+        if (sunderTurns > 0 && sunderPercent > 0f)
+        {
+            return 1f - (sunderPercent / 100f);
+        }
+        return 1f;
+    }
+    
+    /// <summary>
+    /// Get the vulnerable damage taken multiplier (1.0 = normal, 1.5 = +50% damage taken).
+    /// </summary>
+    public float GetVulnerableMultiplier()
+    {
+        if (vulnerableTurns > 0 && vulnerablePercent > 0f)
+        {
+            return 1f + (vulnerablePercent / 100f);
+        }
+        return 1f;
+    }
+    
+    /// <summary>
+    /// Check and consume player stun at start of player turn.
+    /// Returns true if the player is stunned and turn should be skipped.
+    /// </summary>
+    public bool CheckAndConsumePlayerStun()
+    {
+        if (isStunned && stunTurns > 0)
+        {
+            stunTurns--;
+            if (stunTurns <= 0)
+            {
+                isStunned = false;
+            }
+            return true;
+        }
+        return false;
+    }
+    
+    /// <summary>
+    /// Tick player DoT at start of player turn. Returns damage dealt, or 0 if no DoT active.
+    /// </summary>
+    public int TickPlayerDoT()
+    {
+        if (playerDoTTurns > 0 && playerDoTDamage > 0)
+        {
+            playerDoTTurns--;
+            int damage = playerDoTDamage;
+            health -= damage;
+            if (health < 0) health = 0;
+            
+            GameLog.Status(GameLog.Join(
+                "Tick",
+                GameLog.KV("target", "Player"),
+                GameLog.KV("type", "DoT"),
+                GameLog.KV("damage", damage),
+                GameLog.KV("turnsLeft", playerDoTTurns),
+                GameLog.KV("source", playerDoTSource),
+                GameLog.KV("hpAfter", health)
+            ));
+            
+            if (playerDoTTurns <= 0)
+            {
+                playerDoTDamage = 0;
+                playerDoTSource = null;
+            }
+            
+            return damage;
+        }
+        return 0;
+    }
+    
+    /// <summary>
+    /// Tick all debuff durations. Call at start of player turn.
+    /// </summary>
+    public void TickDebuffs()
+    {
+        if (weakenTurns > 0)
+        {
+            weakenTurns--;
+            if (weakenTurns <= 0) weakenPercent = 0f;
+        }
+        if (sunderTurns > 0)
+        {
+            sunderTurns--;
+            if (sunderTurns <= 0) sunderPercent = 0f;
+        }
+        if (vulnerableTurns > 0)
+        {
+            vulnerableTurns--;
+            if (vulnerableTurns <= 0) vulnerablePercent = 0f;
+        }
+    }
+    
+    /// <summary>
+    /// Clear all enemy debuffs (used on new run / combat reset).
+    /// </summary>
+    public void ClearAllDebuffs()
+    {
+        weakenPercent = 0f;
+        weakenTurns = 0;
+        sunderPercent = 0f;
+        sunderTurns = 0;
+        vulnerablePercent = 0f;
+        vulnerableTurns = 0;
+        vulnerableMaxStacks = 0;
+        isStunned = false;
+        stunTurns = 0;
+        playerDoTDamage = 0;
+        playerDoTTurns = 0;
+        playerDoTSource = null;
+    }
+    
+    // Query debuff states for UI
+    public bool IsWeakened => weakenTurns > 0 && weakenPercent > 0f;
+    public bool IsSundered => sunderTurns > 0 && sunderPercent > 0f;
+    public bool IsVulnerable => vulnerableTurns > 0 && vulnerablePercent > 0f;
+    public bool IsPlayerStunned => isStunned && stunTurns > 0;
+    public bool HasPlayerDoT => playerDoTTurns > 0 && playerDoTDamage > 0;
 }

@@ -155,6 +155,7 @@ public class GameManager : MonoBehaviour
         completedNodes = 0;
         runXP = 0;
         runDetonatorXP.Clear();
+        CombatManager.ResetBossDefeatedCount();
         UpdateNodeCounter();
         
         Debug.Log($"[GameManager] Starting run with {character.DisplayName}");

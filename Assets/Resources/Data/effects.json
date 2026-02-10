@@ -12,7 +12,13 @@
     { "id": "eff_on_kill_bonus", "name": "On Kill Bonus", "type": "onKillBonus" },
     { "id": "eff_elemental_reaction", "name": "Elemental Reaction", "type": "elementalReaction" },
     { "id": "eff_stat_bonus", "name": "Stat Bonus", "type": "statBonus" },
-    { "id": "eff_damage_multiplier", "name": "Damage Multiplier", "type": "damageMultiplier" }
+    { "id": "eff_damage_multiplier", "name": "Damage Multiplier", "type": "damageMultiplier" },
+    { "id": "eff_enemy_shield", "name": "Enemy Shield", "type": "enemyShield" },
+    { "id": "eff_syphon_shield", "name": "Syphon Shield", "type": "syphonShield" },
+    { "id": "eff_combo_attack", "name": "Combo Attack", "type": "comboAttack" },
+    { "id": "eff_reborn", "name": "Reborn", "type": "reborn" },
+    { "id": "eff_split", "name": "Split", "type": "split" },
+    { "id": "eff_mirror_copy", "name": "Mirror Copy", "type": "mirrorCopy" }
   ],
   "statuses": [
     { "id": "status_stun", "name": "Stunned", "type": "stun" },
@@ -22,6 +28,17 @@
     { "id": "status_dot_burn", "name": "Burning", "type": "dot" },
     { "id": "status_evasion", "name": "Evasion", "type": "evasion" },
     { "id": "status_damage_up", "name": "Damage Up", "type": "damageBonus" },
-    { "id": "status_riposte_stance", "name": "Riposte Stance", "type": "block" }
+    { "id": "status_riposte_stance", "name": "Riposte Stance", "type": "block" },
+    { "id": "status_player_weaken", "name": "Weakened (Player)", "type": "playerWeaken" },
+    { "id": "status_player_sunder", "name": "Sundered (Player)", "type": "playerSunder" },
+    { "id": "status_player_vulnerable", "name": "Vulnerable", "type": "playerVulnerable" },
+    { "id": "status_player_dot", "name": "Burning (Player)", "type": "playerDot" },
+    { "id": "status_player_stun", "name": "Stunned (Player)", "type": "playerStun" },
+    { "id": "status_enemy_hot", "name": "Regenerating", "type": "enemyHot" },
+    { "id": "status_enemy_damage_up", "name": "Empowered", "type": "enemyDamageUp" },
+    { "id": "status_mark_block", "name": "Null Sigil", "type": "markBlock" },
+    { "id": "status_retaliation", "name": "Retaliation", "type": "retaliation" },
+    { "id": "status_frost_shield", "name": "Frost Shield", "type": "frostShield" },
+    { "id": "status_granite_bastion", "name": "Granite Bastion", "type": "graniteBastion" }
   ]
 }

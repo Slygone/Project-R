@@ -13,6 +13,20 @@ public class CombatManager : MonoBehaviour
     private bool isPlayerTurn = true;
     private bool combatActive = false;
     private bool isEndingCombat = false;
+    
+    // MirrorBoss reactive pattern: tracks the player's last action type
+    private PlayerLastAction lastPlayerAction = PlayerLastAction.Attack;
+    
+    // FallenChampion spawn requirement: tracks bosses defeated across the run
+    private static int bossesDefeatedThisRun = 0;
+    
+    /// <summary>
+    /// Reset boss defeat counter. Call at the start of a new run.
+    /// </summary>
+    public static void ResetBossDefeatedCount()
+    {
+        bossesDefeatedThisRun = 0;
+    }
     private NodeBase currentNode;
     private CombatType currentCombatType = CombatType.Normal;
     
@@ -68,9 +82,33 @@ public class CombatManager : MonoBehaviour
             return;
         }
         
+        // Build eligible boss pool: filter out bosses whose spawn requirements aren't met
+        var eligibleBosses = new List<EnemyData>();
+        foreach (var boss in DataCache.BossEnemies)
+        {
+            if (!string.IsNullOrEmpty(boss.SpawnRequirement) && boss.SpawnRequirement == "defeatBosses")
+            {
+                if (bossesDefeatedThisRun < boss.SpawnRequirementCount)
+                {
+                    GameLog.Combat(GameLog.Join("BossFiltered",
+                        GameLog.KV("boss", boss.DisplayName),
+                        GameLog.KV("requirement", boss.SpawnRequirement),
+                        GameLog.KV("needed", boss.SpawnRequirementCount),
+                        GameLog.KV("current", bossesDefeatedThisRun)));
+                    continue;
+                }
+            }
+            eligibleBosses.Add(boss);
+        }
+        
+        if (eligibleBosses.Count == 0)
+        {
+            eligibleBosses.AddRange(DataCache.BossEnemies.FindAll(b => string.IsNullOrEmpty(b.SpawnRequirement)));
+        }
+        
         for (int i = 0; i < bossCount; i++)
         {
-            var bossData = DataCache.BossEnemies[Random.Range(0, DataCache.BossEnemies.Count)];
+            var bossData = eligibleBosses[Random.Range(0, eligibleBosses.Count)];
             enemies.Add(new CombatEnemy(bossData, world));
         }
 
@@ -343,14 +381,15 @@ public class CombatManager : MonoBehaviour
     
     private void ExecuteAttack(CombatEnemy target, float reactionMultiplier = 1f, Element? forcedElement = null)
     {
+        lastPlayerAction = PlayerLastAction.Attack;
         Element attackElement = forcedElement ?? player.GetAffinity();
 
         string attackerName = player != null && player.GetCharacter() != null ? player.GetCharacter().DisplayName : "Player";
         string reactionId = reactionMultiplier > 1f ? "nonDirectional" : "none";
 
         // Player Attack Order:
-        // 1. Base damage (character damage + elemental bonuses)
-        int baseDamage = player.GetTotalDamage();
+        // 1. Base damage (character damage + elemental bonuses), reduced by Weaken debuff
+        int baseDamage = Mathf.RoundToInt(player.GetTotalDamage() * player.GetWeakenMultiplier());
         
         GameLog.Combat(GameLog.Join(
             "AttackStart",
@@ -410,11 +449,38 @@ public class CombatManager : MonoBehaviour
         
         // Notify in-world combat arena of damage
         NotifyEnemyHit(target);
+        
+        // Check Frost Shield break (Frostcaller)
+        CheckFrostShieldBreak(target);
+        
+        // Check Retaliation counter-attack (Shieldbearer)
+        CheckRetaliationCounter(target);
+        
+        // Player could die from Frost Shield break or Retaliation
+        if (!player.IsAlive())
+        {
+            EndCombat(false);
+            return;
+        }
 
         if (!target.IsAlive())
         {
-            GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
-            NotifyEnemyDeath(target);
+            // Check Reborn mechanic (FallenChampion)
+            if (target.ShouldReborn())
+            {
+                target.ActivateReborn();
+            }
+            else
+            {
+                GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
+                NotifyEnemyDeath(target);
+            }
+        }
+        
+        // Check SlimeBoss split after damage
+        if (target.IsAlive() && target.ShouldSplit())
+        {
+            ExecuteSlimeBossSplit(target);
         }
 
         if (AllEnemiesDead())
@@ -508,12 +574,39 @@ public class CombatManager : MonoBehaviour
         
         // Notify in-world combat arena of damage
         NotifyEnemyHit(target);
+        
+        // Check Frost Shield break (Frostcaller)
+        CheckFrostShieldBreak(target);
+        
+        // Check Retaliation counter-attack (Shieldbearer)
+        CheckRetaliationCounter(target);
+
+        // Player could die from Frost Shield break or Retaliation
+        if (!player.IsAlive())
+        {
+            EndCombat(false);
+            return;
+        }
 
         if (!target.IsAlive())
         {
-            GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
-            AwardDetonatorXPForKill(target);
-            NotifyEnemyDeath(target);
+            // Check Reborn mechanic (FallenChampion)
+            if (target.ShouldReborn())
+            {
+                target.ActivateReborn();
+            }
+            else
+            {
+                GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
+                AwardDetonatorXPForKill(target);
+                NotifyEnemyDeath(target);
+            }
+        }
+        
+        // Check SlimeBoss split after damage
+        if (target.IsAlive() && target.ShouldSplit())
+        {
+            ExecuteSlimeBossSplit(target);
         }
 
         if (AllEnemiesDead())
@@ -522,15 +615,6 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
-    }
-
-    public void OnPlayerSkill(int skillNumber)
-    {
-        var target = GetFirstAliveEnemy();
-        if (target != null)
-        {
-            OnPlayerSkillTarget(skillNumber, target);
-        }
     }
 
     public bool IsQTEActive()
@@ -608,6 +692,7 @@ public class CombatManager : MonoBehaviour
     
     private void ExecuteSkill(int skillNumber, CombatEnemy target, float reactionMultiplier = 1f, Element? forcedElement = null)
     {
+        lastPlayerAction = PlayerLastAction.Attack;
         var character = player.GetCharacter();
         if (character == null) return;
 
@@ -645,11 +730,12 @@ public class CombatManager : MonoBehaviour
         Element skillElement = player.GetSkillElement(skillNumber);
         Element attackElement = forcedElement ?? (skillElement != Element.None ? skillElement : player.GetAffinity());
         int charDamage = player.GetCharacterDamage();
-        int baseDamageBeforeElement = Mathf.RoundToInt(charDamage * skillMultiplier * chainBonus);
+        float weakenMult = player.GetWeakenMultiplier();
+        int baseDamageBeforeElement = Mathf.RoundToInt(charDamage * skillMultiplier * chainBonus * weakenMult);
         
         // Add elemental bonus based on skill's element (from enchantment or base)
         int elementalBonus = attackElement != Element.None ? player.GetElementalBonus(attackElement) : 0;
-        int elementalBonusScaled = Mathf.RoundToInt(elementalBonus * skillMultiplier);
+        int elementalBonusScaled = Mathf.RoundToInt(elementalBonus * skillMultiplier * weakenMult);
         int baseDamage = baseDamageBeforeElement + elementalBonusScaled;
         
         GameLog.Combat(GameLog.Join(
@@ -796,6 +882,7 @@ public class CombatManager : MonoBehaviour
                             
                             // Trigger reaction effect (QTE panel or direct execution)
                             // Note: marks are consumed inside TriggerMarkReaction
+                            lastPlayerAction = PlayerLastAction.Reaction;
                             pendingSkillNumber = skillNumber;
                             TriggerMarkReaction(target, reactionInfo);
                             reactionQTETriggered = true;
@@ -825,16 +912,47 @@ public class CombatManager : MonoBehaviour
         if (effectResult.HealAmount > 0)
             ShowHealToPlayer(effectResult.HealAmount);
         if (effectResult.ShieldGained > 0)
+        {
             ShowShieldToPlayer(effectResult.ShieldGained, FloatingTextType.ShieldGain);
+            lastPlayerAction = PlayerLastAction.Shield;
+        }
         
         // Notify in-world combat arena of damage
         NotifyEnemyHit(target);
         
+        // Check Frost Shield break (Frostcaller)
+        CheckFrostShieldBreak(target);
+        
+        // Check Retaliation counter-attack (Shieldbearer)
+        CheckRetaliationCounter(target);
+        
+        // Player could die from Frost Shield break or Retaliation
+        if (!player.IsAlive())
+        {
+            EndCombat(false);
+            return;
+        }
+        
         bool targetKilled = !target.IsAlive();
         if (targetKilled)
         {
-            GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
-            NotifyEnemyDeath(target);
+            // Check Reborn mechanic (FallenChampion)
+            if (target.ShouldReborn())
+            {
+                target.ActivateReborn();
+                targetKilled = false;
+            }
+            else
+            {
+                GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
+                NotifyEnemyDeath(target);
+            }
+        }
+        
+        // Check SlimeBoss split after damage
+        if (target.IsAlive() && target.ShouldSplit())
+        {
+            ExecuteSlimeBossSplit(target);
         }
 
         // When a reaction QTE was triggered, ExecuteSkillWithReaction will handle
@@ -985,10 +1103,11 @@ public class CombatManager : MonoBehaviour
         Element attackElement = forcedElement ?? player.GetAffinity();
         
         // Player Skill Attack Order with Reaction:
-        // 1. Base damage = (character damage * skill multiplier) + elemental bonus
+        // 1. Base damage = (character damage * skill multiplier) + elemental bonus, reduced by Weaken
         int charDamage = player.GetCharacterDamage();
         int elementalBonus = player.GetAffinityBonus();
-        float baseDamage = (charDamage * skillMultiplier) + (elementalBonus * skillMultiplier);
+        float weakenMult = player.GetWeakenMultiplier();
+        float baseDamage = ((charDamage * skillMultiplier) + (elementalBonus * skillMultiplier)) * weakenMult;
         
         // 2. Apply variance (0.90-1.10)
         int afterVariance = player.ApplyVariance(baseDamage);
@@ -1075,13 +1194,41 @@ public class CombatManager : MonoBehaviour
         
         // Notify in-world combat arena of damage
         NotifyEnemyHit(target);
+        
+        // Check Frost Shield break (Frostcaller)
+        CheckFrostShieldBreak(target);
+        
+        // Check Retaliation counter-attack (Shieldbearer)
+        CheckRetaliationCounter(target);
+        
+        // Player could die from Frost Shield break or Retaliation
+        if (!player.IsAlive())
+        {
+            EndCombat(false);
+            return;
+        }
 
         bool targetKilled = !target.IsAlive();
         if (targetKilled)
         {
-            GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
-            AwardDetonatorXPForKill(target);
-            NotifyEnemyDeath(target);
+            // Check Reborn mechanic (FallenChampion)
+            if (target.ShouldReborn())
+            {
+                target.ActivateReborn();
+                targetKilled = false;
+            }
+            else
+            {
+                GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
+                AwardDetonatorXPForKill(target);
+                NotifyEnemyDeath(target);
+            }
+        }
+        
+        // Check SlimeBoss split after damage
+        if (target.IsAlive() && target.ShouldSplit())
+        {
+            ExecuteSlimeBossSplit(target);
         }
 
         // Apply skill cooldown and energy effects (skillNumber is 1-indexed, array is 0-indexed)
@@ -1143,7 +1290,9 @@ public class CombatManager : MonoBehaviour
     private void DamageAllEnemies(int damage, Element? forcedElement = null, bool isCrit = false)
     {
         Element attackElement = forcedElement ?? player.GetAffinity();
-        foreach (var enemy in enemies)
+        // Copy list to avoid modification during iteration (split can add enemies)
+        var snapshot = new List<CombatEnemy>(enemies);
+        foreach (var enemy in snapshot)
         {
             if (enemy.IsAlive())
             {
@@ -1163,9 +1312,38 @@ public class CombatManager : MonoBehaviour
                     GameLog.KV("hpAfter", enemy.Health),
                     GameLog.KV("source", "AoE")
                 ));
-                // Show floating text for each enemy hit by AOE
                 ShowDamageToEnemy(enemy, finalDamage, isCrit);
                 
+                // Check Frost Shield break
+                CheckFrostShieldBreak(enemy);
+                
+                // Check Retaliation counter-attack
+                CheckRetaliationCounter(enemy);
+                
+                // Player could die from Frost Shield break or Retaliation
+                if (!player.IsAlive())
+                {
+                    EndCombat(false);
+                    return;
+                }
+                
+                if (!enemy.IsAlive())
+                {
+                    if (enemy.ShouldReborn())
+                    {
+                        enemy.ActivateReborn();
+                    }
+                    else
+                    {
+                        GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", enemy.Name)));
+                        NotifyEnemyDeath(enemy);
+                    }
+                }
+                
+                if (enemy.IsAlive() && enemy.ShouldSplit())
+                {
+                    ExecuteSlimeBossSplit(enemy);
+                }
             }
         }
     }
@@ -1196,6 +1374,36 @@ public class CombatManager : MonoBehaviour
         {
             if (enemy.IsAlive())
             {
+                // STEP 0: Tick skill cooldowns and buff/debuff durations
+                enemy.TickSkillCooldowns();
+                enemy.TickDamageBuff();
+                
+                // Tick Mark Block and apply Null Sigil damage when it expires
+                int markBlockBefore = enemy.MarkBlockTurns;
+                enemy.TickMarkBlock();
+                if (markBlockBefore > 0 && enemy.MarkBlockTurns <= 0)
+                {
+                    ApplyNullSigilDamage(enemy);
+                    if (!player.IsAlive())
+                    {
+                        EndCombat(false);
+                        yield break;
+                    }
+                }
+                
+                // Tick HoT (heal over time) from Monsoon
+                int hotHeal = enemy.TickHoT();
+                if (hotHeal > 0)
+                {
+                    GameLog.Status(GameLog.Join(
+                        "Tick",
+                        GameLog.KV("target", enemy.Name),
+                        GameLog.KV("type", "HoT"),
+                        GameLog.KV("heal", hotHeal),
+                        GameLog.KV("hpAfter", enemy.Health)
+                    ));
+                }
+                
                 // STEP 1: Check and consume stun at START of turn
                 bool isStunned = enemy.CheckAndConsumeStun();
                 
@@ -1274,6 +1482,10 @@ public class CombatManager : MonoBehaviour
         ProcessNextEnemyAttack();
     }
     
+    // Tracks the current enemy skill being used for effect processing after QTE
+    private string pendingEnemySkillId;
+    private SkillDefinition pendingEnemySkillDef;
+    
     private void ProcessNextEnemyAttack()
     {
         if (currentAttackerIndex >= pendingAttackers.Count)
@@ -1284,32 +1496,123 @@ public class CombatManager : MonoBehaviour
         
         var enemy = pendingAttackers[currentAttackerIndex];
         
+        // Select skill based on attack pattern / cooldowns (reactive for MirrorBoss)
+        string skillId = enemy.ReactivePattern 
+            ? enemy.GetReactiveSkillId(lastPlayerAction) 
+            : enemy.GetNextSkillId();
+        var skillDef = !string.IsNullOrEmpty(skillId) ? GameDataLoader.GetSkill(skillId) : null;
+        string skillName = skillDef != null ? skillDef.displayName : "Attack";
+        
+        // Store for use after QTE resolution
+        pendingEnemySkillId = skillId;
+        pendingEnemySkillDef = skillDef;
         pendingDefensiveQTEAttacker = enemy;
-        pendingDefensiveQTEBaseDamage = enemy.Damage;
-        pendingDefensiveQTEAfterVariance = enemy.RollDamageWithVariance();
+        
+        // Check if skill is non-damage (pure effect skill like Weaken, Arcane Shield, etc.)
+        float damageMultiplier = 0f;
+        bool hasDamageEffect = false;
+        if (skillDef != null && skillDef.effects != null)
+        {
+            foreach (var eff in skillDef.effects)
+            {
+                if (eff.effectId == "eff_deal_damage" && eff.multiplier > 0f)
+                {
+                    damageMultiplier = eff.multiplier;
+                    hasDamageEffect = true;
+                    break;
+                }
+                if (eff.effectId == "eff_combo_attack" && eff.multiplier > 0f)
+                {
+                    damageMultiplier = eff.multiplier;
+                    hasDamageEffect = true;
+                    break;
+                }
+            }
+        }
+        
+        // If skill has no damage component, apply effects immediately and skip QTE
+        if (!hasDamageEffect)
+        {
+            ApplyEnemySkillEffects(enemy, skillDef);
+            enemy.OnSkillUsed(skillId);
+            
+            GameLog.Combat(GameLog.Join(
+                "EnemySkill",
+                GameLog.KV("attacker", enemy.Name),
+                GameLog.KV("skill", skillName),
+                GameLog.KV("type", "effect_only")
+            ));
+            
+            // Move to next attacker
+            currentAttackerIndex++;
+            if (currentAttackerIndex < pendingAttackers.Count)
+            {
+                Invoke(nameof(ProcessNextEnemyAttack), DELAY_BETWEEN_ENEMY_ATTACKS);
+            }
+            else
+            {
+                EndEnemyTurn();
+            }
+            return;
+        }
+        
+        // Apply Granite Bastion crush bonus (StoneColossus: each stack adds 10% to Crush)
+        float graniteCrushBonus = GetGraniteBastionCrushBonus(enemy);
+        float effectiveDamageMultiplier = damageMultiplier + graniteCrushBonus;
+        
+        // Calculate damage using skill multiplier
+        float baseDamageRaw = enemy.Damage * enemy.GetDamageMultiplier() * effectiveDamageMultiplier;
+        float variance = UnityEngine.Random.Range(0.90f, 1.10f);
+        int afterVariance = Mathf.RoundToInt(baseDamageRaw * variance);
+        
+        pendingDefensiveQTEBaseDamage = Mathf.RoundToInt(baseDamageRaw);
+        pendingDefensiveQTEAfterVariance = afterVariance;
         pendingDefensiveQTEResistPercent = player.CalculateResistance(enemy.Affinity);
-        pendingDefensiveQTEDamage = player.ApplyResistance(pendingDefensiveQTEAfterVariance, enemy.Affinity);
+        
+        // Check ignoreArmor flag from skill effects
+        bool ignoreArmor = false;
+        bool ignoreShield = false;
+        if (skillDef != null && skillDef.effects != null)
+        {
+            foreach (var eff in skillDef.effects)
+            {
+                if (eff.effectId == "eff_deal_damage")
+                {
+                    ignoreArmor = eff.ignoreArmor;
+                    ignoreShield = eff.ignoreShield;
+                    break;
+                }
+            }
+        }
+        
+        if (ignoreArmor)
+        {
+            pendingDefensiveQTEDamage = afterVariance; // bypass resistance
+        }
+        else
+        {
+            pendingDefensiveQTEDamage = player.ApplyResistance(afterVariance, enemy.Affinity);
+        }
+        
+        // Apply Vulnerable debuff: increases damage taken
+        float vulnMult = player.GetVulnerableMultiplier();
+        if (vulnMult > 1f)
+        {
+            pendingDefensiveQTEDamage = Mathf.RoundToInt(pendingDefensiveQTEDamage * vulnMult);
+        }
 
         GameLog.Combat(GameLog.Join(
-            "AttackStart",
+            "EnemySkill",
             GameLog.KV("attacker", enemy.Name),
+            GameLog.KV("skill", skillName),
             GameLog.KV("target", "Player"),
             GameLog.KV("element", enemy.Affinity),
-            GameLog.KV("dmgRange", "unknown"),
-            GameLog.KV("bonuses", GameLog.Join(
-                GameLog.KV("base", pendingDefensiveQTEBaseDamage),
-                GameLog.KV("variance", pendingDefensiveQTEAfterVariance)
-            )),
-            GameLog.KV("reactionId", "none")
-        ));
-
-        GameLog.Combat(GameLog.Join(
-            "AttackRoll",
-            GameLog.KV("roll", pendingDefensiveQTEAfterVariance),
-            GameLog.KV("reactionMult", "1.00"),
-            GameLog.KV("crit", false),
-            GameLog.KV("critMult", "1.00"),
-            GameLog.KV("preResist", pendingDefensiveQTEDamage)
+            GameLog.KV("multiplier", damageMultiplier.ToString("F2")),
+            GameLog.KV("base", pendingDefensiveQTEBaseDamage),
+            GameLog.KV("variance", pendingDefensiveQTEAfterVariance),
+            GameLog.KV("preResist", pendingDefensiveQTEDamage),
+            GameLog.KV("ignoreArmor", ignoreArmor),
+            GameLog.KV("ignoreShield", ignoreShield)
         ));
 
         if (pendingDefensiveQTEDamage <= 0)
@@ -1406,11 +1709,28 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
+        // Apply post-damage skill effects (statuses, lifesteal, etc.)
+        if (pendingEnemySkillDef != null)
+        {
+            ApplyEnemySkillEffects(enemy, pendingEnemySkillDef);
+        }
+        
+        // Track skill usage (cooldown, pattern advance)
+        if (!string.IsNullOrEmpty(pendingEnemySkillId))
+        {
+            enemy.OnSkillUsed(pendingEnemySkillId);
+        }
+        
+        // Check for SlimeBoss split after player was hit (enemy turn context — no split here)
+        // Split and Reborn checks only apply when the enemy takes damage, not the player
+
         pendingDefensiveQTEAttacker = null;
         pendingDefensiveQTEDamage = 0;
         pendingDefensiveQTEBaseDamage = 0;
         pendingDefensiveQTEAfterVariance = 0;
         pendingDefensiveQTEResistPercent = 0;
+        pendingEnemySkillId = null;
+        pendingEnemySkillDef = null;
         
         // Process next attacker with delay so player has time to prepare
         currentAttackerIndex++;
@@ -1422,6 +1742,409 @@ public class CombatManager : MonoBehaviour
         {
             EndEnemyTurn();
         }
+    }
+    
+    /// <summary>
+    /// Apply non-damage effects from an enemy skill definition.
+    /// Handles: status effects on player, self-buffs on enemy, enemy shield, HoT, etc.
+    /// </summary>
+    private void ApplyEnemySkillEffects(CombatEnemy enemy, SkillDefinition skillDef)
+    {
+        if (skillDef == null || skillDef.effects == null) return;
+        
+        foreach (var eff in skillDef.effects)
+        {
+            if (eff == null || string.IsNullOrEmpty(eff.effectId)) continue;
+            
+            switch (eff.effectId)
+            {
+                case "eff_apply_status":
+                    ApplyEnemyStatusEffect(enemy, eff);
+                    break;
+                    
+                case "eff_enemy_shield":
+                    ApplyEnemyShieldEffect(enemy, eff);
+                    break;
+                    
+                case "eff_lifesteal":
+                    // Enemy lifesteal: heal based on damage dealt
+                    if (eff.target == "Self" && eff.percent > 0 && pendingDefensiveQTEDamage > 0)
+                    {
+                        int healAmount = Mathf.RoundToInt(pendingDefensiveQTEDamage * (eff.percent / 100f));
+                        enemy.Health = Mathf.Min(enemy.Health + healAmount, enemy.MaxHealth);
+                        GameLog.Combat(GameLog.Join(
+                            "EnemyLifesteal",
+                            GameLog.KV("enemy", enemy.Name),
+                            GameLog.KV("heal", healAmount),
+                            GameLog.KV("hpAfter", enemy.Health)
+                        ));
+                    }
+                    break;
+                    
+                case "eff_dot":
+                    // DoT applied to the player
+                    if (eff.target == "Player" && eff.multiplier > 0f)
+                    {
+                        int dotDamagePerTick = Mathf.RoundToInt(enemy.Damage * enemy.GetDamageMultiplier() * eff.multiplier);
+                        int dotDuration = eff.duration > 0 ? eff.duration : 2;
+                        player.ApplyDoT(dotDamagePerTick, dotDuration, skillDef.displayName);
+                        GameLog.Status(GameLog.Join(
+                            "Apply",
+                            GameLog.KV("target", "Player"),
+                            GameLog.KV("type", "DoT"),
+                            GameLog.KV("damage", dotDamagePerTick),
+                            GameLog.KV("duration", dotDuration),
+                            GameLog.KV("source", skillDef.displayName)
+                        ));
+                    }
+                    break;
+                    
+                case "eff_syphon_shield":
+                    // Steal all player shield and deal damage based on it
+                    if (eff.target == "Player")
+                    {
+                        int stolenShield = player.GetShield();
+                        if (stolenShield > 0)
+                        {
+                            player.RemoveAllShield();
+                            int syphonDamage = Mathf.RoundToInt(stolenShield * eff.damagePerPoint);
+                            player.TakeDamage(syphonDamage);
+                            GameLog.Combat(GameLog.Join(
+                                "SyphonMagic",
+                                GameLog.KV("attacker", enemy.Name),
+                                GameLog.KV("shieldStolen", stolenShield),
+                                GameLog.KV("damage", syphonDamage)
+                            ));
+                            ShowDamageToPlayer(syphonDamage);
+                        }
+                    }
+                    break;
+                    
+                case "eff_split":
+                    // Handled separately in CheckBossSplitAfterDamage
+                    break;
+                    
+                case "eff_reborn":
+                    // Handled separately in death check
+                    break;
+                    
+                case "eff_mirror_copy":
+                    // Mirror Reaction: handled in MirrorBoss reactive turn processing
+                    break;
+                    
+                case "eff_combo_attack":
+                    // Combo damage is handled in ProcessNextEnemyAttack damage calculation
+                    break;
+                    
+                case "eff_deal_damage":
+                    // Damage is handled in ProcessNextEnemyAttack damage calculation
+                    break;
+                    
+                case "eff_multi_hit":
+                    // Multi-hit is handled in ProcessNextEnemyAttack (multiple QTE rounds)
+                    break;
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Apply a status effect from an enemy skill to the appropriate target.
+    /// </summary>
+    private void ApplyEnemyStatusEffect(CombatEnemy enemy, EffectEntry eff)
+    {
+        string target = eff.target ?? "Player";
+        string status = eff.status ?? "";
+        int duration = eff.duration;
+        float magnitude = eff.magnitude;
+        
+        switch (status)
+        {
+            case "status_player_weaken":
+                if (target == "Player")
+                {
+                    player.ApplyWeaken(magnitude, duration);
+                    GameLog.Status(GameLog.Join("Apply",
+                        GameLog.KV("target", "Player"), GameLog.KV("type", "Weaken"),
+                        GameLog.KV("magnitude", magnitude), GameLog.KV("duration", duration)));
+                }
+                break;
+                
+            case "status_player_sunder":
+                if (target == "Player")
+                {
+                    player.ApplySunder(magnitude, duration);
+                    GameLog.Status(GameLog.Join("Apply",
+                        GameLog.KV("target", "Player"), GameLog.KV("type", "Sunder"),
+                        GameLog.KV("magnitude", magnitude), GameLog.KV("duration", duration)));
+                }
+                break;
+                
+            case "status_player_vulnerable":
+                if (target == "Player")
+                {
+                    player.ApplyVulnerable(magnitude, duration, eff.maxStacks);
+                    GameLog.Status(GameLog.Join("Apply",
+                        GameLog.KV("target", "Player"), GameLog.KV("type", "Vulnerable"),
+                        GameLog.KV("magnitude", magnitude), GameLog.KV("duration", duration),
+                        GameLog.KV("maxStacks", eff.maxStacks)));
+                }
+                break;
+                
+            case "status_player_stun":
+                if (target == "Player")
+                {
+                    player.ApplyStun(duration);
+                    GameLog.Status(GameLog.Join("Apply",
+                        GameLog.KV("target", "Player"), GameLog.KV("type", "Stun"),
+                        GameLog.KV("duration", duration)));
+                }
+                break;
+                
+            case "status_enemy_damage_up":
+                // Apply to all allies (all enemies)
+                if (target == "AllAllies")
+                {
+                    foreach (var ally in enemies)
+                    {
+                        if (ally.IsAlive())
+                        {
+                            ally.DamageBuffPercent += magnitude;
+                            ally.DamageBuffTurns = Mathf.Max(ally.DamageBuffTurns, duration);
+                        }
+                    }
+                    GameLog.Status(GameLog.Join("Apply",
+                        GameLog.KV("target", "AllEnemies"), GameLog.KV("type", "DamageBuff"),
+                        GameLog.KV("magnitude", magnitude), GameLog.KV("duration", duration)));
+                }
+                break;
+                
+            case "status_enemy_hot":
+                // Apply HoT to all allies (all enemies)
+                if (target == "AllAllies")
+                {
+                    foreach (var ally in enemies)
+                    {
+                        if (ally.IsAlive())
+                        {
+                            ally.HoTActive = true;
+                            ally.HoTAmount = Mathf.RoundToInt(magnitude);
+                        }
+                    }
+                    GameLog.Status(GameLog.Join("Apply",
+                        GameLog.KV("target", "AllEnemies"), GameLog.KV("type", "HoT"),
+                        GameLog.KV("magnitude", magnitude)));
+                }
+                break;
+                
+            case "status_retaliation":
+                if (target == "Self")
+                {
+                    enemy.RetaliationActive = true;
+                    enemy.RetaliationDamageMult = magnitude;
+                    GameLog.Status(GameLog.Join("Apply",
+                        GameLog.KV("target", enemy.Name), GameLog.KV("type", "Retaliation"),
+                        GameLog.KV("magnitude", magnitude)));
+                }
+                break;
+                
+            case "status_frost_shield":
+                if (target == "Self")
+                {
+                    enemy.ActivateFrostShield(
+                        Mathf.RoundToInt(magnitude),
+                        eff.breakThreshold,
+                        eff.breakDamageMultiplier
+                    );
+                    GameLog.Status(GameLog.Join("Apply",
+                        GameLog.KV("target", enemy.Name), GameLog.KV("type", "FrostShield"),
+                        GameLog.KV("resistBonus", magnitude),
+                        GameLog.KV("breakThreshold", eff.breakThreshold),
+                        GameLog.KV("breakDamageMult", eff.breakDamageMultiplier)));
+                }
+                break;
+                
+            case "status_mark_block":
+                if (target == "Self")
+                {
+                    enemy.MarkBlockTurns = duration;
+                    enemy.MarkBlockDamageMult = magnitude;
+                    enemy.MarksBlocked = 0;
+                    GameLog.Status(GameLog.Join("Apply",
+                        GameLog.KV("target", enemy.Name), GameLog.KV("type", "MarkBlock"),
+                        GameLog.KV("duration", duration), GameLog.KV("damageMult", magnitude)));
+                }
+                break;
+                
+            case "status_granite_bastion":
+                if (target == "Self")
+                {
+                    enemy.GraniteStacks++;
+                    GameLog.Status(GameLog.Join("Apply",
+                        GameLog.KV("target", enemy.Name), GameLog.KV("type", "GraniteBastion"),
+                        GameLog.KV("stacks", enemy.GraniteStacks),
+                        GameLog.KV("crushBonus", $"{enemy.GraniteStacks * magnitude}%")));
+                }
+                break;
+                
+            default:
+                GameLog.Warn(GameLogCategory.System, "[CombatManager]",
+                    GameLog.Join("UnknownEnemyStatus", GameLog.KV("status", status)));
+                break;
+        }
+    }
+    
+    /// <summary>
+    /// Apply enemy shield effect (Arcane Shield, Mirror Shield, Granite Bastion).
+    /// </summary>
+    private void ApplyEnemyShieldEffect(CombatEnemy enemy, EffectEntry eff)
+    {
+        if (eff.percentOfMaxHealth > 0)
+        {
+            int shieldAmount = Mathf.RoundToInt(enemy.MaxHealth * (eff.percentOfMaxHealth / 100f));
+            enemy.AddShield(shieldAmount);
+            GameLog.Combat(GameLog.Join(
+                "EnemyShieldGain",
+                GameLog.KV("enemy", enemy.Name),
+                GameLog.KV("amount", shieldAmount),
+                GameLog.KV("totalShield", enemy.Shield)
+            ));
+        }
+        else if (eff.value > 0)
+        {
+            enemy.AddShield(eff.value);
+            GameLog.Combat(GameLog.Join(
+                "EnemyShieldGain",
+                GameLog.KV("enemy", enemy.Name),
+                GameLog.KV("amount", eff.value),
+                GameLog.KV("totalShield", enemy.Shield)
+            ));
+        }
+    }
+    
+    /// <summary>
+    /// Check if Frost Shield broke from accumulated damage. If so, deal break damage to player.
+    /// </summary>
+    private void CheckFrostShieldBreak(CombatEnemy enemy)
+    {
+        int breakDamage = enemy.CheckFrostShieldBreak();
+        if (breakDamage > 0)
+        {
+            player.TakeDamage(breakDamage);
+            ShowDamageToPlayer(breakDamage);
+            GameLog.Combat(GameLog.Join(
+                "FrostShieldBreak",
+                GameLog.KV("enemy", enemy.Name),
+                GameLog.KV("damage", breakDamage)
+            ));
+        }
+    }
+    
+    /// <summary>
+    /// Check if the attacked enemy has Retaliation active. If so, counter-attack the player.
+    /// </summary>
+    private void CheckRetaliationCounter(CombatEnemy enemy)
+    {
+        if (!enemy.RetaliationActive || !enemy.IsAlive()) return;
+        
+        int counterDamage = Mathf.RoundToInt(enemy.Damage * enemy.RetaliationDamageMult);
+        if (counterDamage > 0)
+        {
+            player.TakeDamage(counterDamage);
+            ShowDamageToPlayer(counterDamage);
+            GameLog.Combat(GameLog.Join(
+                "RetaliationCounter",
+                GameLog.KV("enemy", enemy.Name),
+                GameLog.KV("damage", counterDamage)
+            ));
+        }
+    }
+    
+    /// <summary>
+    /// Execute SlimeBoss split: remove SlimeBoss and spawn MadSlime + SadSlime.
+    /// Each spawned slime gets a percentage of the SlimeBoss's current health.
+    /// </summary>
+    private void ExecuteSlimeBossSplit(CombatEnemy slimeBoss)
+    {
+        slimeBoss.MarkAsSplit();
+        int currentHealth = slimeBoss.Health;
+        
+        // Kill the SlimeBoss
+        slimeBoss.Health = 0;
+        GameLog.Combat(GameLog.Join("SlimeBossSplit",
+            GameLog.KV("boss", slimeBoss.Name),
+            GameLog.KV("healthAtSplit", currentHealth)));
+        NotifyEnemyDeath(slimeBoss);
+        
+        if (slimeBoss.SplitInto == null) return;
+        
+        // Spawn sub-enemies
+        int world = GameManager.CurrentWorld;
+        
+        foreach (string spawnName in slimeBoss.SplitInto)
+        {
+            EnemyData spawnData = DataCache.GetEnemyByName(spawnName);
+            if (spawnData == null)
+            {
+                GameLog.Warn(GameLogCategory.System, "[CombatManager]",
+                    GameLog.Join("SplitSpawnFail", GameLog.KV("name", spawnName)));
+                continue;
+            }
+            
+            var spawned = new CombatEnemy(spawnData, world);
+            // Set health to percentage of SlimeBoss's current health at split
+            int splitHealth = Mathf.RoundToInt(currentHealth * (slimeBoss.SplitHealthPercent / 100f));
+            spawned.Health = Mathf.Min(splitHealth, spawned.MaxHealth);
+            spawned.MaxHealth = spawned.Health;
+            
+            enemies.Add(spawned);
+            
+            GameLog.Combat(GameLog.Join("SplitSpawn",
+                GameLog.KV("name", spawned.Name),
+                GameLog.KV("health", spawned.Health),
+                GameLog.KV("damage", spawned.Damage)));
+        }
+        
+        // Notify combat arena to update enemy visuals
+        if (combatArena != null)
+        {
+            combatArena.OnEnemiesChanged(enemies);
+        }
+    }
+    
+    /// <summary>
+    /// Get Granite Bastion crush damage bonus for StoneColossus.
+    /// Each stack adds the magnitude% to the crush skill multiplier.
+    /// </summary>
+    private float GetGraniteBastionCrushBonus(CombatEnemy enemy)
+    {
+        if (enemy.GraniteStacks <= 0) return 0f;
+        
+        // Each stack adds 10% (magnitude from status_granite_bastion)
+        // The magnitude is stored per-stack as 10 in the skill definition
+        return enemy.GraniteStacks * 0.10f;
+    }
+    
+    /// <summary>
+    /// Calculate and deal Null Sigil mark block damage to the player.
+    /// Called when mark block expires or when the StormCaptain attacks.
+    /// </summary>
+    private void ApplyNullSigilDamage(CombatEnemy enemy)
+    {
+        if (enemy.MarksBlocked <= 0 || enemy.MarkBlockDamageMult <= 0f) return;
+        
+        int sigilDamage = Mathf.RoundToInt(enemy.Damage * enemy.MarkBlockDamageMult * enemy.MarksBlocked);
+        if (sigilDamage > 0)
+        {
+            player.TakeDamage(sigilDamage);
+            ShowDamageToPlayer(sigilDamage);
+            GameLog.Combat(GameLog.Join(
+                "NullSigilDamage",
+                GameLog.KV("enemy", enemy.Name),
+                GameLog.KV("marksBlocked", enemy.MarksBlocked),
+                GameLog.KV("damage", sigilDamage)
+            ));
+        }
+        enemy.MarksBlocked = 0;
     }
     
     private void EndEnemyTurn()
@@ -1454,6 +2177,36 @@ public class CombatManager : MonoBehaviour
             }
         }
 
+        // Tick player debuff durations at start of player's turn
+        player.TickDebuffs();
+        
+        // Tick player DoT
+        int playerDotDmg = player.TickPlayerDoT();
+        if (playerDotDmg > 0)
+        {
+            ShowDamageToPlayer(playerDotDmg);
+            if (!player.IsAlive())
+            {
+                EndCombat(false);
+                return;
+            }
+        }
+        
+        // Check player stun (Hydra Tail)
+        if (player.CheckAndConsumePlayerStun())
+        {
+            GameLog.Status(GameLog.Join(
+                "Tick",
+                GameLog.KV("target", "Player"),
+                GameLog.KV("type", "Stun"),
+                GameLog.KV("tick", "skip")
+            ));
+            // Skip player turn entirely — go straight to enemy turn
+            isPlayerTurn = false;
+            EnemyTurn();
+            return;
+        }
+        
         isPlayerTurn = true;
         
         // Tick down cooldowns at start of player's turn
@@ -1461,8 +2214,6 @@ public class CombatManager : MonoBehaviour
         
         // Refresh AP at start of player's turn
         player.RefreshAP();
-
-        
         
         // Reset AP in CombatArena UI
         if (combatArena != null)
@@ -1664,6 +2415,15 @@ public class CombatManager : MonoBehaviour
     /// </summary>
     private void NotifyEnemyDeath(CombatEnemy enemy)
     {
+        // Track boss defeats for FallenChampion spawn requirement
+        if (enemy.IsBoss && !enemy.SpawnOnly)
+        {
+            bossesDefeatedThisRun++;
+            GameLog.Combat(GameLog.Join("BossDefeated",
+                GameLog.KV("boss", enemy.Name),
+                GameLog.KV("totalBossesDefeated", bossesDefeatedThisRun)));
+        }
+        
         if (combatArena == null) return;
         var unit = combatArena.GetEnemyUnit(enemy);
         if (unit != null)

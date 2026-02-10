@@ -8,6 +8,40 @@ public class EnemyData
     public int BaseResistance;
     public int BonusResistance;
     
+    // Skills (skill IDs referencing skills.json)
+    public string Skill1Id;
+    public string Skill2Id;
+    public int Skill2Cooldown;
+    public string Skill3Id;
+    public int Skill3Cooldown;
+    public string Skill4Id;
+    
+    // Attack pattern (1-indexed skill numbers, repeating cycle for bosses)
+    public int[] AttackPattern;
+    
+    // Spawn control
+    public bool SpawnOnly; // true = can only be spawned by other enemies (MadSlime, SadSlime)
+    
+    // Boss: Split mechanic (SlimeBoss)
+    public float SplitThreshold;    // health ratio to trigger split (0.66 = 66%)
+    public string[] SplitInto;      // enemy displayNames to spawn on split
+    public int SplitHealthPercent;  // % of current health for each spawned enemy
+    
+    // Boss: Reactive pattern (MirrorBoss)
+    public bool ReactivePattern;    // true = uses reactive skill selection instead of fixed pattern
+    public int ReactiveOnAttack;    // skill number to use when player attacks
+    public int ReactiveOnShield;    // skill number to use when player gains shield
+    public int ReactiveOnReaction;  // skill number to use when player triggers reaction
+    
+    // Boss: Reborn mechanic (FallenChampion)
+    public int RebornHealthPercent; // revive at this % of max health (0 = no reborn)
+    public float RebornDamageBonus; // damage bonus after reborn (1.0 = +100%)
+    public int[] RebornPattern;     // new attack pattern after reborn
+    
+    // Boss: Spawn requirement (FallenChampion)
+    public string SpawnRequirement;     // "defeatBosses" etc.
+    public int SpawnRequirementCount;   // number of bosses to defeat first
+    
     // Rewards
     public int RewardXP;
     public int RewardGoldMin;

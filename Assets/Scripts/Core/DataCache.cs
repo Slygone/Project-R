@@ -39,6 +39,19 @@ public static class DataCache
         Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEOffensiveMultipliers.Count} QTE offensive, {QTEDefensiveShield.Count} QTE defensive, {Reactions.Count} reactions, {ReactionEffects.Count} reaction effect groups, {ElementalTiers.Count} element tier groups, {WorldEncounters.Count} world encounters");
     }
 
+    /// <summary>
+    /// Look up an EnemyData by display name (used for split/spawn mechanics).
+    /// </summary>
+    public static EnemyData GetEnemyByName(string displayName)
+    {
+        if (Enemies == null || string.IsNullOrEmpty(displayName)) return null;
+        foreach (var e in Enemies)
+        {
+            if (e.DisplayName == displayName) return e;
+        }
+        return null;
+    }
+    
     private static List<EnemyData> LoadEnemies()
     {
         var json = Resources.Load<TextAsset>("Data/enemies");
@@ -75,11 +88,47 @@ public static class DataCache
                 Damage = baseDamage,
                 BaseResistance = e.baseResistance,
                 BonusResistance = e.bonusResistance,
+                
+                // Skills
+                Skill1Id = e.skill1,
+                Skill2Id = e.skill2,
+                Skill2Cooldown = e.skill2Cooldown,
+                Skill3Id = e.skill3,
+                Skill3Cooldown = e.skill3Cooldown,
+                Skill4Id = e.skill4,
+                
+                // Attack pattern & spawn control
+                AttackPattern = e.attackPattern,
+                SpawnOnly = e.spawnOnly,
+                
+                // Boss: Split mechanic
+                SplitThreshold = e.splitThreshold,
+                SplitInto = e.splitInto,
+                SplitHealthPercent = e.splitHealthPercent,
+                
+                // Boss: Reactive pattern
+                ReactivePattern = e.reactivePattern,
+                ReactiveOnAttack = e.reactiveOnAttack,
+                ReactiveOnShield = e.reactiveOnShield,
+                ReactiveOnReaction = e.reactiveOnReaction,
+                
+                // Boss: Reborn mechanic
+                RebornHealthPercent = e.rebornHealthPercent,
+                RebornDamageBonus = e.rebornDamageBonus,
+                RebornPattern = e.rebornPattern,
+                
+                // Boss: Spawn requirement
+                SpawnRequirement = e.spawnRequirement,
+                SpawnRequirementCount = e.spawnRequirementCount,
+                
+                // Rewards
                 RewardXP = e.rewards != null ? e.rewards.xp : 0,
                 RewardGoldMin = e.rewards != null ? e.rewards.goldMin : 0,
                 RewardGoldMax = e.rewards != null ? e.rewards.goldMax : 0,
                 SigilChance = e.rewards != null ? e.rewards.sigilChance : 0,
                 RelicChance = e.rewards != null ? e.rewards.relicChance : 0,
+                
+                // World scaling
                 World2HealthMultiplier = e.healthModifiers.Length > 1 ? e.healthModifiers[1] : 1f,
                 World2DamageMultiplier = e.damageModifiers.Length > 1 ? e.damageModifiers[1] : 1f,
                 World2BaseResistanceAddend = e.resistanceModifiers.Length > 1 ? e.resistanceModifiers[1] : 0,
@@ -96,7 +145,12 @@ public static class DataCache
             
             list.Add(enemy);
             
-            if (enemy.IsRegular) RegularEnemies.Add(enemy);
+            // SpawnOnly enemies (MadSlime, SadSlime) are not added to normal spawn pools
+            if (enemy.SpawnOnly)
+            {
+                // Still in the master list but not in any spawn category
+            }
+            else if (enemy.IsRegular) RegularEnemies.Add(enemy);
             else if (enemy.IsElite) EliteEnemies.Add(enemy);
             else if (enemy.IsBoss) BossEnemies.Add(enemy);
         }
@@ -120,6 +174,12 @@ public static class DataCache
         public float[] healthModifiers;
         public string skill1;
         public string skill2;
+        public int skill2Cooldown;
+        public string skill3;
+        public int skill3Cooldown;
+        public string skill4;
+        public int[] attackPattern;
+        public bool spawnOnly;
         public int baseDamageMin;
         public int baseDamageMax;
         public float[] damageModifiers;
@@ -127,6 +187,26 @@ public static class DataCache
         public int[] resistanceModifiers;
         public int bonusResistance;
         public EnemyRewardsJson rewards;
+        
+        // Boss: Split mechanic (SlimeBoss)
+        public float splitThreshold;
+        public string[] splitInto;
+        public int splitHealthPercent;
+        
+        // Boss: Reactive pattern (MirrorBoss)
+        public bool reactivePattern;
+        public int reactiveOnAttack;
+        public int reactiveOnShield;
+        public int reactiveOnReaction;
+        
+        // Boss: Reborn mechanic (FallenChampion)
+        public int rebornHealthPercent;
+        public float rebornDamageBonus;
+        public int[] rebornPattern;
+        
+        // Boss: Spawn requirement (FallenChampion)
+        public string spawnRequirement;
+        public int spawnRequirementCount;
     }
     
     [System.Serializable]

@@ -9,11 +9,13 @@ using System;
 public class EffectEntry
 {
     public string effectId;
-    public string target;               // "Self", "SelectedEnemy", "AllEnemies"
+    public string target;               // "Self", "SelectedEnemy", "AllEnemies", "Player", "AllAllies"
 
     // eff_deal_damage
     public float multiplier;            // damage multiplier (e.g., 1.25 = 125% of base)
     public bool ignoreArmor;            // true = bypass resistance
+    public bool ignoreShield;           // true = bypass shields (Piercing Arrow)
+    public float shieldMultiplier;      // bonus multiplier to shield damage (Spell Blade: 1.5)
     public bool useElemental;           // true = use random element for resistance calc (potions)
     public int value;                   // flat value (heal amount, shield flat, stat bonus amount, flat damage)
 
@@ -24,6 +26,9 @@ public class EffectEntry
     public string status;               // status id (e.g., "status_stun")
     public int duration;                // turns the status lasts
     public float magnitude;             // strength of the status (e.g., 50 = 50% block)
+    public int maxStacks;               // max stackable magnitude (Vulnerable: 50)
+    public int breakThreshold;          // % of max health to break shield (Frost Shield: 20)
+    public float breakDamageMultiplier; // damage multiplier on shield break (Frost Shield: 1.5)
 
     // eff_dot
     public int damagePercent;           // % of damage dealt applied as DoT per tick
@@ -54,6 +59,19 @@ public class EffectEntry
 
     // eff_damage_multiplier (offensive QTE)
     // uses 'multiplier' field above
+
+    // eff_syphon_shield
+    public float damagePerPoint;        // damage per shield point stolen (Syphon Magic: 1.0)
+
+    // eff_mirror_copy
+    public string copyType;             // "reaction" for Mirror Reaction
+
+    // eff_combo_attack (uses hitCount and multiplier above)
+    public bool perfectNegate;          // true = perfect defensive QTE negates all damage
+
+    // eff_reborn
+    public int healthPercent;           // revive at this % of max health
+    public float damageBonus;           // bonus damage multiplier after reborn (1.0 = +100%)
 }
 
 /// <summary>
