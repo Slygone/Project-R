@@ -254,8 +254,8 @@ public class CombatUI : MonoBehaviour
 
         if (lootTitleText != null) lootTitleText.text = isBoss ? "BOSS DEFEATED!" : "Reward";
         if (goldRewardButton != null) goldRewardButton.interactable = true;
-        if (lootGoldText != null) lootGoldText.text = $"<color=#FFD700>\u25C6</color>Gold:+{gold}<size=16>(Click to collect)</size>";
-        if (lootXPText != null) lootXPText.text = $"<color=#6CF>\u2605</color>Experience:+{xp}<size=16>(Auto)</size>";
+        if (lootGoldText != null) lootGoldText.text = $"<color=#FFD700>\u2022</color>Gold:+{gold}<size=16>(Click to collect)</size>";
+        if (lootXPText != null) lootXPText.text = $"<color=#6CF>\u2022</color>Experience:+{xp}<size=16>(Auto)</size>";
 
         bool showSigil = dropsSigil || isElite;
         if (sigilRewardButton != null)

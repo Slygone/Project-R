@@ -1,7 +1,10 @@
+using System.Collections.Generic;
+
 public class ReactionData
 {
-    public string ReactionId { get; set; }
-    public string Name { get; set; }
-    public string EffectId { get; set; }
-    public int EffectValue { get; set; }
+    public string ReactionId;
+    public string Name;
+    public string Type;     // "mono" or "dual"
+    public bool CanCrit;
+    public List<ReactionEffectEntry> Effects = new List<ReactionEffectEntry>();
 }

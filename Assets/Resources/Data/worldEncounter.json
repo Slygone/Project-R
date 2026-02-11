@@ -2,11 +2,11 @@
   "worldEncounters": [
     {
       "world": 1,
-      "nodeCount": 10,
-      "combatNodeCount": 20,
-      "restNodeCount": 5,
-      "shopNodeCount": 3,
-      "eliteNodeCount": 10,
+      "nodeCount": 14,
+      "combatNodeCount": 5,
+      "restNodeCount": 2,
+      "shopNodeCount": 1,
+      "eliteNodeCount": 6,
       "regularEnemy": 1,
       "eliteEnemy": 1,
       "bossEnemy": 1
@@ -14,10 +14,10 @@
     {
       "world": 2,
       "nodeCount": 12,
-      "combatNodeCount": 20,
-      "restNodeCount": 5,
-      "shopNodeCount": 3,
-      "eliteNodeCount": 10,
+      "combatNodeCount": 6,
+      "restNodeCount": 2,
+      "shopNodeCount": 1,
+      "eliteNodeCount": 3,
       "regularEnemy": 2,
       "eliteEnemy": 2,
       "bossEnemy": 2
@@ -25,10 +25,10 @@
     {
       "world": 3,
       "nodeCount": 14,
-      "combatNodeCount": 20,
-      "restNodeCount": 5,
-      "shopNodeCount": 3,
-      "eliteNodeCount": 10,
+      "combatNodeCount": 7,
+      "restNodeCount": 2,
+      "shopNodeCount": 2,
+      "eliteNodeCount": 3,
       "regularEnemy": 3,
       "eliteEnemy": 3,
       "bossEnemy": 2
@@ -36,10 +36,10 @@
     {
       "world": 4,
       "nodeCount": 16,
-      "combatNodeCount": 20,
-      "restNodeCount": 5,
-      "shopNodeCount": 3,
-      "eliteNodeCount": 10,
+      "combatNodeCount": 8,
+      "restNodeCount": 2,
+      "shopNodeCount": 2,
+      "eliteNodeCount": 4,
       "regularEnemy": 4,
       "eliteEnemy": 3,
       "bossEnemy": 2
@@ -47,10 +47,10 @@
     {
       "world": 5,
       "nodeCount": 18,
-      "combatNodeCount": 20,
-      "restNodeCount": 5,
-      "shopNodeCount": 3,
-      "eliteNodeCount": 10,
+      "combatNodeCount": 9,
+      "restNodeCount": 2,
+      "shopNodeCount": 2,
+      "eliteNodeCount": 5,
       "regularEnemy": 5,
       "eliteEnemy": 4,
       "bossEnemy": 3

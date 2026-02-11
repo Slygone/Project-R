@@ -600,7 +600,7 @@
     {
       "id": "skill_divine_shield",
       "name": "DivineShield",
-      "description": "Holy protection that shields and heals",
+      "description": "Holy protection that shields",
       "apCost": 3,
       "cooldown": 3,
       "element": "none",
@@ -612,11 +612,6 @@
           "target": "Self",
           "value": 25,
           "capPercent": 40
-        },
-        {
-          "effectId": "eff_heal",
-          "target": "Self",
-          "value": 15
         },
         {
           "effectId": "eff_energy_delta",
@@ -798,7 +793,7 @@
       "cooldown": 0,
       "effects": [
         { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 },
-        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_vulnerable", "duration": 2, "magnitude": 10, "maxStacks": 30 }
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_vulnerable", "duration": 3, "magnitude": 10, "maxStacks": 30 }
       ]
     },
     {

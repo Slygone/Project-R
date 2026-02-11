@@ -1313,4 +1313,189 @@ public class Player : MonoBehaviour
     public bool IsVulnerable => vulnerableTurns > 0 && vulnerablePercent > 0f;
     public bool IsPlayerStunned => isStunned && stunTurns > 0;
     public bool HasPlayerDoT => playerDoTTurns > 0 && playerDoTDamage > 0;
+    
+    // Debuff detail getters for UI tooltips
+    public float WeakenPercent => weakenPercent;
+    public int WeakenTurns => weakenTurns;
+    public float SunderPercent => sunderPercent;
+    public int SunderTurns => sunderTurns;
+    public float VulnerablePercent => vulnerablePercent;
+    public int VulnerableTurns => vulnerableTurns;
+    public int StunTurns => stunTurns;
+    public int PlayerDoTDamage => playerDoTDamage;
+    public int PlayerDoTTurns => playerDoTTurns;
+    
+    // ========== REACTION BUFF SYSTEM ==========
+    
+    // CritDamage buff: +value% crit damage for duration turns
+    private float reactionCritDamageBonus;
+    private int reactionCritDamageTurns;
+    
+    // BonusAP buff: +value max AP and current AP for duration turns
+    private int reactionBonusAP;
+    private int reactionBonusAPTurns;
+    
+    // ReflectiveArmor buff: reflect value% damage back for duration turns
+    private float reactionReflectPercent;
+    private int reactionReflectTurns;
+    
+    // DamageReduction buff: reduce incoming damage by value% for duration turns
+    private float reactionDamageReduction;
+    private int reactionDamageReductionTurns;
+    
+    // RockDamageWhileShielded: +value% rock damage while player has shield (passive, no duration)
+    private float reactionRockDmgWhileShielded;
+    
+    /// <summary>
+    /// Apply a reaction buff by type. Called by ReactionEffectEngine.
+    /// </summary>
+    public void ApplyReactionBuff(string buffType, float value, int duration, bool refreshable)
+    {
+        switch (buffType)
+        {
+            case "CritDamage":
+                reactionCritDamageBonus = value;
+                reactionCritDamageTurns = refreshable ? Mathf.Max(reactionCritDamageTurns, duration) : duration;
+                break;
+                
+            case "BonusAP":
+                int extraAP = Mathf.RoundToInt(value);
+                if (reactionBonusAPTurns <= 0)
+                {
+                    // First application: increase max and current AP
+                    reactionBonusAP = extraAP;
+                    maxAP += extraAP;
+                    currentAP += extraAP;
+                }
+                // Refresh duration
+                if (refreshable)
+                    reactionBonusAPTurns = Mathf.Max(reactionBonusAPTurns, duration);
+                else
+                    reactionBonusAPTurns = duration;
+                break;
+                
+            case "ReflectiveArmor":
+                reactionReflectPercent = value;
+                reactionReflectTurns = refreshable ? Mathf.Max(reactionReflectTurns, duration) : duration;
+                break;
+                
+            case "DamageReduction":
+                reactionDamageReduction = value;
+                reactionDamageReductionTurns = refreshable ? Mathf.Max(reactionDamageReductionTurns, duration) : duration;
+                break;
+                
+            case "RockDamageWhileShielded":
+                reactionRockDmgWhileShielded = value;
+                break;
+        }
+        
+        GameLog.Status(GameLog.Join(
+            "ReactionBuff",
+            GameLog.KV("buff", buffType),
+            GameLog.KV("value", value),
+            GameLog.KV("dur", duration),
+            GameLog.KV("refresh", refreshable)
+        ), GameLogVerbosity.Verbose);
+    }
+    
+    /// <summary>
+    /// Tick reaction buff durations. Call at start of player turn.
+    /// </summary>
+    public void TickReactionBuffs()
+    {
+        if (reactionCritDamageTurns > 0)
+        {
+            reactionCritDamageTurns--;
+            if (reactionCritDamageTurns <= 0) reactionCritDamageBonus = 0f;
+        }
+        
+        if (reactionBonusAPTurns > 0)
+        {
+            reactionBonusAPTurns--;
+            if (reactionBonusAPTurns <= 0 && reactionBonusAP > 0)
+            {
+                // Remove the bonus AP
+                maxAP -= reactionBonusAP;
+                if (currentAP > maxAP) currentAP = maxAP;
+                reactionBonusAP = 0;
+            }
+        }
+        
+        if (reactionReflectTurns > 0)
+        {
+            reactionReflectTurns--;
+            if (reactionReflectTurns <= 0) reactionReflectPercent = 0f;
+        }
+        
+        if (reactionDamageReductionTurns > 0)
+        {
+            reactionDamageReductionTurns--;
+            if (reactionDamageReductionTurns <= 0) reactionDamageReduction = 0f;
+        }
+    }
+    
+    /// <summary>
+    /// Clear all reaction buffs (on combat end).
+    /// </summary>
+    public void ClearReactionBuffs()
+    {
+        reactionCritDamageBonus = 0f;
+        reactionCritDamageTurns = 0;
+        if (reactionBonusAP > 0)
+        {
+            maxAP -= reactionBonusAP;
+            if (currentAP > maxAP) currentAP = maxAP;
+        }
+        reactionBonusAP = 0;
+        reactionBonusAPTurns = 0;
+        reactionReflectPercent = 0f;
+        reactionReflectTurns = 0;
+        reactionDamageReduction = 0f;
+        reactionDamageReductionTurns = 0;
+        reactionRockDmgWhileShielded = 0f;
+        reactionChips.Clear();
+    }
+    
+    // Query reaction buff states
+    public float GetReactionCritDamageBonus() => reactionCritDamageTurns > 0 ? reactionCritDamageBonus / 100f : 0f;
+    public bool HasReactionBonusAP => reactionBonusAPTurns > 0 && reactionBonusAP > 0;
+    public int GetReactionBonusAPAmount() => reactionBonusAP;
+    public int GetReactionBonusAPTurns() => reactionBonusAPTurns;
+    public float GetReflectPercent() => reactionReflectTurns > 0 ? reactionReflectPercent / 100f : 0f;
+    public bool HasReflectiveArmor => reactionReflectTurns > 0 && reactionReflectPercent > 0f;
+    public float GetDamageReductionPercent() => reactionDamageReductionTurns > 0 ? reactionDamageReduction / 100f : 0f;
+    public bool HasDamageReduction => reactionDamageReductionTurns > 0 && reactionDamageReduction > 0f;
+    public float GetRockDamageWhileShieldedBonus() => GetShield() > 0 ? reactionRockDmgWhileShielded / 100f : 0f;
+    
+    // ========== REACTION CHIP DISPLAY ==========
+    
+    private List<ReactionChipInfo> reactionChips = new List<ReactionChipInfo>();
+    
+    public void AddReactionChip(string name, string tooltip, int turns)
+    {
+        for (int i = 0; i < reactionChips.Count; i++)
+        {
+            if (reactionChips[i].ChipName == name)
+            {
+                reactionChips[i].Tooltip = tooltip;
+                reactionChips[i].TurnsRemaining = Mathf.Max(reactionChips[i].TurnsRemaining, turns);
+                return;
+            }
+        }
+        reactionChips.Add(new ReactionChipInfo(name, tooltip, turns, true));
+    }
+    
+    public void TickReactionChips()
+    {
+        for (int i = reactionChips.Count - 1; i >= 0; i--)
+        {
+            reactionChips[i].TurnsRemaining--;
+            if (reactionChips[i].TurnsRemaining <= 0)
+            {
+                reactionChips.RemoveAt(i);
+            }
+        }
+    }
+    
+    public List<ReactionChipInfo> GetReactionChips() => reactionChips;
 }

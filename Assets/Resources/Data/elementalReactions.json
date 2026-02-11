@@ -1,25 +1,207 @@
 {
   "reactions": [
-    { "id": "Fire_Fire", "name": "Pyroclasm", "effectId": "eff_reaction_dot", "effectValue": 15 },
-    { "id": "Fire_Ice", "name": "Steam", "effectId": "eff_reaction_shield", "effectValue": 10 },
-    { "id": "Fire_Lightning", "name": "Overload", "effectId": "eff_reaction_dot", "effectValue": 25 },
-    { "id": "Fire_Rock", "name": "Magma", "effectId": "eff_reaction_shield_flat", "effectValue": 15 },
-    { "id": "Fire_Water", "name": "Vaporize", "effectId": "eff_reaction_dot", "effectValue": 12 },
-    { "id": "Fire_Wind", "name": "Inferno", "effectId": "eff_reaction_dot_trigger", "effectValue": 1 },
-    { "id": "Ice_Ice", "name": "Coldsnap", "effectId": "eff_reaction_resist_ice", "effectValue": 15 },
-    { "id": "Ice_Lightning", "name": "Superconduct", "effectId": "eff_reaction_status", "effectValue": 1 },
-    { "id": "Ice_Rock", "name": "Permafrost", "effectId": "eff_reaction_shield_flat", "effectValue": 20 },
-    { "id": "Ice_Water", "name": "Freeze", "effectId": "eff_reaction_status", "effectValue": 1 },
-    { "id": "Ice_Wind", "name": "Frostwind", "effectId": "eff_reaction_crit_chance", "effectValue": 15 },
-    { "id": "Lightning_Lightning", "name": "Chain Lightning", "effectId": "eff_reaction_crit_chance", "effectValue": 20 },
-    { "id": "Lightning_Rock", "name": "Shockwave", "effectId": "eff_reaction_dot", "effectValue": 20 },
-    { "id": "Lightning_Water", "name": "Electrocute", "effectId": "eff_reaction_dot", "effectValue": 30 },
-    { "id": "Lightning_Wind", "name": "Tempest", "effectId": "eff_reaction_crit_damage", "effectValue": 25 },
-    { "id": "Rock_Rock", "name": "Fortify", "effectId": "eff_reaction_shield_flat", "effectValue": 30 },
-    { "id": "Rock_Water", "name": "Mudslide", "effectId": "eff_reaction_resist_all", "effectValue": 10 },
-    { "id": "Rock_Wind", "name": "Sandstorm", "effectId": "eff_reaction_dot", "effectValue": 10 },
-    { "id": "Water_Water", "name": "Tidal Surge", "effectId": "eff_reaction_shield", "effectValue": 15 },
-    { "id": "Water_Wind", "name": "Monsoon", "effectId": "eff_reaction_crit_damage", "effectValue": 20 },
-    { "id": "Wind_Wind", "name": "Tornado", "effectId": "eff_reaction_crit_chance", "effectValue": 10 }
+    {
+      "id": "Fire_Fire",
+      "name": "Pyroclasm",
+      "type": "mono",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 1.0 },
+        { "effectId": "rxn_apply_dot", "target": "Enemy", "dotName": "Ignite", "damagePercent": 0.15, "duration": 2, "maxStacks": 1, "refreshable": true, "bonusDmgIfExists": 0.10, "bonusDotIfExists": 0.10 }
+      ]
+    },
+    {
+      "id": "Ice_Ice",
+      "name": "Glacial Focus",
+      "type": "mono",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_player_buff", "buffType": "CritDamage", "value": 20, "duration": 2 }
+      ]
+    },
+    {
+      "id": "Lightning_Lightning",
+      "name": "Overcharge",
+      "type": "mono",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 1.0 },
+        { "effectId": "rxn_player_buff", "buffType": "BonusAP", "value": 2, "duration": 2, "refreshable": true }
+      ]
+    },
+    {
+      "id": "Rock_Rock",
+      "name": "Stoneguard",
+      "type": "mono",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_apply_shield", "value": 25 },
+        { "effectId": "rxn_player_buff", "buffType": "RockDamageWhileShielded", "value": 10 }
+      ]
+    },
+    {
+      "id": "Water_Water",
+      "name": "Tidal Surge",
+      "type": "mono",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 1.0 },
+        { "effectId": "rxn_enemy_debuff", "target": "Enemy", "debuffType": "HealOnHit", "value": 1, "duration": 2, "refreshable": true }
+      ]
+    },
+    {
+      "id": "Wind_Wind",
+      "name": "Gale",
+      "type": "mono",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 1.0 },
+        { "effectId": "rxn_reduce_resist", "target": "Enemy", "elements": "All", "value": 40, "duration": 2 }
+      ]
+    },
+    {
+      "id": "Fire_Ice",
+      "name": "Melt",
+      "type": "dual",
+      "canCrit": true,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 2.0 }
+      ]
+    },
+    {
+      "id": "Fire_Lightning",
+      "name": "Overload",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 1.0 },
+        { "effectId": "rxn_deal_damage", "target": "AllOtherEnemies", "damageMultiplier": 0.5 }
+      ]
+    },
+    {
+      "id": "Fire_Rock",
+      "name": "Magma Scorch",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_apply_dot", "target": "Enemy", "dotName": "Magma Scorch", "damagePercent": 0.25, "duration": 2, "maxStacks": 3, "refreshable": true }
+      ]
+    },
+    {
+      "id": "Fire_Water",
+      "name": "Vaporize",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 1.0 },
+        { "effectId": "rxn_enemy_debuff", "target": "Enemy", "debuffType": "Weak", "value": 50, "duration": 2 }
+      ]
+    },
+    {
+      "id": "Fire_Wind",
+      "name": "Inferno",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 1.0 },
+        { "effectId": "rxn_reduce_resist", "target": "Enemy", "elements": "Fire,Wind", "value": 25, "duration": 2 }
+      ]
+    },
+    {
+      "id": "Ice_Lightning",
+      "name": "Superconduct",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 1.5, "ignoreResist": true }
+      ]
+    },
+    {
+      "id": "Ice_Rock",
+      "name": "Permafrost",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 1.0 },
+        { "effectId": "rxn_enemy_debuff", "target": "Enemy", "debuffType": "Shatter", "duration": 2, "refreshable": false }
+      ]
+    },
+    {
+      "id": "Ice_Water",
+      "name": "Flash Freeze",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_enemy_debuff", "target": "Enemy", "debuffType": "Freeze", "duration": 1 }
+      ]
+    },
+    {
+      "id": "Ice_Wind",
+      "name": "Boreal Howl",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 1.0 },
+        { "effectId": "rxn_reduce_resist", "target": "Enemy", "elements": "Ice,Wind", "value": 25, "duration": 2 }
+      ]
+    },
+    {
+      "id": "Lightning_Rock",
+      "name": "Thunderclad",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_player_buff", "buffType": "ReflectiveArmor", "value": 30, "duration": 1 },
+        { "effectId": "rxn_player_buff", "buffType": "DamageReduction", "value": 10, "duration": 1 }
+      ]
+    },
+    {
+      "id": "Lightning_Water",
+      "name": "Electrocute",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_enemy_debuff", "target": "Enemy", "debuffType": "Electrocute", "duration": 2, "refreshable": true, "maxStacks": 3, "stackValues": [0.2, 0.25, 0.3] }
+      ]
+    },
+    {
+      "id": "Lightning_Wind",
+      "name": "Tempest",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 1.0 },
+        { "effectId": "rxn_reduce_resist", "target": "Enemy", "elements": "Lightning,Wind", "value": 25, "duration": 2 }
+      ]
+    },
+    {
+      "id": "Rock_Water",
+      "name": "Mudslide",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_enemy_debuff", "target": "Enemy", "debuffType": "Mudslide", "duration": 2, "refreshable": true, "maxStacks": 3, "stackValues": [0.3, 0.4, 0.5] }
+      ]
+    },
+    {
+      "id": "Rock_Wind",
+      "name": "Sandstorm",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 1.0 },
+        { "effectId": "rxn_reduce_resist", "target": "Enemy", "elements": "Rock,Wind", "value": 25, "duration": 2 }
+      ]
+    },
+    {
+      "id": "Water_Wind",
+      "name": "Monsoon Surge",
+      "type": "dual",
+      "canCrit": false,
+      "effects": [
+        { "effectId": "rxn_deal_damage", "target": "Enemy", "damageMultiplier": 1.0 },
+        { "effectId": "rxn_reduce_resist", "target": "Enemy", "elements": "Water,Wind", "value": 25, "duration": 2 }
+      ]
+    }
   ]
 }

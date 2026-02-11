@@ -129,7 +129,7 @@ public class UIManager : MonoBehaviour
             if (line.ToLower().Contains("gold"))
             {
                 string goldText = line;
-                sb.AppendLine($"<color=#ffd700>◆ {goldText}</color>");
+                sb.AppendLine($"<color=#ffd700>* {goldText}</color>");
                 continue;
             }
 

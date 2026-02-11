@@ -1,31 +1,38 @@
-public class ReactionEffectData
+/// <summary>
+/// Flat data class for a single reaction effect entry.
+/// All possible fields are present; unused fields default to zero/null/false.
+/// Unity's JsonUtility requires a single class with all fields.
+/// </summary>
+[System.Serializable]
+public class ReactionEffectEntry
 {
-    public string ReactionId { get; set; }
-    public string EffectType { get; set; }
-    public string Target { get; set; }
-    public string Value { get; set; }
-    public int DurationTurns { get; set; }
-    public int ChancePct { get; set; }
-    public string Notes { get; set; }
+    // Common
+    public string effectId;         // rxn_deal_damage, rxn_apply_dot, rxn_player_buff, rxn_enemy_debuff, rxn_apply_shield, rxn_reduce_resist
+    public string target;           // "Enemy", "AllOtherEnemies", "Player"
     
-    public float GetValueAsFloat(float defaultValue = 0f)
-    {
-        if (string.IsNullOrEmpty(Value)) return defaultValue;
-        if (float.TryParse(Value, System.Globalization.NumberStyles.Float, 
-            System.Globalization.CultureInfo.InvariantCulture, out float result))
-        {
-            return result;
-        }
-        return defaultValue;
-    }
+    // rxn_deal_damage
+    public float damageMultiplier;  // 1.0 = damage range, 2.0 = 2x, etc.
+    public bool ignoreResist;       // skip resistance calculation
     
-    public int GetValueAsInt(int defaultValue = 0)
-    {
-        if (string.IsNullOrEmpty(Value)) return defaultValue;
-        if (int.TryParse(Value, out int result))
-        {
-            return result;
-        }
-        return defaultValue;
-    }
+    // rxn_apply_dot
+    public string dotName;          // "Ignite", "Magma Scorch"
+    public float damagePercent;     // % of damage range per tick (0.15 = 15%)
+    public float bonusDmgIfExists;  // extra reaction damage % if DoT already present
+    public float bonusDotIfExists;  // extra DoT damage % if DoT already present
+    
+    // rxn_player_buff
+    public string buffType;         // "CritDamage", "BonusAP", "ReflectiveArmor", "DamageReduction", "RockDamageWhileShielded"
+    
+    // rxn_enemy_debuff
+    public string debuffType;       // "Weak", "Freeze", "Shatter", "HealOnHit", "Electrocute", "Mudslide"
+    
+    // rxn_reduce_resist
+    public string elements;         // comma-separated: "Fire,Wind" or "All"
+    
+    // Shared
+    public float value;             // generic value (buff %, shield amount, debuff magnitude, resist reduction %)
+    public int duration;            // turns
+    public int maxStacks;           // for stackable effects
+    public bool refreshable;        // whether duration is refreshed on reapply
+    public float[] stackValues;     // per-stack damage multipliers (e.g., [0.2, 0.25, 0.3])
 }

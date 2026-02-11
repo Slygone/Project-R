@@ -86,8 +86,11 @@ public class CombatArena : MonoBehaviour
     
     // Health and Energy UI containers
     private GameObject healthContainer;
+    private Image healthBarFill;
+    private Image shieldBarFill;
     private TextMeshProUGUI healthText;
     private GameObject energyContainer;
+    private Image energyBarFill;
     private TextMeshProUGUI energyText;
     
     // Player nameplate
@@ -96,6 +99,49 @@ public class CombatArena : MonoBehaviour
     
     // Camera manager for switching between freeroam and combat cameras
     private CinemachineCameraManager cameraManager;
+    
+    // Tooltip for enemy intent hover
+    private static CombatArena _instance;
+    private GameObject tooltipPanel;
+    private TextMeshProUGUI tooltipText;
+    private bool tooltipVisible;
+    
+    // Player debuff display (above health bar)
+    private GameObject debuffContainer;
+    private List<DebuffChipData> debuffChips = new List<DebuffChipData>();
+    
+    // Player reaction buff display (above debuff container)
+    private GameObject buffContainer;
+    private List<BuffChipData> buffChips = new List<BuffChipData>();
+    
+    private class BuffChipData
+    {
+        public GameObject chipObj;
+        public TextMeshProUGUI nameText;
+        public string chipName;
+        public string tooltipDescription;
+    }
+    
+    private class DebuffChipData
+    {
+        public GameObject chipObj;
+        public TextMeshProUGUI nameText;
+        public string debuffId;
+        public string tooltipDescription;
+    }
+    
+    private struct DebuffInfo
+    {
+        public string id;
+        public string name;
+        public string description;
+        public DebuffInfo(string id, string name, string description)
+        {
+            this.id = id;
+            this.name = name;
+            this.description = description;
+        }
+    }
     
     public bool InCombat => inCombat;
     public List<EnemyWorldUnit> SpawnedEnemies => spawnedEnemies;
@@ -115,6 +161,7 @@ public class CombatArena : MonoBehaviour
 
     private void Awake()
     {
+        _instance = this;
         CreateCombatUI();
     }
     
@@ -175,6 +222,28 @@ public class CombatArena : MonoBehaviour
         
         // Update health and energy displays
         UpdateHealthEnergyDisplays();
+        
+        // Update player debuff display
+        UpdateDebuffDisplay();
+        
+        // Update player reaction buff display
+        UpdateBuffDisplay();
+        
+        // Follow mouse with tooltip (positioned to the left of cursor)
+        if (tooltipVisible && tooltipPanel != null)
+        {
+            var rt = tooltipPanel.GetComponent<RectTransform>();
+            Vector2 mousePos = Input.mousePosition;
+            // Position to the left and above cursor
+            float x = mousePos.x - 16f;
+            float y = mousePos.y + 16f;
+            // Clamp to screen bounds
+            float tooltipWidth = rt.sizeDelta.x;
+            float tooltipHeight = rt.sizeDelta.y > 0 ? rt.sizeDelta.y : 100f;
+            if (x - tooltipWidth < 0) x = tooltipWidth;
+            if (y + tooltipHeight > Screen.height) y = Screen.height - tooltipHeight;
+            rt.position = new Vector3(x, y, 0f);
+        }
     }
     
     /// <summary>
@@ -529,8 +598,17 @@ public class CombatArena : MonoBehaviour
         // Create Health container (bottom left - red circle)
         CreateHealthContainer();
         
+        // Create debuff display (above health bar)
+        CreateDebuffContainer();
+        
+        // Create buff display (above debuff container)
+        CreateBuffContainer();
+        
         // Create Energy container (bottom right - dark circle)
         CreateEnergyContainer();
+        
+        // Create tooltip for enemy intent hover
+        CreateTooltip();
         
         // Initially hide the UI
         combatCanvas.gameObject.SetActive(false);
@@ -1030,6 +1108,23 @@ public class CombatArena : MonoBehaviour
         {
             targetIndicator.SetActive(false);
         }
+        
+        // Hide tooltip
+        HideTooltipInternal();
+        
+        // Clear debuff chips
+        foreach (var chip in debuffChips)
+        {
+            if (chip.chipObj != null) Destroy(chip.chipObj);
+        }
+        debuffChips.Clear();
+        
+        // Clear buff chips
+        foreach (var chip in buffChips)
+        {
+            if (chip.chipObj != null) Destroy(chip.chipObj);
+        }
+        buffChips.Clear();
     }
     
     /// <summary>
@@ -1064,7 +1159,7 @@ public class CombatArena : MonoBehaviour
     
     private void CreateHealthContainer()
     {
-        // Red circle container for player health - bottom left
+        // Horizontal bar for player health - bottom left
         healthContainer = new GameObject("HealthContainer");
         healthContainer.transform.SetParent(combatCanvas.transform);
         
@@ -1072,21 +1167,47 @@ public class CombatArena : MonoBehaviour
         containerRect.anchorMin = new Vector2(0f, 0f);
         containerRect.anchorMax = new Vector2(0f, 0f);
         containerRect.pivot = new Vector2(0f, 0f);
-        containerRect.anchoredPosition = new Vector2(30, 30);
-        containerRect.sizeDelta = new Vector2(120, 120);
+        containerRect.anchoredPosition = new Vector2(20, 20);
+        containerRect.sizeDelta = new Vector2(260, 36);
         
-        // Red circle background
+        // Dark background bar
         var bgImage = healthContainer.AddComponent<Image>();
-        bgImage.color = new Color(0.7f, 0.15f, 0.15f); // Dark red
+        bgImage.color = new Color(0.15f, 0.05f, 0.05f);
         
-        // Make it circular using a simple approach - we'll use outline
+        // Border outline
         var outline = healthContainer.AddComponent<Outline>();
-        outline.effectColor = new Color(0.3f, 0.05f, 0.05f);
-        outline.effectDistance = new Vector2(3, 3);
+        outline.effectColor = new Color(0.4f, 0.1f, 0.1f);
+        outline.effectDistance = new Vector2(2, 2);
         
-        // Health text in center
+        // Red fill bar (fillAmount tracks current/max HP)
+        var fillObj = new GameObject("HealthFill");
+        fillObj.transform.SetParent(healthContainer.transform, false);
+        
+        var fillRect = fillObj.AddComponent<RectTransform>();
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.offsetMin = new Vector2(2, 2);
+        fillRect.offsetMax = new Vector2(-2, -2);
+        
+        healthBarFill = fillObj.AddComponent<Image>();
+        healthBarFill.color = new Color(0.8f, 0.2f, 0.15f);
+        
+        // Light blue shield overlay (rendered on top of health fill)
+        var shieldObj = new GameObject("ShieldFill");
+        shieldObj.transform.SetParent(healthContainer.transform, false);
+        
+        var shieldRect = shieldObj.AddComponent<RectTransform>();
+        shieldRect.anchorMin = Vector2.zero;
+        shieldRect.anchorMax = new Vector2(0f, 1f); // starts hidden (zero width)
+        shieldRect.offsetMin = new Vector2(2, 2);
+        shieldRect.offsetMax = new Vector2(-2, -2);
+        
+        shieldBarFill = shieldObj.AddComponent<Image>();
+        shieldBarFill.color = new Color(0.4f, 0.7f, 1f); // Light blue
+        
+        // Health text overlay
         var textObj = new GameObject("HealthText");
-        textObj.transform.SetParent(healthContainer.transform);
+        textObj.transform.SetParent(healthContainer.transform, false);
         
         var textRect = textObj.AddComponent<RectTransform>();
         textRect.anchorMin = Vector2.zero;
@@ -1095,16 +1216,18 @@ public class CombatArena : MonoBehaviour
         textRect.offsetMax = Vector2.zero;
         
         healthText = textObj.AddComponent<TextMeshProUGUI>();
-        healthText.text = "100";
-        healthText.fontSize = 36;
+        healthText.text = "100 / 100";
+        healthText.fontSize = 20;
         healthText.fontStyle = FontStyles.Bold;
         healthText.alignment = TextAlignmentOptions.Center;
         healthText.color = Color.white;
+        healthText.outlineWidth = 0.3f;
+        healthText.outlineColor = Color.black;
     }
     
     private void CreateEnergyContainer()
     {
-        // Dark circle container for player energy - bottom right
+        // Horizontal bar for player energy - bottom right
         energyContainer = new GameObject("EnergyContainer");
         energyContainer.transform.SetParent(combatCanvas.transform);
         
@@ -1112,21 +1235,34 @@ public class CombatArena : MonoBehaviour
         containerRect.anchorMin = new Vector2(1f, 0f);
         containerRect.anchorMax = new Vector2(1f, 0f);
         containerRect.pivot = new Vector2(1f, 0f);
-        containerRect.anchoredPosition = new Vector2(-30, 30);
-        containerRect.sizeDelta = new Vector2(120, 120);
+        containerRect.anchoredPosition = new Vector2(-20, 20);
+        containerRect.sizeDelta = new Vector2(220, 36);
         
-        // Dark circle background
+        // Dark background bar
         var bgImage = energyContainer.AddComponent<Image>();
-        bgImage.color = new Color(0.1f, 0.1f, 0.15f); // Very dark blue/black
+        bgImage.color = new Color(0.05f, 0.05f, 0.15f);
         
         // Border outline
         var outline = energyContainer.AddComponent<Outline>();
-        outline.effectColor = new Color(0.3f, 0.3f, 0.4f);
-        outline.effectDistance = new Vector2(3, 3);
+        outline.effectColor = new Color(0.15f, 0.15f, 0.4f);
+        outline.effectDistance = new Vector2(2, 2);
         
-        // Energy text in center
+        // Blue fill bar (fillAmount tracks current/max energy)
+        var fillObj = new GameObject("EnergyFill");
+        fillObj.transform.SetParent(energyContainer.transform, false);
+        
+        var fillRect = fillObj.AddComponent<RectTransform>();
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.offsetMin = new Vector2(2, 2);
+        fillRect.offsetMax = new Vector2(-2, -2);
+        
+        energyBarFill = fillObj.AddComponent<Image>();
+        energyBarFill.color = new Color(0.2f, 0.5f, 0.9f);
+        
+        // Energy text overlay
         var textObj = new GameObject("EnergyText");
-        textObj.transform.SetParent(energyContainer.transform);
+        textObj.transform.SetParent(energyContainer.transform, false);
         
         var textRect = textObj.AddComponent<RectTransform>();
         textRect.anchorMin = Vector2.zero;
@@ -1135,26 +1271,416 @@ public class CombatArena : MonoBehaviour
         textRect.offsetMax = Vector2.zero;
         
         energyText = textObj.AddComponent<TextMeshProUGUI>();
-        energyText.text = "0";
-        energyText.fontSize = 36;
+        energyText.text = "0 / 100";
+        energyText.fontSize = 20;
         energyText.fontStyle = FontStyles.Bold;
         energyText.alignment = TextAlignmentOptions.Center;
         energyText.color = Color.white;
+        energyText.outlineWidth = 0.3f;
+        energyText.outlineColor = Color.black;
+    }
+    
+    private void CreateDebuffContainer()
+    {
+        // Horizontal container above the health bar for debuff chips
+        debuffContainer = new GameObject("DebuffContainer");
+        debuffContainer.transform.SetParent(combatCanvas.transform, false);
+        
+        var containerRect = debuffContainer.AddComponent<RectTransform>();
+        containerRect.anchorMin = new Vector2(0f, 0f);
+        containerRect.anchorMax = new Vector2(0f, 0f);
+        containerRect.pivot = new Vector2(0f, 0f);
+        containerRect.anchoredPosition = new Vector2(20, 62); // Above health bar (health at y=20, height=36)
+        containerRect.sizeDelta = new Vector2(400, 28);
+        
+        // Horizontal layout for debuff chips
+        var layout = debuffContainer.AddComponent<HorizontalLayoutGroup>();
+        layout.spacing = 6;
+        layout.childAlignment = TextAnchor.MiddleLeft;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = true;
+        layout.padding = new RectOffset(0, 0, 0, 0);
+    }
+    
+    private void CreateBuffContainer()
+    {
+        // Horizontal container above the debuff container for reaction buff chips
+        buffContainer = new GameObject("BuffContainer");
+        buffContainer.transform.SetParent(combatCanvas.transform, false);
+        
+        var containerRect = buffContainer.AddComponent<RectTransform>();
+        containerRect.anchorMin = new Vector2(0f, 0f);
+        containerRect.anchorMax = new Vector2(0f, 0f);
+        containerRect.pivot = new Vector2(0f, 0f);
+        containerRect.anchoredPosition = new Vector2(20, 96); // Above debuff container (debuff at y=62, height=28)
+        containerRect.sizeDelta = new Vector2(400, 28);
+        
+        var layout = buffContainer.AddComponent<HorizontalLayoutGroup>();
+        layout.spacing = 6;
+        layout.childAlignment = TextAnchor.MiddleLeft;
+        layout.childForceExpandWidth = false;
+        layout.childForceExpandHeight = true;
+        layout.padding = new RectOffset(0, 0, 0, 0);
+    }
+    
+    private void UpdateBuffDisplay()
+    {
+        if (currentPlayer == null || buffContainer == null) return;
+        
+        var activeChips = currentPlayer.GetReactionChips();
+        
+        // Remove UI chips no longer active
+        for (int i = buffChips.Count - 1; i >= 0; i--)
+        {
+            bool found = false;
+            foreach (var chip in activeChips)
+            {
+                if (chip.ChipName == buffChips[i].chipName) { found = true; break; }
+            }
+            if (!found)
+            {
+                Destroy(buffChips[i].chipObj);
+                buffChips.RemoveAt(i);
+            }
+        }
+        
+        // Add or update chips
+        foreach (var chipInfo in activeChips)
+        {
+            bool exists = false;
+            foreach (var existing in buffChips)
+            {
+                if (existing.chipName == chipInfo.ChipName)
+                {
+                    existing.tooltipDescription = chipInfo.Tooltip;
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists)
+            {
+                var uiChip = CreateBuffChip(chipInfo.ChipName, chipInfo.Tooltip);
+                buffChips.Add(uiChip);
+            }
+        }
+    }
+    
+    private BuffChipData CreateBuffChip(string chipName, string tooltip)
+    {
+        var chip = new BuffChipData();
+        chip.chipName = chipName;
+        chip.tooltipDescription = tooltip;
+        
+        chip.chipObj = new GameObject($"Buff_{chipName}");
+        chip.chipObj.transform.SetParent(buffContainer.transform, false);
+        
+        // Green-tinted background for buff chips
+        var bg = chip.chipObj.AddComponent<Image>();
+        bg.color = new Color(0.1f, 0.3f, 0.15f, 0.9f);
+        bg.raycastTarget = true;
+        
+        // Green border
+        var outline = chip.chipObj.AddComponent<Outline>();
+        outline.effectColor = new Color(0.3f, 0.8f, 0.4f, 0.8f);
+        outline.effectDistance = new Vector2(1, 1);
+        
+        // Size via LayoutElement — same size as debuff chips
+        var layoutElem = chip.chipObj.AddComponent<LayoutElement>();
+        layoutElem.preferredHeight = 24;
+        layoutElem.minWidth = 20;
+        
+        var fitter = chip.chipObj.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+        
+        var hLayout = chip.chipObj.AddComponent<HorizontalLayoutGroup>();
+        hLayout.padding = new RectOffset(8, 8, 2, 2);
+        hLayout.childAlignment = TextAnchor.MiddleCenter;
+        hLayout.childForceExpandWidth = false;
+        hLayout.childForceExpandHeight = true;
+        
+        // Name text
+        var textObj = new GameObject("BuffName");
+        textObj.transform.SetParent(chip.chipObj.transform, false);
+        
+        chip.nameText = textObj.AddComponent<TextMeshProUGUI>();
+        chip.nameText.text = chipName;
+        chip.nameText.fontSize = 14;
+        chip.nameText.color = new Color(0.6f, 1f, 0.7f);
+        chip.nameText.alignment = TextAlignmentOptions.Center;
+        chip.nameText.textWrappingMode = TextWrappingModes.NoWrap;
+        chip.nameText.raycastTarget = false;
+        
+        // EventTrigger for tooltip hover
+        var trigger = chip.chipObj.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+        
+        var enterEntry = new UnityEngine.EventSystems.EventTrigger.Entry();
+        enterEntry.eventID = UnityEngine.EventSystems.EventTriggerType.PointerEnter;
+        enterEntry.callback.AddListener((data) => { ShowTooltipInternal(chip.tooltipDescription); });
+        trigger.triggers.Add(enterEntry);
+        
+        var exitEntry = new UnityEngine.EventSystems.EventTrigger.Entry();
+        exitEntry.eventID = UnityEngine.EventSystems.EventTriggerType.PointerExit;
+        exitEntry.callback.AddListener((data) => { HideTooltipInternal(); });
+        trigger.triggers.Add(exitEntry);
+        
+        return chip;
+    }
+    
+    private void UpdateDebuffDisplay()
+    {
+        if (currentPlayer == null || debuffContainer == null) return;
+        
+        // Build list of currently active debuffs
+        var activeDebuffs = new List<DebuffInfo>();
+        
+        if (currentPlayer.IsWeakened)
+            activeDebuffs.Add(new DebuffInfo("weaken", "Weaken",
+                $"Damage dealt reduced by {currentPlayer.WeakenPercent:F0}% ({currentPlayer.WeakenTurns} turns)"));
+        
+        if (currentPlayer.IsSundered)
+            activeDebuffs.Add(new DebuffInfo("sunder", "Sunder",
+                $"Shield gain reduced by {currentPlayer.SunderPercent:F0}% ({currentPlayer.SunderTurns} turns)"));
+        
+        if (currentPlayer.IsVulnerable)
+            activeDebuffs.Add(new DebuffInfo("vulnerable", "Vulnerable",
+                $"Damage taken increased by {currentPlayer.VulnerablePercent:F0}% ({currentPlayer.VulnerableTurns} turns)"));
+        
+        if (currentPlayer.IsPlayerStunned)
+            activeDebuffs.Add(new DebuffInfo("stun", "Stunned",
+                $"Cannot act ({currentPlayer.StunTurns} turns)"));
+        
+        if (currentPlayer.HasPlayerDoT)
+            activeDebuffs.Add(new DebuffInfo("dot", "Burning",
+                $"Taking {currentPlayer.PlayerDoTDamage} damage per turn ({currentPlayer.PlayerDoTTurns} turns)"));
+        
+        // Remove chips for debuffs that are no longer active
+        for (int i = debuffChips.Count - 1; i >= 0; i--)
+        {
+            bool stillActive = false;
+            foreach (var d in activeDebuffs)
+            {
+                if (d.id == debuffChips[i].debuffId) { stillActive = true; break; }
+            }
+            if (!stillActive)
+            {
+                Destroy(debuffChips[i].chipObj);
+                debuffChips.RemoveAt(i);
+            }
+        }
+        
+        // Add chips for new debuffs, update descriptions for existing ones
+        foreach (var debuff in activeDebuffs)
+        {
+            bool exists = false;
+            foreach (var chip in debuffChips)
+            {
+                if (chip.debuffId == debuff.id)
+                {
+                    // Update description (turns may have changed)
+                    chip.tooltipDescription = debuff.description;
+                    exists = true;
+                    break;
+                }
+            }
+            if (exists) continue;
+            
+            // Create new chip
+            var chipData = CreateDebuffChip(debuff.id, debuff.name, debuff.description);
+            debuffChips.Add(chipData);
+        }
+    }
+    
+    private DebuffChipData CreateDebuffChip(string debuffId, string name, string description)
+    {
+        var chip = new DebuffChipData();
+        chip.debuffId = debuffId;
+        chip.tooltipDescription = description;
+        
+        chip.chipObj = new GameObject($"Debuff_{debuffId}");
+        chip.chipObj.transform.SetParent(debuffContainer.transform, false);
+        
+        // Background
+        var bg = chip.chipObj.AddComponent<Image>();
+        bg.color = new Color(0.5f, 0.15f, 0.15f, 0.9f);
+        bg.raycastTarget = true;
+        
+        // Border
+        var outline = chip.chipObj.AddComponent<Outline>();
+        outline.effectColor = new Color(0.8f, 0.2f, 0.2f, 0.8f);
+        outline.effectDistance = new Vector2(1, 1);
+        
+        // Size via LayoutElement
+        var layoutElem = chip.chipObj.AddComponent<LayoutElement>();
+        layoutElem.preferredHeight = 24;
+        layoutElem.minWidth = 20;
+        
+        // ContentSizeFitter to auto-width based on text
+        var fitter = chip.chipObj.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
+        fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+        
+        // Horizontal padding layout
+        var hLayout = chip.chipObj.AddComponent<HorizontalLayoutGroup>();
+        hLayout.padding = new RectOffset(8, 8, 2, 2);
+        hLayout.childAlignment = TextAnchor.MiddleCenter;
+        hLayout.childForceExpandWidth = false;
+        hLayout.childForceExpandHeight = true;
+        
+        // Name text
+        var textObj = new GameObject("DebuffName");
+        textObj.transform.SetParent(chip.chipObj.transform, false);
+        
+        chip.nameText = textObj.AddComponent<TextMeshProUGUI>();
+        chip.nameText.text = name;
+        chip.nameText.fontSize = 14;
+        chip.nameText.color = new Color(1f, 0.7f, 0.7f);
+        chip.nameText.alignment = TextAlignmentOptions.Center;
+        chip.nameText.textWrappingMode = TextWrappingModes.NoWrap;
+        chip.nameText.raycastTarget = false;
+        
+        // EventTrigger for tooltip hover
+        var trigger = chip.chipObj.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+        
+        var enterEntry = new UnityEngine.EventSystems.EventTrigger.Entry();
+        enterEntry.eventID = UnityEngine.EventSystems.EventTriggerType.PointerEnter;
+        enterEntry.callback.AddListener((data) => { ShowTooltipInternal(chip.tooltipDescription); });
+        trigger.triggers.Add(enterEntry);
+        
+        var exitEntry = new UnityEngine.EventSystems.EventTrigger.Entry();
+        exitEntry.eventID = UnityEngine.EventSystems.EventTriggerType.PointerExit;
+        exitEntry.callback.AddListener((data) => { HideTooltipInternal(); });
+        trigger.triggers.Add(exitEntry);
+        
+        return chip;
     }
     
     private void UpdateHealthEnergyDisplays()
     {
         if (currentPlayer == null) return;
         
+        int hp = currentPlayer.GetHealth();
+        int maxHp = currentPlayer.GetMaxHealth();
+        int energy = currentPlayer.GetEnergy();
+        int maxEnergy = currentPlayer.GetMaxEnergy();
+        
+        // Update health bar fill via RectTransform anchor width
+        int shield = currentPlayer.GetShield();
+        if (healthBarFill != null)
+        {
+            float hpPercent = maxHp > 0 ? Mathf.Clamp01((float)hp / maxHp) : 0f;
+            var rt = healthBarFill.rectTransform;
+            rt.anchorMax = new Vector2(hpPercent, rt.anchorMax.y);
+        }
+        // Shield overlay: fills from left, width = shield / maxHP
+        if (shieldBarFill != null)
+        {
+            float shieldPercent = maxHp > 0 ? Mathf.Clamp01((float)shield / maxHp) : 0f;
+            var rt = shieldBarFill.rectTransform;
+            rt.anchorMax = new Vector2(shieldPercent, rt.anchorMax.y);
+        }
         if (healthText != null)
         {
-            healthText.text = currentPlayer.GetHealth().ToString();
+            if (shield > 0)
+                healthText.text = $"{hp} / {maxHp}  (+{shield})";
+            else
+                healthText.text = $"{hp} / {maxHp}";
         }
         
+        // Update energy bar fill via RectTransform anchor width
+        if (energyBarFill != null)
+        {
+            float energyPercent = maxEnergy > 0 ? Mathf.Clamp01((float)energy / maxEnergy) : 0f;
+            var rt = energyBarFill.rectTransform;
+            rt.anchorMax = new Vector2(energyPercent, rt.anchorMax.y);
+        }
         if (energyText != null)
         {
-            energyText.text = currentPlayer.GetEnergy().ToString();
+            energyText.text = $"{energy} / {maxEnergy}";
         }
+    }
+    
+    private void CreateTooltip()
+    {
+        // Tooltip panel on screen-space overlay canvas (always visible, not clipped by 3D)
+        tooltipPanel = new GameObject("IntentTooltip");
+        tooltipPanel.transform.SetParent(combatCanvas.transform, false);
+        
+        var panelRect = tooltipPanel.AddComponent<RectTransform>();
+        panelRect.pivot = new Vector2(1f, 0f); // Top-right pivot so it expands left+up from cursor
+        panelRect.sizeDelta = new Vector2(320, 0); // Width fixed, height auto from layout
+        
+        // Dark background
+        var panelImage = tooltipPanel.AddComponent<Image>();
+        panelImage.color = new Color(0.1f, 0.1f, 0.15f, 0.95f);
+        panelImage.raycastTarget = false;
+        
+        // Border
+        var outline = tooltipPanel.AddComponent<Outline>();
+        outline.effectColor = new Color(0.6f, 0.5f, 0.2f, 0.9f);
+        outline.effectDistance = new Vector2(2, 2);
+        
+        // Auto-size height to fit content
+        var layout = tooltipPanel.AddComponent<VerticalLayoutGroup>();
+        layout.padding = new RectOffset(10, 10, 8, 8);
+        layout.childForceExpandWidth = true;
+        layout.childForceExpandHeight = false;
+        
+        var fitter = tooltipPanel.AddComponent<ContentSizeFitter>();
+        fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+        fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+        
+        // Description text
+        var textObj = new GameObject("TooltipText");
+        textObj.transform.SetParent(tooltipPanel.transform, false);
+        
+        tooltipText = textObj.AddComponent<TextMeshProUGUI>();
+        tooltipText.text = "";
+        tooltipText.fontSize = 18;
+        tooltipText.color = new Color(0.9f, 0.85f, 0.7f);
+        tooltipText.alignment = TextAlignmentOptions.TopLeft;
+        tooltipText.textWrappingMode = TextWrappingModes.Normal;
+        tooltipText.raycastTarget = false;
+        
+        // LayoutElement to let text drive the panel height
+        var layoutElem = textObj.AddComponent<LayoutElement>();
+        layoutElem.preferredWidth = 300;
+        
+        tooltipPanel.SetActive(false);
+        tooltipVisible = false;
+    }
+    
+    /// <summary>
+    /// Show the intent tooltip with the given description text. Called by EnemyWorldUnit on hover.
+    /// </summary>
+    public static void ShowTooltip(string text)
+    {
+        if (_instance != null) _instance.ShowTooltipInternal(text);
+    }
+    
+    /// <summary>
+    /// Hide the intent tooltip. Called by EnemyWorldUnit on hover exit.
+    /// </summary>
+    public static void HideTooltip()
+    {
+        if (_instance != null) _instance.HideTooltipInternal();
+    }
+    
+    private void ShowTooltipInternal(string text)
+    {
+        if (tooltipPanel == null || string.IsNullOrEmpty(text)) return;
+        
+        tooltipText.text = text;
+        tooltipPanel.SetActive(true);
+        tooltipVisible = true;
+    }
+    
+    private void HideTooltipInternal()
+    {
+        if (tooltipPanel == null) return;
+        
+        tooltipPanel.SetActive(false);
+        tooltipVisible = false;
     }
     
     #endregion
@@ -1215,9 +1741,9 @@ public class CombatArena : MonoBehaviour
             {
                 targetIndicator.SetActive(true);
                 
-                // Position above the enemy (with bob offset consideration)
+                // Position well above the enemy nameplate
                 Vector3 enemyPos = selectedEnemy.transform.position;
-                targetIndicator.transform.position = enemyPos + new Vector3(0f, 4f, 0f);
+                targetIndicator.transform.position = enemyPos + new Vector3(0f, 6.5f, 0f);
                 
                 // Make it face the camera
                 if (Camera.main != null)

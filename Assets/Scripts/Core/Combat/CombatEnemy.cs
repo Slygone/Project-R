@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using UnityEngine;
 
 /// <summary>
 /// Tracks what the player did on their last turn, used by reactive bosses (MirrorBoss).
@@ -114,6 +115,56 @@ public class CombatEnemy
     private Dictionary<Element, int> elementalMarks = new Dictionary<Element, int>();
     private const int MARKS_FOR_SINGLE_REACTION = 6;
     private const int MARKS_FOR_DUAL_REACTION = 3;
+    
+    // ========== REACTION DEBUFF TRACKING ==========
+    // Freeze (separate from Stun per GDD)
+    private int freezeTurns;
+    public bool IsFrozen => freezeTurns > 0;
+    
+    // Weak (enemy deals less damage)
+    private float weakPercent;   // e.g., 50 = 50% less damage
+    private int weakTurns;
+    public bool IsWeakened => weakTurns > 0;
+    public float GetWeakMultiplier() => weakTurns > 0 ? 1f - (weakPercent / 100f) : 1f;
+    
+    // Shatter (accumulates damage, pops when threshold reached)
+    private bool hasShatter;
+    private int shatterThreshold;
+    private int shatterPopDamage;
+    private int shatterTurns;
+    private int shatterAccumulated;
+    private bool shatterRefreshable;
+    
+    // Named DoTs (Ignite, Magma Scorch, etc.)
+    private Dictionary<string, NamedDoTState> namedDoTs = new Dictionary<string, NamedDoTState>();
+    
+    public class NamedDoTState
+    {
+        public string Name;
+        public int DamagePerTurn;
+        public int TurnsRemaining;
+        public int MaxStacks;
+        public int CurrentStacks;
+        public bool Refreshable;
+    }
+    
+    // Generic reaction debuffs (HealOnHit, Electrocute, Mudslide)
+    private Dictionary<string, ReactionDebuffState> reactionDebuffs = new Dictionary<string, ReactionDebuffState>();
+    
+    // Reaction status chips for UI display (separate from gameplay tracking)
+    private List<ReactionChipInfo> reactionChips = new List<ReactionChipInfo>();
+    
+    public class ReactionDebuffState
+    {
+        public string Type;
+        public float Value;
+        public int TurnsRemaining;
+        public bool Refreshable;
+        public int CurrentStacks;
+        public int MaxStacks;
+        public float[] StackValues;
+        public int DamageRange;
+    }
 
     public CombatEnemy(EnemyData data) : this(data, 1) { }
     
@@ -280,6 +331,60 @@ public class CombatEnemy
             2 => Skill2CurrentCD > 0,
             3 => Skill3CurrentCD > 0,
             _ => false // skill1 and skill4 have no cooldown
+        };
+    }
+    
+    /// <summary>
+    /// Preview the next skill without advancing state. Used by intent UI.
+    /// Simulates one cooldown tick (which happens before skill selection).
+    /// Returns null for reactive bosses (skill depends on player action).
+    /// </summary>
+    public string PeekNextSkillId()
+    {
+        if (ReactivePattern) return null;
+        
+        int nextTurn = turnCount + 1;
+        
+        // Bosses and enemies with explicit attack patterns
+        if (AttackPattern != null && AttackPattern.Length > 0)
+        {
+            int skillNumber = AttackPattern[patternIndex % AttackPattern.Length];
+            string skillId = GetSkillIdByNumber(skillNumber);
+            
+            // Simulate cooldown tick: skill available if CD <= 1 (will be 0 after tick)
+            if (IsSkillOnCooldownAfterTick(skillNumber))
+            {
+                return Skill1Id;
+            }
+            
+            return skillId ?? Skill1Id;
+        }
+        
+        // Regular/Elite: first turn is always basic (skill1)
+        if (nextTurn == 1)
+        {
+            return Skill1Id;
+        }
+        
+        // After first turn: use special (skill2) when off cooldown after tick
+        if (!string.IsNullOrEmpty(Skill2Id) && Skill2CurrentCD <= 1)
+        {
+            return Skill2Id;
+        }
+        
+        return Skill1Id;
+    }
+    
+    /// <summary>
+    /// Check if a skill by number would still be on cooldown after one tick.
+    /// </summary>
+    private bool IsSkillOnCooldownAfterTick(int skillNumber)
+    {
+        return skillNumber switch
+        {
+            2 => Skill2CurrentCD > 1,
+            3 => Skill3CurrentCD > 1,
+            _ => false
         };
     }
     
@@ -607,7 +712,8 @@ public class CombatEnemy
     
     public void ApplyWeak(int duration, float magnitude)
     {
-        // TODO: Extend StatusEffectType to support Weak when needed
+        weakPercent = magnitude;
+        weakTurns = duration;
         GameLog.Status(GameLog.Join(
             "Apply",
             GameLog.KV("target", Name),
@@ -858,6 +964,279 @@ public class CombatEnemy
     {
         elementalMarks.Clear();
     }
+    
+    // ========== REACTION DEBUFF METHODS ==========
+    
+    /// <summary>
+    /// Check if enemy has a named DoT with the given name.
+    /// </summary>
+    public bool HasDoT(string dotName)
+    {
+        return namedDoTs.ContainsKey(dotName) && namedDoTs[dotName].TurnsRemaining > 0;
+    }
+    
+    /// <summary>
+    /// Apply a named DoT (e.g., Ignite, Magma Scorch). Supports stacking and refresh.
+    /// </summary>
+    public void ApplyNamedDoT(string name, int damagePerTurn, int duration, int maxStacks, bool refreshable)
+    {
+        if (namedDoTs.TryGetValue(name, out var existing))
+        {
+            if (existing.CurrentStacks < maxStacks)
+            {
+                existing.CurrentStacks++;
+                existing.DamagePerTurn = damagePerTurn; // Update to latest damage value
+            }
+            if (refreshable)
+            {
+                existing.TurnsRemaining = duration;
+            }
+        }
+        else
+        {
+            namedDoTs[name] = new NamedDoTState
+            {
+                Name = name,
+                DamagePerTurn = damagePerTurn,
+                TurnsRemaining = duration,
+                MaxStacks = maxStacks,
+                CurrentStacks = 1,
+                Refreshable = refreshable
+            };
+        }
+    }
+    
+    /// <summary>
+    /// Tick all named DoTs, dealing damage. Called at start of enemy turn.
+    /// Returns total DoT damage dealt.
+    /// </summary>
+    public int TickNamedDoTs()
+    {
+        int totalDamage = 0;
+        var toRemove = new List<string>();
+        
+        foreach (var kvp in namedDoTs)
+        {
+            var dot = kvp.Value;
+            if (dot.TurnsRemaining <= 0) { toRemove.Add(kvp.Key); continue; }
+            
+            int dmg = dot.DamagePerTurn * dot.CurrentStacks;
+            if (dmg > 0)
+            {
+                TakeDamage(dmg);
+                totalDamage += dmg;
+                GameLog.Status(GameLog.Join("DoTTick", GameLog.KV("target", Name), GameLog.KV("dot", dot.Name), GameLog.KV("dmg", dmg), GameLog.KV("stacks", dot.CurrentStacks)));
+            }
+            
+            dot.TurnsRemaining--;
+            if (dot.TurnsRemaining <= 0) toRemove.Add(kvp.Key);
+        }
+        
+        foreach (var key in toRemove) namedDoTs.Remove(key);
+        return totalDamage;
+    }
+    
+    /// <summary>
+    /// Apply Freeze debuff (separate from Stun per GDD). Enemy skips turn.
+    /// </summary>
+    public void ApplyFreeze(int duration)
+    {
+        freezeTurns = Mathf.Max(freezeTurns, duration);
+        GameLog.Status(GameLog.Join("Apply", GameLog.KV("target", Name), GameLog.KV("type", "Freeze"), GameLog.KV("dur", duration)), GameLogVerbosity.Minimal);
+    }
+    
+    /// <summary>
+    /// Check if frozen and consume a freeze turn. Call at start of enemy turn.
+    /// Returns true if frozen (should skip turn).
+    /// </summary>
+    public bool CheckAndConsumeFreeze()
+    {
+        if (freezeTurns > 0)
+        {
+            freezeTurns--;
+            return true;
+        }
+        return false;
+    }
+    
+    /// <summary>
+    /// Apply Shatter debuff. Accumulates damage taken; pops when threshold reached.
+    /// Re-applying does NOT refresh if refreshable is false.
+    /// </summary>
+    public void ApplyShatter(int threshold, int popDamage, int duration, bool refreshable)
+    {
+        if (hasShatter && !refreshable) return; // Already has Shatter, don't refresh
+        
+        hasShatter = true;
+        shatterThreshold = threshold;
+        shatterPopDamage = popDamage;
+        shatterTurns = duration;
+        shatterAccumulated = 0;
+        shatterRefreshable = refreshable;
+        GameLog.Status(GameLog.Join("Apply", GameLog.KV("target", Name), GameLog.KV("type", "Shatter"), GameLog.KV("threshold", threshold), GameLog.KV("dur", duration)), GameLogVerbosity.Minimal);
+    }
+    
+    /// <summary>
+    /// Called when this enemy takes damage while Shatter is active.
+    /// Returns pop damage if threshold reached, 0 otherwise.
+    /// </summary>
+    public int AccumulateShatterDamage(int damageDealt)
+    {
+        if (!hasShatter) return 0;
+        
+        shatterAccumulated += damageDealt;
+        if (shatterAccumulated >= shatterThreshold)
+        {
+            // Pop!
+            hasShatter = false;
+            int pop = shatterPopDamage;
+            GameLog.Status(GameLog.Join("ShatterPop", GameLog.KV("target", Name), GameLog.KV("accumulated", shatterAccumulated), GameLog.KV("threshold", shatterThreshold), GameLog.KV("popDmg", pop)));
+            TakeDamage(pop);
+            return pop;
+        }
+        return 0;
+    }
+    
+    public bool HasShatter => hasShatter;
+    
+    /// <summary>
+    /// Apply a generic reaction debuff (HealOnHit, etc.).
+    /// </summary>
+    public void ApplyReactionDebuff(string type, float value, int duration, bool refreshable)
+    {
+        if (reactionDebuffs.TryGetValue(type, out var existing))
+        {
+            if (refreshable) existing.TurnsRemaining = duration;
+            existing.Value = value;
+        }
+        else
+        {
+            reactionDebuffs[type] = new ReactionDebuffState
+            {
+                Type = type,
+                Value = value,
+                TurnsRemaining = duration,
+                Refreshable = refreshable
+            };
+        }
+        GameLog.Status(GameLog.Join("Apply", GameLog.KV("target", Name), GameLog.KV("type", type), GameLog.KV("value", value), GameLog.KV("dur", duration)), GameLogVerbosity.Minimal);
+    }
+    
+    /// <summary>
+    /// Apply a stackable reaction debuff (Electrocute, Mudslide).
+    /// </summary>
+    public void ApplyReactionDebuff(string type, float value, int duration, bool refreshable, int maxStacks, float[] stackValues, int damageRange)
+    {
+        if (reactionDebuffs.TryGetValue(type, out var existing))
+        {
+            if (existing.CurrentStacks < existing.MaxStacks)
+                existing.CurrentStacks++;
+            if (refreshable) existing.TurnsRemaining = duration;
+            existing.DamageRange = damageRange; // Update to latest damage range
+        }
+        else
+        {
+            reactionDebuffs[type] = new ReactionDebuffState
+            {
+                Type = type,
+                Value = value,
+                TurnsRemaining = duration,
+                Refreshable = refreshable,
+                CurrentStacks = 1,
+                MaxStacks = maxStacks,
+                StackValues = stackValues,
+                DamageRange = damageRange
+            };
+        }
+        GameLog.Status(GameLog.Join("Apply", GameLog.KV("target", Name), GameLog.KV("type", type), GameLog.KV("stacks", reactionDebuffs[type].CurrentStacks), GameLog.KV("dur", duration)), GameLogVerbosity.Minimal);
+    }
+    
+    /// <summary>
+    /// Get a reaction debuff state by type. Returns null if not present.
+    /// </summary>
+    public ReactionDebuffState GetReactionDebuff(string type)
+    {
+        return reactionDebuffs.TryGetValue(type, out var state) && state.TurnsRemaining > 0 ? state : null;
+    }
+    
+    /// <summary>
+    /// Tick all reaction debuffs at end of turn. Also ticks Weak, Freeze, Shatter.
+    /// </summary>
+    public void TickReactionDebuffs()
+    {
+        // Tick Weak
+        if (weakTurns > 0)
+        {
+            weakTurns--;
+            if (weakTurns <= 0) weakPercent = 0;
+        }
+        
+        // Tick Shatter
+        if (hasShatter)
+        {
+            shatterTurns--;
+            if (shatterTurns <= 0)
+            {
+                hasShatter = false;
+                shatterAccumulated = 0;
+            }
+        }
+        
+        // Tick generic reaction debuffs
+        var toRemove = new List<string>();
+        foreach (var kvp in reactionDebuffs)
+        {
+            kvp.Value.TurnsRemaining--;
+            if (kvp.Value.TurnsRemaining <= 0) toRemove.Add(kvp.Key);
+        }
+        foreach (var key in toRemove) reactionDebuffs.Remove(key);
+    }
+    
+    /// <summary>
+    /// Clear all reaction debuffs (on combat end).
+    /// </summary>
+    public void ClearReactionDebuffs()
+    {
+        freezeTurns = 0;
+        weakPercent = 0;
+        weakTurns = 0;
+        hasShatter = false;
+        shatterAccumulated = 0;
+        namedDoTs.Clear();
+        reactionDebuffs.Clear();
+        reactionChips.Clear();
+    }
+    
+    // ========== REACTION CHIP DISPLAY ==========
+    
+    public void AddReactionChip(string name, string tooltip, int turns)
+    {
+        // Update existing chip if same name, otherwise add new
+        for (int i = 0; i < reactionChips.Count; i++)
+        {
+            if (reactionChips[i].ChipName == name)
+            {
+                reactionChips[i].Tooltip = tooltip;
+                reactionChips[i].TurnsRemaining = Mathf.Max(reactionChips[i].TurnsRemaining, turns);
+                return;
+            }
+        }
+        reactionChips.Add(new ReactionChipInfo(name, tooltip, turns, false));
+    }
+    
+    public void TickReactionChips()
+    {
+        for (int i = reactionChips.Count - 1; i >= 0; i--)
+        {
+            reactionChips[i].TurnsRemaining--;
+            if (reactionChips[i].TurnsRemaining <= 0)
+            {
+                reactionChips.RemoveAt(i);
+            }
+        }
+    }
+    
+    public List<ReactionChipInfo> GetReactionChips() => reactionChips;
 }
 
 /// <summary>

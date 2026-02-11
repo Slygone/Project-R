@@ -1,19 +1,28 @@
 using System.Collections.Generic;
 using UnityEngine;
 
+/// <summary>
+/// Spawns world nodes using ring-based placement driven by worldEncounter.json.
+/// nodeCount is the authoritative total. Individual type counts are clamped to fit.
+/// Nodes are placed in concentric rings around origin with guaranteed minimum spacing.
+/// </summary>
 public class NodeSpawner : MonoBehaviour
 {
-    [SerializeField] private GameObject nodePrefab;
+    [Header("Ring-Based Placement")]
+    [Tooltip("Minimum distance between any two nodes")]
+    [SerializeField] private float minNodeSpacing = 12f;
     
-    [Header("Grid-Based Spawning (no fallbacks)")]
-    [Tooltip("Spacing between nodes in the grid")]
-    [SerializeField] private float nodeSpacing = 8f;
+    [Tooltip("Minimum distance from player spawn (origin) to nearest node")]
+    [SerializeField] private float playerSafeRadius = 10f;
+    
+    [Tooltip("Distance between concentric rings")]
+    [SerializeField] private float ringSpacing = 14f;
+    
+    [Tooltip("Random offset applied to each node position (jitter)")]
+    [SerializeField] private float positionJitter = 3f;
     
     [Tooltip("Height of nodes above ground")]
     [SerializeField] private float nodeHeight = 0.75f;
-    
-    private List<Vector3> spawnedPositions = new List<Vector3>();
-    private List<Vector3> availablePositions = new List<Vector3>();
 
     void Start()
     {
@@ -22,117 +31,122 @@ public class NodeSpawner : MonoBehaviour
 
     public void SpawnNodesForWorld(int world)
     {
-        spawnedPositions.Clear();
+        var encounter = DataCache.GetWorldEncounter(world);
+        int totalNodes = encounter.NodeCount;
         
-        var encounterData = DataCache.GetWorldEncounter(world);
+        // Build node type list, clamped to totalNodes
+        var nodeTypes = BuildNodeTypeList(encounter, totalNodes);
         
-        int shopCount = encounterData.ShopNodeCount;
-        int combatCount = encounterData.CombatNodeCount;
-        int restCount = encounterData.RestNodeCount;
-        int eliteCount = encounterData.EliteNodeCount;
-        int totalNodes = shopCount + combatCount + restCount + eliteCount;
+        // Shuffle so node types are randomly distributed across positions
+        Shuffle(nodeTypes);
         
-        // Generate grid positions for all nodes needed
-        GenerateGridPositions(totalNodes);
+        // Generate well-spaced positions using concentric rings
+        var positions = GenerateRingPositions(totalNodes);
         
-        // Spawn nodes using pre-calculated positions
-        for (int i = 0; i < shopCount; i++)
-            SpawnNode<ShopNode>();
+        // Spawn each node at its position
+        int spawned = Mathf.Min(totalNodes, positions.Count);
+        for (int i = 0; i < spawned; i++)
+        {
+            SpawnNodeAt(nodeTypes[i], positions[i]);
+        }
         
-        for (int i = 0; i < combatCount; i++)
-            SpawnNode<CombatNode>();
+        int combat = 0, rest = 0, shop = 0, elite = 0;
+        foreach (var t in nodeTypes)
+        {
+            if (t == typeof(CombatNode)) combat++;
+            else if (t == typeof(RestNode)) rest++;
+            else if (t == typeof(ShopNode)) shop++;
+            else if (t == typeof(MysteryNode)) elite++;
+        }
         
-        for (int i = 0; i < restCount; i++)
-            SpawnNode<RestNode>();
-        
-        for (int i = 0; i < eliteCount; i++)
-            SpawnNode<MysteryNode>();
-            
-        Debug.Log($"[NodeSpawner] Spawned {totalNodes} nodes for World {world}: {shopCount} shops, {combatCount} combats, {restCount} rests, {eliteCount} elites");
+        Debug.Log($"[NodeSpawner] World {world}: spawned {spawned} nodes ({combat} combat, {rest} rest, {shop} shop, {elite} elite)");
     }
     
     /// <summary>
-    /// Generates a grid of positions using a spiral pattern from center outward.
-    /// Guarantees enough positions for all nodes without fallbacks.
+    /// Builds an ordered list of node types from encounter data, clamped to totalNodes.
+    /// Priority: combat > elite > rest > shop (combat fills first, shop fills last).
     /// </summary>
-    private void GenerateGridPositions(int count)
+    private List<System.Type> BuildNodeTypeList(WorldEncounterData encounter, int totalNodes)
     {
-        availablePositions.Clear();
+        var list = new List<System.Type>();
         
-        // Spiral out from center to generate positions
-        // This ensures nodes are spread out evenly
-        int gridSize = Mathf.CeilToInt(Mathf.Sqrt(count)) + 2; // Extra buffer
-        int half = gridSize / 2;
+        int combat = Mathf.Min(encounter.CombatNodeCount, totalNodes);
+        for (int i = 0; i < combat; i++) list.Add(typeof(CombatNode));
         
-        // Generate positions in a spiral pattern starting from center
-        List<Vector2Int> spiralOrder = GenerateSpiralOrder(gridSize);
+        int elite = Mathf.Min(encounter.EliteNodeCount, totalNodes - list.Count);
+        for (int i = 0; i < elite; i++) list.Add(typeof(MysteryNode));
         
-        foreach (var gridPos in spiralOrder)
+        int rest = Mathf.Min(encounter.RestNodeCount, totalNodes - list.Count);
+        for (int i = 0; i < rest; i++) list.Add(typeof(RestNode));
+        
+        int shop = Mathf.Min(encounter.ShopNodeCount, totalNodes - list.Count);
+        for (int i = 0; i < shop; i++) list.Add(typeof(ShopNode));
+        
+        // If data under-specified, fill remaining slots with combat nodes
+        while (list.Count < totalNodes)
         {
-            if (availablePositions.Count >= count) break;
+            list.Add(typeof(CombatNode));
+        }
+        
+        return list;
+    }
+    
+    /// <summary>
+    /// Places nodes in concentric rings radiating outward from origin.
+    /// Each ring is at radius = playerSafeRadius + (ringIndex * ringSpacing).
+    /// Nodes within a ring are evenly spaced angularly with random jitter.
+    /// </summary>
+    private List<Vector3> GenerateRingPositions(int count)
+    {
+        var positions = new List<Vector3>();
+        int remaining = count;
+        int ringIndex = 0;
+        
+        while (remaining > 0)
+        {
+            float radius = playerSafeRadius + (ringIndex * ringSpacing);
             
-            // Convert grid position to world position with some randomness
-            float x = (gridPos.x - half) * nodeSpacing + Random.Range(-1f, 1f);
-            float z = (gridPos.y - half) * nodeSpacing + Random.Range(-1f, 1f);
+            // How many nodes fit in this ring with minimum spacing between them?
+            // Arc length between nodes must be >= minNodeSpacing
+            float circumference = 2f * Mathf.PI * radius;
+            int capacity = Mathf.Max(1, Mathf.FloorToInt(circumference / minNodeSpacing));
+            int nodesInRing = Mathf.Min(capacity, remaining);
             
-            // Skip positions too close to origin (player spawn)
-            if (Mathf.Abs(x) < nodeSpacing * 0.5f && Mathf.Abs(z) < nodeSpacing * 0.5f)
-                continue;
+            // Evenly distribute nodes around the ring with a random rotation offset
+            float angleStep = 360f / nodesInRing;
+            float angleOffset = Random.Range(0f, 360f);
+            
+            for (int i = 0; i < nodesInRing; i++)
+            {
+                float angle = (angleOffset + i * angleStep) * Mathf.Deg2Rad;
                 
-            availablePositions.Add(new Vector3(x, nodeHeight, z));
-        }
-        
-        // Shuffle positions for variety
-        ShufflePositions();
-    }
-    
-    private List<Vector2Int> GenerateSpiralOrder(int size)
-    {
-        var result = new List<Vector2Int>();
-        int x = 0, y = 0;
-        int dx = 0, dy = -1;
-        int half = size / 2;
-        
-        for (int i = 0; i < size * size; i++)
-        {
-            if (-half <= x && x <= half && -half <= y && y <= half)
-            {
-                result.Add(new Vector2Int(x + half, y + half));
+                // Apply jitter to both radius and angle
+                float jitteredRadius = radius + Random.Range(-positionJitter, positionJitter);
+                float angleJitter = (positionJitter / radius) * Random.Range(-0.5f, 0.5f);
+                float jitteredAngle = angle + angleJitter;
+                
+                float x = Mathf.Cos(jitteredAngle) * jitteredRadius;
+                float z = Mathf.Sin(jitteredAngle) * jitteredRadius;
+                
+                positions.Add(new Vector3(x, nodeHeight, z));
             }
             
-            if (x == y || (x < 0 && x == -y) || (x > 0 && x == 1 - y))
-            {
-                int temp = dx;
-                dx = -dy;
-                dy = temp;
-            }
-            x += dx;
-            y += dy;
+            remaining -= nodesInRing;
+            ringIndex++;
         }
         
-        return result;
+        // Shuffle final positions so node types don't cluster by ring
+        Shuffle(positions);
+        
+        return positions;
     }
     
-    private void ShufflePositions()
+    private void SpawnNodeAt(System.Type nodeType, Vector3 position)
     {
-        for (int i = availablePositions.Count - 1; i > 0; i--)
-        {
-            int j = Random.Range(0, i + 1);
-            var temp = availablePositions[i];
-            availablePositions[i] = availablePositions[j];
-            availablePositions[j] = temp;
-        }
-    }
-
-    private void SpawnNode<T>() where T : NodeBase
-    {
-        Vector3 position = GetNextPosition();
-        spawnedPositions.Add(position);
-        
         GameObject nodeObj = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         nodeObj.transform.position = position;
         nodeObj.transform.localScale = Vector3.one * 1.5f;
-        nodeObj.name = typeof(T).Name;
+        nodeObj.name = nodeType.Name;
         
         var collider = nodeObj.GetComponent<SphereCollider>();
         if (collider != null)
@@ -140,24 +154,17 @@ public class NodeSpawner : MonoBehaviour
             collider.isTrigger = true;
         }
         
-        nodeObj.AddComponent<T>();
+        nodeObj.AddComponent(nodeType);
     }
-
-    /// <summary>
-    /// Gets the next available position from the pre-generated grid.
-    /// No fallbacks - positions are guaranteed by GenerateGridPositions.
-    /// </summary>
-    private Vector3 GetNextPosition()
+    
+    private static void Shuffle<T>(List<T> list)
     {
-        if (availablePositions.Count > 0)
+        for (int i = list.Count - 1; i > 0; i--)
         {
-            Vector3 pos = availablePositions[0];
-            availablePositions.RemoveAt(0);
-            return pos;
+            int j = Random.Range(0, i + 1);
+            T temp = list[i];
+            list[i] = list[j];
+            list[j] = temp;
         }
-        
-        // This should never happen if GenerateGridPositions was called correctly
-        Debug.LogError("[NodeSpawner] No available positions - this is a bug, GenerateGridPositions should have created enough");
-        return new Vector3(spawnedPositions.Count * nodeSpacing, nodeHeight, 0);
     }
 }

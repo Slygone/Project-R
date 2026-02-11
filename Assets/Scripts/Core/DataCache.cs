@@ -14,7 +14,6 @@ public static class DataCache
     public static Dictionary<string, float> QTEOffensiveMultipliers { get; private set; }
     public static Dictionary<string, int> QTEDefensiveShield { get; private set; }
     public static Dictionary<string, ReactionData> Reactions { get; private set; }
-    public static Dictionary<string, List<ReactionEffectData>> ReactionEffects { get; private set; }
     public static Dictionary<string, List<ElementalTierData>> ElementalTiers { get; private set; }
     public static Dictionary<int, WorldEncounterData> WorldEncounters { get; private set; }
 
@@ -31,12 +30,11 @@ public static class DataCache
         Relics = LoadRelics();
         LoadQTEEffects();
         Reactions = LoadReactions();
-        ReactionEffects = LoadReactionEffects();
         ElementalTiers = LoadElementalTiers();
         WorldEncounters = LoadWorldEncounters();
 
         IsLoaded = true;
-        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEOffensiveMultipliers.Count} QTE offensive, {QTEDefensiveShield.Count} QTE defensive, {Reactions.Count} reactions, {ReactionEffects.Count} reaction effect groups, {ElementalTiers.Count} element tier groups, {WorldEncounters.Count} world encounters");
+        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEOffensiveMultipliers.Count} QTE offensive, {QTEDefensiveShield.Count} QTE defensive, {Reactions.Count} reactions, {ElementalTiers.Count} element tier groups, {WorldEncounters.Count} world encounters");
     }
 
     /// <summary>
@@ -475,13 +473,20 @@ public static class DataCache
         {
             if (string.IsNullOrEmpty(r.id)) continue;
             
-            dict[r.id] = new ReactionData
+            var data = new ReactionData
             {
                 ReactionId = r.id,
                 Name = r.name,
-                EffectId = r.effectId,
-                EffectValue = r.effectValue
+                Type = r.type,
+                CanCrit = r.canCrit
             };
+            
+            if (r.effects != null)
+            {
+                data.Effects.AddRange(r.effects);
+            }
+            
+            dict[r.id] = data;
         }
 
         return dict;
@@ -498,67 +503,9 @@ public static class DataCache
     {
         public string id;
         public string name;
-        public string effectId;
-        public int effectValue;
-    }
-    
-    private static Dictionary<string, List<ReactionEffectData>> LoadReactionEffects()
-    {
-        var json = Resources.Load<TextAsset>("Data/reactionEffects");
-        var dict = new Dictionary<string, List<ReactionEffectData>>();
-        
-        if (json == null)
-        {
-            throw new System.Exception("Missing reactionEffects.json. Expected at Resources/Data/reactionEffects.json");
-        }
-
-        var wrapper = JsonUtility.FromJson<ReactionEffectsWrapper>(json.text);
-        if (wrapper == null || wrapper.reactionEffects == null)
-        {
-            throw new System.Exception("Failed to parse reactionEffects.json or reactionEffects is null");
-        }
-        
-        foreach (var e in wrapper.reactionEffects)
-        {
-            if (string.IsNullOrEmpty(e.reactionId)) continue;
-            
-            var effect = new ReactionEffectData
-            {
-                ReactionId = e.reactionId,
-                EffectType = e.effectType,
-                Target = e.target,
-                Value = e.value,
-                DurationTurns = e.durationTurns,
-                ChancePct = e.chancePct,
-                Notes = e.notes
-            };
-            
-            if (!dict.ContainsKey(e.reactionId))
-            {
-                dict[e.reactionId] = new List<ReactionEffectData>();
-            }
-            dict[e.reactionId].Add(effect);
-        }
-        
-        return dict;
-    }
-    
-    [System.Serializable]
-    private class ReactionEffectsWrapper
-    {
-        public ReactionEffectJsonEntry[] reactionEffects;
-    }
-    
-    [System.Serializable]
-    private class ReactionEffectJsonEntry
-    {
-        public string reactionId;
-        public string effectType;
-        public string target;
-        public string value;
-        public int durationTurns;
-        public int chancePct;
-        public string notes;
+        public string type;
+        public bool canCrit;
+        public List<ReactionEffectEntry> effects;
     }
 
     public static float GetQTEOffensiveMultiplier(QTEResult result)
@@ -599,17 +546,19 @@ public static class DataCache
     
     /// <summary>
     /// Get reaction effects by ReactionId (returns empty list if none).
+    /// Effects are now stored directly on ReactionData.
     /// </summary>
-    public static List<ReactionEffectData> GetReactionEffects(string reactionId)
+    public static List<ReactionEffectEntry> GetReactionEffects(string reactionId)
     {
-        if (string.IsNullOrEmpty(reactionId)) return new List<ReactionEffectData>();
+        if (string.IsNullOrEmpty(reactionId)) return new List<ReactionEffectEntry>();
         
-        if (ReactionEffects != null && ReactionEffects.TryGetValue(reactionId, out var effects))
+        var def = GetReactionDef(reactionId);
+        if (def != null && def.Effects != null)
         {
-            return effects;
+            return def.Effects;
         }
         
-        return new List<ReactionEffectData>();
+        return new List<ReactionEffectEntry>();
     }
     
     // Build ReactionId from two elements (normalized alphabetically so Fire_Ice = Ice_Fire)

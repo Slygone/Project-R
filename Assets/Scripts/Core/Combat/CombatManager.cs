@@ -34,8 +34,6 @@ public class CombatManager : MonoBehaviour
     private int pendingSkillNumber;
     private bool pendingIsAttack;
     private Element pendingInfusedElement = Element.None;
-    private string pendingReactionEffectId = "";
-    private int pendingReactionEffectValue = 0;
     private string pendingReactionName = "";
     private string pendingReactionId = null;
     private Element pendingReactionFirstElement = Element.None;
@@ -273,16 +271,101 @@ public class CombatManager : MonoBehaviour
             GameLog.KV("qteMult", qteMultiplier.ToString("F2"))
         ), GameLogVerbosity.Verbose);
         
-        if (pendingIsAttack)
-        {
-            ExecuteAttackWithReaction(pendingTarget, pendingReactionEffectId, pendingReactionEffectValue, qteMultiplier, pendingInfusedElement, result);
-        }
-        else
-        {
-            ExecuteSkillWithReaction(pendingSkillNumber, pendingTarget, pendingReactionEffectId, pendingReactionEffectValue, qteMultiplier, pendingInfusedElement, result);
-        }
+        // Process reaction effects via data-driven engine (separate from skill/attack damage)
+        ProcessReactionAfterQTE(qteMultiplier);
         
         ClearPendingAction();
+    }
+    
+    /// <summary>
+    /// Process all reaction effects after QTE completes. Reaction damage is its own source,
+    /// separate from skill damage. Called from OnQTEComplete.
+    /// </summary>
+    private void ProcessReactionAfterQTE(float qteMultiplier)
+    {
+        if (string.IsNullOrEmpty(pendingReactionId) || pendingTarget == null) return;
+        
+        Element attackElement = pendingInfusedElement != Element.None ? pendingInfusedElement : player.GetAffinity();
+        
+        // Process all reaction effects via the data-driven engine
+        var reactionResult = ReactionEffectEngine.ProcessReaction(
+            pendingReactionId,
+            player,
+            pendingTarget,
+            enemies,
+            qteMultiplier,
+            attackElement
+        );
+        
+        // Show floating text for reaction damage instances
+        foreach (var dmgInstance in reactionResult.DamageInstances)
+        {
+            if (dmgInstance.Damage > 0)
+            {
+                ShowDamageToEnemy(dmgInstance.Target, dmgInstance.Damage, dmgInstance.IsCrit);
+                NotifyEnemyHit(dmgInstance.Target);
+                
+                // Shatter accumulation on damage dealt
+                if (dmgInstance.Target.HasShatter)
+                {
+                    int shatterPop = dmgInstance.Target.AccumulateShatterDamage(dmgInstance.Damage);
+                    if (shatterPop > 0)
+                    {
+                        ShowDamageToEnemy(dmgInstance.Target, shatterPop, false);
+                    }
+                }
+            }
+        }
+        
+        // Show shield gain floating text
+        if (reactionResult.ShieldGained > 0)
+        {
+            ShowShieldToPlayer(reactionResult.ShieldGained, FloatingTextType.ShieldGain);
+        }
+        
+        GameLog.Reaction(GameLog.Join(
+            "ReactionProcessed",
+            GameLog.KV("id", pendingReactionId),
+            GameLog.KV("name", pendingReactionName),
+            GameLog.KV("dmgToTarget", reactionResult.TotalDamageToTarget),
+            GameLog.KV("dmgToOthers", reactionResult.TotalDamageToOthers),
+            GameLog.KV("shield", reactionResult.ShieldGained),
+            GameLog.KV("crit", reactionResult.DidCrit)
+        ));
+        
+        // Show reaction name floating text after QTE (ensures it's visible)
+        ShowReactionToEnemy(pendingTarget, pendingReactionName, 0);
+        
+        // Create UI chips for reaction effects
+        CreateReactionChips(pendingReactionId, pendingReactionName, pendingTarget);
+        
+        // Check for enemy deaths from reaction damage
+        foreach (var dmgInstance in reactionResult.DamageInstances)
+        {
+            var t = dmgInstance.Target;
+            if (t != null && !t.IsAlive())
+            {
+                if (t.ShouldReborn())
+                {
+                    t.ActivateReborn();
+                }
+                else
+                {
+                    GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", t.Name), GameLog.KV("source", "Reaction")));
+                    AwardDetonatorXPForKill(t);
+                    NotifyEnemyDeath(t);
+                }
+            }
+            if (t != null && t.IsAlive() && t.ShouldSplit())
+            {
+                ExecuteSlimeBossSplit(t);
+            }
+        }
+        
+        if (AllEnemiesDead())
+        {
+            EndCombat(true);
+        }
     }
     
     private void ExecuteActionWithoutReaction()
@@ -305,8 +388,6 @@ public class CombatManager : MonoBehaviour
         pendingSkillNumber = 0;
         pendingIsAttack = false;
         pendingInfusedElement = Element.None;
-        pendingReactionEffectId = "";
-        pendingReactionEffectValue = 0;
         pendingReactionName = "";
         pendingReactionId = null;
         pendingReactionFirstElement = Element.None;
@@ -327,21 +408,15 @@ public class CombatManager : MonoBehaviour
         pendingInfusedElement = reactionInfo.PrimaryElement;
         pendingReactionId = reactionInfo.GetReactionId();
         
-        // Get reaction data from JSON
+        // Get reaction data from JSON — no fallbacks
         var reactionDef = DataCache.GetReactionDef(pendingReactionId);
         if (reactionDef == null)
         {
-            // Fallback for unknown reactions
-            pendingReactionName = reactionInfo.IsSingleElement ? $"{reactionInfo.PrimaryElement} Burst" : $"{reactionInfo.PrimaryElement}-{reactionInfo.SecondaryElement} Fusion";
-            pendingReactionEffectId = "eff_reaction_damage";
-            pendingReactionEffectValue = reactionInfo.IsSingleElement ? 50 : 75;
+            GameLog.Warn(GameLogCategory.Reaction, "[CombatManager]", $"No reaction data for {pendingReactionId}");
+            return;
         }
-        else
-        {
-            pendingReactionName = reactionDef.Name;
-            pendingReactionEffectId = reactionDef.EffectId;
-            pendingReactionEffectValue = reactionDef.EffectValue;
-        }
+        
+        pendingReactionName = reactionDef.Name;
         
         // Consume the marks
         target.ConsumeMarksForReaction(reactionInfo);
@@ -351,8 +426,6 @@ public class CombatManager : MonoBehaviour
             "MarkReactionTrigger",
             GameLog.KV("id", pendingReactionId),
             GameLog.KV("name", pendingReactionName),
-            GameLog.KV("effectId", pendingReactionEffectId),
-            GameLog.KV("effectValue", pendingReactionEffectValue),
             GameLog.KV("type", reactionInfo.IsSingleElement ? "single" : "dual"),
             GameLog.KV("primary", reactionInfo.PrimaryElement),
             GameLog.KV("secondary", reactionInfo.SecondaryElement),
@@ -360,8 +433,7 @@ public class CombatManager : MonoBehaviour
             GameLog.KV("target", target.Name)
         ));
         
-        // Show reaction floating text
-        ShowReactionToEnemy(target, pendingReactionName, pendingReactionEffectValue);
+        // Reaction floating text is shown after QTE completes in ProcessReactionAfterQTE
         
         if (qtePanel == null)
         {
@@ -390,6 +462,17 @@ public class CombatManager : MonoBehaviour
         // Player Attack Order:
         // 1. Base damage (character damage + elemental bonuses), reduced by Weaken debuff
         int baseDamage = Mathf.RoundToInt(player.GetTotalDamage() * player.GetWeakenMultiplier());
+        
+        // 1b. Apply Rock damage bonus while shielded (Stoneguard)
+        if (attackElement == Element.Rock)
+        {
+            float rockBonus = player.GetRockDamageWhileShieldedBonus();
+            if (rockBonus > 0f)
+            {
+                baseDamage = Mathf.RoundToInt(baseDamage * (1f + rockBonus));
+                GameLog.Combat(GameLog.Join("RockShieldBonus", GameLog.KV("bonus", $"{rockBonus * 100f:F0}%")));
+            }
+        }
         
         GameLog.Combat(GameLog.Join(
             "AttackStart",
@@ -491,131 +574,7 @@ public class CombatManager : MonoBehaviour
 
     }
     
-    private void ExecuteAttackWithReaction(CombatEnemy target, string reactionEffectId, int reactionEffectValue, float qteMultiplier, Element? forcedElement, QTEResult qteResult)
-    {
-        Element attackElement = forcedElement ?? player.GetAffinity();
-
-        string attackerName = player != null && player.GetCharacter() != null ? player.GetCharacter().DisplayName : "Player";
-        GameLog.Combat(GameLog.Join(
-            "AttackStart",
-            GameLog.KV("attacker", attackerName),
-            GameLog.KV("target", target != null ? target.Name : "null"),
-            GameLog.KV("element", attackElement),
-            GameLog.KV("bonuses", GameLog.Join(GameLog.KV("oqte", qteMultiplier.ToString("F2")))),
-            GameLog.KV("reactionId", pendingReactionId ?? "none")
-        ));
-        
-        // Player Attack Order with Reaction:
-        // 1. Base damage (character damage + elemental bonuses)
-        int baseDamage = player.GetTotalDamage();
-        
-        // 2. Apply variance (0.90-1.10)
-        int afterVariance = player.ApplyVariance(baseDamage);
-        
-        // 3. Apply Offensive QTE multiplier
-        float afterOQTE = afterVariance * qteMultiplier;
-        
-        // 4. Apply crit (direct hit only)
-        int critChance = player.GetCritChance();
-        int critRoll = Random.Range(0, 100);
-        bool isCrit = critRoll < critChance;
-        float critMultiplier = isCrit ? player.GetCritDamage() : 1f;
-        float directAfterCrit = afterOQTE * critMultiplier;
-        
-        // 5. Reaction effect value is added as flat damage (scaled by QTE)
-        float reactionDamage = reactionEffectId == "eff_reaction_damage" ? reactionEffectValue * qteMultiplier : 0;
-        
-        // 6. Total = DirectAfterCrit + ReactionDamage
-        float totalDamage = directAfterCrit + reactionDamage;
-        int damageBeforeResist = Mathf.RoundToInt(totalDamage);
-        
-        GameLog.Combat(GameLog.Join(
-            "AttackRoll",
-            GameLog.KV("roll", afterVariance),
-            GameLog.KV("reactionEffectId", reactionEffectId),
-            GameLog.KV("reactionEffectValue", reactionEffectValue),
-            GameLog.KV("critRoll", critRoll),
-            GameLog.KV("critChance", critChance),
-            GameLog.KV("crit", isCrit),
-            GameLog.KV("critMult", critMultiplier.ToString("F2")),
-            GameLog.KV("preResist", damageBeforeResist)
-        ));
-
-        // 7. Apply enemy resistance
-        int damage = target.ApplyResistance(damageBeforeResist, attackElement);
-        int resistPercent = target.CalculateResistance(attackElement);
-
-        int hpBefore = target.Health;
-        target.TakeDamage(damage);
-        int hpAfter = target.Health;
-        GameLog.Combat(GameLog.Join(
-            "DamageApply",
-            GameLog.KV("target", target.Name),
-            GameLog.KV("resistTotal", $"{resistPercent}%"),
-            GameLog.KV("shieldBefore", 0),
-            GameLog.KV("shieldAbsorbed", 0),
-            GameLog.KV("shieldAfter", 0),
-            GameLog.KV("hpBefore", hpBefore),
-            GameLog.KV("dmgFinal", damage),
-            GameLog.KV("hpAfter", hpAfter)
-        ));
-
-        // Apply reaction effects from JSON data (track shield gain for floating text)
-        int shieldBeforeReact = player.GetShield();
-        ReactionEffectEngine.ApplyPostHitEffects(pendingReactionId, player, target, damage, attackElement);
-
-        // Show floating text using CombatArena transforms
-        ShowDamageToEnemy(target, damage, isCrit);
-        int shieldAfterReact = player.GetShield();
-        if (shieldAfterReact > shieldBeforeReact)
-        {
-            ShowShieldToPlayer(shieldAfterReact - shieldBeforeReact, FloatingTextType.ShieldGain);
-        }
-        
-        // Notify in-world combat arena of damage
-        NotifyEnemyHit(target);
-        
-        // Check Frost Shield break (Frostcaller)
-        CheckFrostShieldBreak(target);
-        
-        // Check Retaliation counter-attack (Shieldbearer)
-        CheckRetaliationCounter(target);
-
-        // Player could die from Frost Shield break or Retaliation
-        if (!player.IsAlive())
-        {
-            EndCombat(false);
-            return;
-        }
-
-        if (!target.IsAlive())
-        {
-            // Check Reborn mechanic (FallenChampion)
-            if (target.ShouldReborn())
-            {
-                target.ActivateReborn();
-            }
-            else
-            {
-                GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
-                AwardDetonatorXPForKill(target);
-                NotifyEnemyDeath(target);
-            }
-        }
-        
-        // Check SlimeBoss split after damage
-        if (target.IsAlive() && target.ShouldSplit())
-        {
-            ExecuteSlimeBossSplit(target);
-        }
-
-        if (AllEnemiesDead())
-        {
-            EndCombat(true);
-            return;
-        }
-
-    }
+    // ExecuteAttackWithReaction removed — reaction processing is now handled by ProcessReactionAfterQTE
 
     public bool IsQTEActive()
     {
@@ -738,6 +697,17 @@ public class CombatManager : MonoBehaviour
         int elementalBonusScaled = Mathf.RoundToInt(elementalBonus * skillMultiplier * weakenMult);
         int baseDamage = baseDamageBeforeElement + elementalBonusScaled;
         
+        // Apply Rock damage bonus while shielded (Stoneguard)
+        if (attackElement == Element.Rock)
+        {
+            float rockBonus = player.GetRockDamageWhileShieldedBonus();
+            if (rockBonus > 0f)
+            {
+                baseDamage = Mathf.RoundToInt(baseDamage * (1f + rockBonus));
+                GameLog.Combat(GameLog.Join("RockShieldBonus", GameLog.KV("bonus", $"{rockBonus * 100f:F0}%")));
+            }
+        }
+        
         GameLog.Combat(GameLog.Join(
             "DamageCalc",
             GameLog.KV("charDmg", charDamage),
@@ -840,7 +810,6 @@ public class CombatManager : MonoBehaviour
         
         // ========== ELEMENTAL MARK SYSTEM ==========
         // Apply elemental marks based on skill data (element, markChance, markCount)
-        bool reactionQTETriggered = false;
         if (target != null && target.IsAlive())
         {
             Element markElement = player.GetSkillElement(skillNumber);
@@ -885,7 +854,6 @@ public class CombatManager : MonoBehaviour
                             lastPlayerAction = PlayerLastAction.Reaction;
                             pendingSkillNumber = skillNumber;
                             TriggerMarkReaction(target, reactionInfo);
-                            reactionQTETriggered = true;
                         }
                     }
                     
@@ -955,15 +923,8 @@ public class CombatManager : MonoBehaviour
             ExecuteSlimeBossSplit(target);
         }
 
-        // When a reaction QTE was triggered, ExecuteSkillWithReaction will handle
-        // cooldown, chain tracking, on-kill effects, and combat-end checks after the QTE resolves.
-        // Do NOT double-apply them here.
-        if (reactionQTETriggered)
-        {
-            // Still update UI and notify arena of the hit
-            if (combatArena != null) combatArena.OnPlayerEnergyChanged();
-            return;
-        }
+        // Reaction effects are now processed separately via ProcessReactionAfterQTE,
+        // so skill cooldowns/chains/on-kill must always apply here regardless of reaction state.
 
         // Apply skill cooldown and energy effects BEFORE possible early return
         player.UseSkillAndApplyEffects(skillNumber - 1);
@@ -1087,205 +1048,7 @@ public class CombatManager : MonoBehaviour
         return GameDataLoader.GetSkill(skillId);
     }
     
-    private void ExecuteSkillWithReaction(int skillNumber, CombatEnemy target, string reactionEffectId, int reactionEffectValue, float qteMultiplier, Element? forcedElement, QTEResult qteResult)
-    {
-        var character = player.GetCharacter();
-        if (character == null) return;
-
-        // Look up SkillDefinition from JSON data
-        var skillDef = GetSkillDefinition(skillNumber);
-        string skillName = skillDef != null ? skillDef.displayName : GetSkillName(skillNumber);
-        var effects = skillDef?.effects;
-        
-        float skillMultiplier = SkillEffectEngine.GetDamageMultiplier(effects);
-        bool isAoE = SkillEffectEngine.IsAoE(effects);
-        
-        Element attackElement = forcedElement ?? player.GetAffinity();
-        
-        // Player Skill Attack Order with Reaction:
-        // 1. Base damage = (character damage * skill multiplier) + elemental bonus, reduced by Weaken
-        int charDamage = player.GetCharacterDamage();
-        int elementalBonus = player.GetAffinityBonus();
-        float weakenMult = player.GetWeakenMultiplier();
-        float baseDamage = ((charDamage * skillMultiplier) + (elementalBonus * skillMultiplier)) * weakenMult;
-        
-        // 2. Apply variance (0.90-1.10)
-        int afterVariance = player.ApplyVariance(baseDamage);
-        
-        // 3. Apply Offensive QTE multiplier
-        float afterOQTE = afterVariance * qteMultiplier;
-        
-        // 4. Apply crit (direct hit only)
-        bool isCrit = Random.Range(0, 100) < player.GetCritChance();
-        float critMultiplier = isCrit ? player.GetCritDamage() : 1f;
-        float directAfterCrit = afterOQTE * critMultiplier;
-        
-        // 5. Reaction effect value is added as flat damage (scaled by QTE)
-        float reactionDamage = reactionEffectId == "eff_reaction_damage" ? reactionEffectValue * qteMultiplier : 0;
-        
-        // 6. Total = DirectAfterCrit + ReactionDamage
-        float totalDamage = directAfterCrit + reactionDamage;
-        int damageBeforeResist = Mathf.RoundToInt(totalDamage);
-        
-        // 7. Apply enemy resistance
-        int finalDamage = target.ApplyResistance(damageBeforeResist, attackElement);
-        int resistPercent = target.CalculateResistance(attackElement);
-        
-        if (isAoE)
-        {
-            DamageAllEnemies(finalDamage, forcedElement, isCrit);
-        }
-        else
-        {
-            target.TakeDamage(finalDamage);
-            ShowDamageToEnemy(target, finalDamage, isCrit);
-        }
-        
-        // Apply skill post-hit effects via data-driven engine
-        var effectCtx = new SkillEffectEngine.EffectContext
-        {
-            Player = player,
-            Target = target,
-            AllEnemies = enemies,
-            DamageDealt = finalDamage,
-            AttackElement = attackElement,
-            SkillName = skillName,
-            SkillNumber = skillNumber
-        };
-        var effectResult = SkillEffectEngine.Execute(effects, effectCtx);
-        
-        if (effectResult.HealAmount > 0)
-            ShowHealToPlayer(effectResult.HealAmount);
-        if (effectResult.ShieldGained > 0)
-            ShowShieldToPlayer(effectResult.ShieldGained, FloatingTextType.ShieldGain);
-        
-        GameLog.Combat(GameLog.Join(
-            "AttackRoll",
-            GameLog.KV("skill", skillName),
-            GameLog.KV("roll", afterVariance),
-            GameLog.KV("reactionEffectId", reactionEffectId),
-            GameLog.KV("reactionEffectValue", reactionEffectValue),
-            GameLog.KV("crit", isCrit),
-            GameLog.KV("critMult", critMultiplier.ToString("F2")),
-            GameLog.KV("preResist", damageBeforeResist)
-        ));
-
-        GameLog.Reaction(GameLog.Join(
-            "Trigger",
-            GameLog.KV("id", pendingReactionId ?? "none"),
-            GameLog.KV("name", pendingReactionName),
-            GameLog.KV("effectId", pendingReactionEffectId),
-            GameLog.KV("effectValue", pendingReactionEffectValue),
-            GameLog.KV("first", pendingReactionFirstElement),
-            GameLog.KV("det", pendingReactionDetonator),
-            GameLog.KV("attacker", player != null && player.GetCharacter() != null ? player.GetCharacter().DisplayName : "Player"),
-            GameLog.KV("target", target != null ? target.Name : "null")
-        ), GameLogVerbosity.Minimal);
-
-        // Apply reaction effects from JSON data (track shield gain for floating text)
-        int shieldBeforeReact2 = player.GetShield();
-        ReactionEffectEngine.ApplyPostHitEffects(pendingReactionId, player, target, finalDamage, attackElement);
-        
-        int shieldAfterReact2 = player.GetShield();
-        if (shieldAfterReact2 > shieldBeforeReact2)
-        {
-            ShowShieldToPlayer(shieldAfterReact2 - shieldBeforeReact2, FloatingTextType.ShieldGain);
-        }
-        
-        // Notify in-world combat arena of damage
-        NotifyEnemyHit(target);
-        
-        // Check Frost Shield break (Frostcaller)
-        CheckFrostShieldBreak(target);
-        
-        // Check Retaliation counter-attack (Shieldbearer)
-        CheckRetaliationCounter(target);
-        
-        // Player could die from Frost Shield break or Retaliation
-        if (!player.IsAlive())
-        {
-            EndCombat(false);
-            return;
-        }
-
-        bool targetKilled = !target.IsAlive();
-        if (targetKilled)
-        {
-            // Check Reborn mechanic (FallenChampion)
-            if (target.ShouldReborn())
-            {
-                target.ActivateReborn();
-                targetKilled = false;
-            }
-            else
-            {
-                GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", target.Name)));
-                AwardDetonatorXPForKill(target);
-                NotifyEnemyDeath(target);
-            }
-        }
-        
-        // Check SlimeBoss split after damage
-        if (target.IsAlive() && target.ShouldSplit())
-        {
-            ExecuteSlimeBossSplit(target);
-        }
-
-        // Apply skill cooldown and energy effects (skillNumber is 1-indexed, array is 0-indexed)
-        player.UseSkillAndApplyEffects(skillNumber - 1);
-
-        if (AllEnemiesDead())
-        {
-            EndCombat(true);
-            return;
-        }
-
-        // Handle on-kill effects from data
-        if (targetKilled && effectResult.HasOnKillBonus)
-        {
-            if (effectResult.OnKillEnergyRefundPercent > 0)
-            {
-                int refund = Mathf.RoundToInt(player.GetMaxEnergy() * (effectResult.OnKillEnergyRefundPercent / 100f));
-                player.GainEnergy(refund);
-            }
-            if (effectResult.OnKillCooldownOverride > 0)
-            {
-                player.SetSkillCooldown(skillNumber - 1, effectResult.OnKillCooldownOverride);
-            }
-            if (effectResult.OnKillBonusDamageMultiplier > 0)
-            {
-                var nextTarget = GetFirstAliveEnemy();
-                if (nextTarget != null)
-                {
-                    int chainDamage = Mathf.RoundToInt(finalDamage * effectResult.OnKillBonusDamageMultiplier);
-                    nextTarget.TakeDamage(chainDamage);
-                    ShowDamageToEnemy(nextTarget, chainDamage, false);
-                }
-            }
-            if (combatArena != null) combatArena.OnPlayerEnergyChanged();
-        }
-        
-        // Track chain skills (data-driven, per-skill)
-        // Using a chain skill: reset all other chains, then increment this one
-        // Using a non-chain skill: reset ALL chains (breaks any active chain)
-        if (skillDef?.chainSettings != null && skillDef.chainSettings.maxChainUses > 0)
-        {
-            player.ResetAllChainStacksExcept(skillNumber - 1);
-            player.IncrementChainUse(skillNumber - 1, skillDef.chainSettings);
-        }
-        else
-        {
-            player.ResetAllChainStacksExcept(-1);
-        }
-        
-        // Update CombatArena skill states (for ultimate availability)
-        if (combatArena != null)
-        {
-            combatArena.OnPlayerEnergyChanged();
-        }
-
-        // Player can continue using skills - turn does NOT end after reaction skill
-    }
+    // ExecuteSkillWithReaction removed — reaction processing is now handled by ProcessReactionAfterQTE
     
     private void DamageAllEnemies(int damage, Element? forcedElement = null, bool isCrit = false)
     {
@@ -1404,18 +1167,28 @@ public class CombatManager : MonoBehaviour
                     ));
                 }
                 
-                // STEP 1: Check and consume stun at START of turn
+                // STEP 1: Check and consume stun or freeze at START of turn
                 bool isStunned = enemy.CheckAndConsumeStun();
+                bool isFrozen = !isStunned && enemy.CheckAndConsumeFreeze();
                 
-                // Show stun skip floating text
+                // Show stun/freeze skip floating text
                 if (isStunned)
                 {
                     ShowTurnSkippedToEnemy(enemy, "Stunned!");
-                    yield return new WaitForSeconds(0.3f); // Brief pause for stun text
+                    yield return new WaitForSeconds(0.3f);
+                }
+                else if (isFrozen)
+                {
+                    ShowTurnSkippedToEnemy(enemy, "Frozen!");
+                    yield return new WaitForSeconds(0.3f);
                 }
                 
-                // STEP 2: Tick DoT effects (DoT still ticks even when stunned)
+                // STEP 2: Tick DoT effects (DoT still ticks even when stunned/frozen)
                 int dotDamage = enemy.TickDoTEffects();
+                
+                // Tick named DoTs from reactions (Ignite, Magma Scorch, etc.)
+                int namedDotDamage = enemy.TickNamedDoTs();
+                dotDamage += namedDotDamage;
 
                 if (dotDamage > 0)
                 {
@@ -1702,6 +1475,9 @@ public class CombatManager : MonoBehaviour
                 ShowDamageToPlayer(dmgInfo.finalDamage);
             }
         }
+        
+        // HealOnHit: if this enemy has the debuff, heal player (once per attack)
+        CheckHealOnHit(enemy);
 
         if (!player.IsAlive())
         {
@@ -2174,11 +1950,17 @@ public class CombatManager : MonoBehaviour
             if (enemy.IsAlive())
             {
                 enemy.TickTempResists();
+                enemy.TickReactionDebuffs();
+                enemy.TickReactionChips();
             }
         }
 
         // Tick player debuff durations at start of player's turn
         player.TickDebuffs();
+        
+        // Tick reaction buff durations
+        player.TickReactionBuffs();
+        player.TickReactionChips();
         
         // Tick player DoT
         int playerDotDmg = player.TickPlayerDoT();
@@ -2573,6 +2355,135 @@ public class CombatManager : MonoBehaviour
     }
     
     #endregion
+    
+    /// <summary>
+    /// Create UI chips for all effects of a reaction. Called after ProcessReactionAfterQTE.
+    /// Chips track display info (name + tooltip) for the EnemyWorldUnit and CombatArena UI.
+    /// </summary>
+    private void CreateReactionChips(string reactionId, string reactionName, CombatEnemy target)
+    {
+        var reactionDef = DataCache.GetReactionDef(reactionId);
+        if (reactionDef == null || reactionDef.Effects == null) return;
+        
+        foreach (var effect in reactionDef.Effects)
+        {
+            if (effect == null || string.IsNullOrEmpty(effect.effectId)) continue;
+            
+            int dur = effect.duration > 0 ? effect.duration : 1;
+            
+            switch (effect.effectId)
+            {
+                case "rxn_apply_dot":
+                {
+                    string dotName = !string.IsNullOrEmpty(effect.dotName) ? effect.dotName : "DoT";
+                    string tooltip = $"Deals damage per turn ({dur} turns)";
+                    if (target != null) target.AddReactionChip(dotName, tooltip, dur);
+                    break;
+                }
+                case "rxn_player_buff":
+                {
+                    string tooltip = effect.buffType switch
+                    {
+                        "CritDamage" => $"Bonus Crit Damage +{effect.value:F0}% ({dur} turns)",
+                        "BonusAP" => $"+{effect.value:F0} max AP ({dur} turns)",
+                        "ReflectiveArmor" => $"Reflects {effect.value:F0}% damage back ({dur} turns)",
+                        "DamageReduction" => $"Takes {effect.value:F0}% less damage ({dur} turns)",
+                        "RockDamageWhileShielded" => $"+{effect.value:F0}% Rock damage while shielded",
+                        _ => reactionName
+                    };
+                    player.AddReactionChip(reactionName, tooltip, dur > 0 ? dur : 99);
+                    break;
+                }
+                case "rxn_enemy_debuff":
+                {
+                    string chipName;
+                    string tooltip;
+                    switch (effect.debuffType)
+                    {
+                        case "Freeze":
+                            chipName = "Frozen";
+                            tooltip = "Enemy is frozen and skips the next turn";
+                            break;
+                        case "Weak":
+                            chipName = reactionName;
+                            tooltip = $"Enemy deals {effect.value:F0}% less damage ({dur} turns)";
+                            break;
+                        case "Shatter":
+                            chipName = reactionName;
+                            tooltip = $"Accumulates damage taken. Pops for bonus damage at threshold ({dur} turns)";
+                            break;
+                        case "HealOnHit":
+                            chipName = reactionName;
+                            tooltip = $"Player heals {effect.value:F0}% max HP when this enemy attacks ({dur} turns)";
+                            break;
+                        case "Electrocute":
+                            chipName = reactionName;
+                            tooltip = $"Takes bonus damage when hit. Stacks up to {effect.maxStacks} ({dur} turns)";
+                            break;
+                        case "Mudslide":
+                            chipName = reactionName;
+                            tooltip = $"Slowed. At max stacks, consumes for damage + stun ({dur} turns)";
+                            break;
+                        default:
+                            chipName = reactionName;
+                            tooltip = reactionName;
+                            break;
+                    }
+                    if (target != null) target.AddReactionChip(chipName, tooltip, dur);
+                    break;
+                }
+                case "rxn_apply_shield":
+                {
+                    string tooltip = $"+{effect.value:F0} Shield";
+                    player.AddReactionChip(reactionName, tooltip, 1);
+                    break;
+                }
+                case "rxn_reduce_resist":
+                {
+                    string elems = effect.elements ?? "All";
+                    string tooltip = $"Resistances reduced by {effect.value:F0}% ({elems}) ({dur} turns)";
+                    if (target != null) target.AddReactionChip(reactionName, tooltip, dur);
+                    break;
+                }
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Check HealOnHit: if the attacking enemy has the HealOnHit reaction debuff,
+    /// heal the player for the specified % of max HP. Called after enemy deals damage.
+    /// </summary>
+    private void CheckHealOnHit(CombatEnemy attacker)
+    {
+        if (attacker == null || player == null || !player.IsAlive()) return;
+        
+        var healDebuff = attacker.GetReactionDebuff("HealOnHit");
+        if (healDebuff == null || healDebuff.Value <= 0) return;
+        
+        int healAmount = Mathf.RoundToInt(player.GetMaxHealth() * (healDebuff.Value / 100f));
+        if (healAmount <= 0) return;
+        
+        int hpBefore = player.GetHealth();
+        player.Heal(healAmount);
+        int actualHeal = player.GetHealth() - hpBefore;
+        
+        if (actualHeal > 0)
+        {
+            var ftm = FloatingTextManager.Instance;
+            if (ftm != null && combatArena != null)
+            {
+                var pt = combatArena.GetPlayerTransform();
+                if (pt != null) ftm.ShowHeal(pt, actualHeal);
+            }
+            
+            GameLog.Reaction(GameLog.Join(
+                "HealOnHit",
+                GameLog.KV("source", attacker.Name),
+                GameLog.KV("healPercent", healDebuff.Value),
+                GameLog.KV("healed", actualHeal)
+            ));
+        }
+    }
     
     /// <summary>
     /// Awards Elemental Ascension XP to the detonator element when an enemy is killed via reaction.

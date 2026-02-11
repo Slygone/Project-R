@@ -50,10 +50,13 @@ public class NodeBase : MonoBehaviour
     {
         if (hasBeenCompleted) return;
         
-        if (other.CompareTag("Player"))
-        {
-            OnNodeTriggered();
-        }
+        if (!other.CompareTag("Player")) return;
+        
+        // Prevent triggering during combat or combat-exit transition
+        var arena = FindFirstObjectByType<CombatArena>();
+        if (arena != null && arena.IsInCombatOrTransitioning()) return;
+        
+        OnNodeTriggered();
     }
 
     protected virtual void OnNodeTriggered()
