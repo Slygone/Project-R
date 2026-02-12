@@ -1038,13 +1038,22 @@ public class CombatArena : MonoBehaviour
         // If only one enemy, execute directly on them
         if (aliveCount == 1)
         {
-            // Deduct AP cost
-            currentAP -= skillData.apCost;
+            // Find the single alive enemy (don't rely on selectedEnemyIndex which may be stale)
+            CombatEnemy target = null;
+            for (int i = 0; i < spawnedEnemies.Count; i++)
+            {
+                if (spawnedEnemies[i] != null && spawnedEnemies[i].IsAlive)
+                {
+                    target = spawnedEnemies[i].CombatEnemy;
+                    selectedEnemyIndex = i;
+                    break;
+                }
+            }
             
-            // Find the alive enemy and execute
-            var target = GetSelectedEnemy();
             if (target != null && combatManager != null)
             {
+                // Deduct AP cost only when we have a valid target
+                currentAP -= skillData.apCost;
                 combatManager.OnPlayerSkillTarget(skillNumber, target);
             }
             
@@ -1741,9 +1750,10 @@ public class CombatArena : MonoBehaviour
             {
                 targetIndicator.SetActive(true);
                 
-                // Position well above the enemy nameplate
+                // Position above the enemy nameplate using dynamic height
                 Vector3 enemyPos = selectedEnemy.transform.position;
-                targetIndicator.transform.position = enemyPos + new Vector3(0f, 6.5f, 0f);
+                float indicatorY = selectedEnemy.GetIndicatorWorldY();
+                targetIndicator.transform.position = new Vector3(enemyPos.x, indicatorY, enemyPos.z);
                 
                 // Make it face the camera
                 if (Camera.main != null)
@@ -1799,6 +1809,46 @@ public class CombatArena : MonoBehaviour
             if (spawnedEnemies[i] != null)
             {
                 spawnedEnemies[i].SetSelected(i == selectedEnemyIndex);
+            }
+        }
+    }
+    
+    /// <summary>
+    /// Called when an enemy dies. If the dead enemy was the selected target,
+    /// auto-advance to the next alive enemy so the player isn't stuck.
+    /// </summary>
+    public void OnEnemyDied(CombatEnemy deadEnemy)
+    {
+        // Find the index of the dead enemy
+        int deadIndex = -1;
+        for (int i = 0; i < spawnedEnemies.Count; i++)
+        {
+            if (spawnedEnemies[i] != null && spawnedEnemies[i].CombatEnemy == deadEnemy)
+            {
+                deadIndex = i;
+                break;
+            }
+        }
+        
+        // If the dead enemy was the selected target, advance to next alive
+        if (deadIndex >= 0 && deadIndex == selectedEnemyIndex)
+        {
+            SelectNextAliveEnemy();
+        }
+    }
+    
+    /// <summary>
+    /// Select the first alive enemy starting from the current index.
+    /// </summary>
+    private void SelectNextAliveEnemy()
+    {
+        for (int i = 0; i < spawnedEnemies.Count; i++)
+        {
+            if (spawnedEnemies[i] != null && spawnedEnemies[i].IsAlive)
+            {
+                selectedEnemyIndex = i;
+                UpdateEnemySelection();
+                return;
             }
         }
     }

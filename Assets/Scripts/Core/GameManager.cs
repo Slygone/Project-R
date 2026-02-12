@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -209,6 +210,21 @@ public class GameManager : MonoBehaviour
             refs.playerController.SetCanMove(false);
         }
 
+        StartCoroutine(StartBossFightWhenReady());
+    }
+    
+    private IEnumerator StartBossFightWhenReady()
+    {
+        // Wait for any active arena transition to finish so EnterCombat succeeds
+        var arena = FindFirstObjectByType<CombatArena>();
+        if (arena != null)
+        {
+            while (arena.IsInCombatOrTransitioning())
+            {
+                yield return null;
+            }
+        }
+        
         if (refs != null && refs.combatManager != null && refs.player != null)
         {
             refs.combatManager.StartBossCombat(refs.player, OnBossFightComplete);

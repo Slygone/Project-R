@@ -83,6 +83,7 @@ public class CombatEnemy
     public string[] SplitInto;
     public int SplitHealthPercent;
     public bool HasSplit;
+    public bool PendingSplit; // threshold reached, split deferred until End Turn
     
     // Boss: Reactive pattern (MirrorBoss)
     public bool ReactivePattern;
@@ -210,6 +211,7 @@ public class CombatEnemy
         SplitInto = data.SplitInto;
         SplitHealthPercent = data.SplitHealthPercent;
         HasSplit = false;
+        PendingSplit = false;
         
         ReactivePattern = data.ReactivePattern;
         ReactiveOnAttack = data.ReactiveOnAttack;
@@ -447,15 +449,24 @@ public class CombatEnemy
     // ========== BOSS MECHANICS ==========
     
     /// <summary>
-    /// Check if SlimeBoss should split (health <= threshold).
+    /// Check if SlimeBoss has crossed the split threshold and mark as pending.
+    /// The actual split is deferred until the player presses End Turn.
     /// </summary>
-    public bool ShouldSplit()
+    public void CheckSplitThreshold()
     {
-        if (HasSplit) return false;
-        if (SplitThreshold <= 0f) return false;
-        if (SplitInto == null || SplitInto.Length == 0) return false;
-        return (float)Health / MaxHealth <= SplitThreshold;
+        if (HasSplit || PendingSplit) return;
+        if (SplitThreshold <= 0f) return;
+        if (SplitInto == null || SplitInto.Length == 0) return;
+        if ((float)Health / MaxHealth <= SplitThreshold)
+        {
+            PendingSplit = true;
+        }
     }
+    
+    /// <summary>
+    /// Returns true if the split threshold was reached and is awaiting End Turn.
+    /// </summary>
+    public bool IsPendingSplit => PendingSplit && !HasSplit;
     
     /// <summary>
     /// Mark this enemy as having split.

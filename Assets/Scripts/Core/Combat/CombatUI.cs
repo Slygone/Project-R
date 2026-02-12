@@ -262,7 +262,7 @@ public class CombatUI : MonoBehaviour
         {
             if (showSigil)
             {
-                var els = new Element[] { Element.Fire, Element.Ice, Element.Water, Element.Wind, Element.Rock };
+                var els = new Element[] { Element.Fire, Element.Ice, Element.Water, Element.Wind, Element.Rock, Element.Lightning };
                 pendingSigil = els[Random.Range(0, els.Length)];
                 var si = sigilRewardButton.GetComponent<Image>();
                 if (si != null) si.color = ElementColors.Get(pendingSigil) * 0.4f;

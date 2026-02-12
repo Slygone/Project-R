@@ -80,10 +80,25 @@ public class CombatManager : MonoBehaviour
             return;
         }
         
-        // Build eligible boss pool: filter out bosses whose spawn requirements aren't met
+        // Build eligible boss pool: filter by world, then by spawn requirements
         var eligibleBosses = new List<EnemyData>();
         foreach (var boss in DataCache.BossEnemies)
         {
+            // Filter by world pool (if defined)
+            if (boss.Worlds != null && boss.Worlds.Length > 0)
+            {
+                if (System.Array.IndexOf(boss.Worlds, world) < 0)
+                {
+                    GameLog.Combat(GameLog.Join("BossFiltered",
+                        GameLog.KV("boss", boss.DisplayName),
+                        GameLog.KV("requirement", "worldPool"),
+                        GameLog.KV("allowedWorlds", string.Join(",", boss.Worlds)),
+                        GameLog.KV("currentWorld", world)));
+                    continue;
+                }
+            }
+            
+            // Filter by spawn requirements
             if (!string.IsNullOrEmpty(boss.SpawnRequirement) && boss.SpawnRequirement == "defeatBosses")
             {
                 if (bossesDefeatedThisRun < boss.SpawnRequirementCount)
@@ -99,6 +114,15 @@ public class CombatManager : MonoBehaviour
             eligibleBosses.Add(boss);
         }
         
+        // Fallback: if no bosses match world + requirements, try world-only (ignore requirements)
+        if (eligibleBosses.Count == 0)
+        {
+            eligibleBosses.AddRange(DataCache.BossEnemies.FindAll(b =>
+                b.Worlds != null && b.Worlds.Length > 0 && System.Array.IndexOf(b.Worlds, world) >= 0
+                && string.IsNullOrEmpty(b.SpawnRequirement)));
+        }
+        
+        // Last resort: any boss with no spawn requirement
         if (eligibleBosses.Count == 0)
         {
             eligibleBosses.AddRange(DataCache.BossEnemies.FindAll(b => string.IsNullOrEmpty(b.SpawnRequirement)));
@@ -226,6 +250,17 @@ public class CombatManager : MonoBehaviour
         if (!combatActive || !isPlayerTurn) return;
         
         GameLog.Combat(GameLog.Join("EndTurnClicked"));
+        
+        // Execute any deferred SlimeBoss splits before ending the turn.
+        // The split uses the boss's current HP at this moment (not when threshold was crossed).
+        var snapshot = new List<CombatEnemy>(enemies);
+        foreach (var enemy in snapshot)
+        {
+            if (enemy.IsAlive() && enemy.IsPendingSplit)
+            {
+                ExecuteSlimeBossSplit(enemy);
+            }
+        }
         
         isPlayerTurn = false;
         StartCoroutine(DelayedEnemyTurn());
@@ -356,9 +391,9 @@ public class CombatManager : MonoBehaviour
                     NotifyEnemyDeath(t);
                 }
             }
-            if (t != null && t.IsAlive() && t.ShouldSplit())
+            if (t != null && t.IsAlive())
             {
-                ExecuteSlimeBossSplit(t);
+                t.CheckSplitThreshold();
             }
         }
         
@@ -560,10 +595,10 @@ public class CombatManager : MonoBehaviour
             }
         }
         
-        // Check SlimeBoss split after damage
-        if (target.IsAlive() && target.ShouldSplit())
+        // Check SlimeBoss split threshold (deferred until End Turn)
+        if (target.IsAlive())
         {
-            ExecuteSlimeBossSplit(target);
+            target.CheckSplitThreshold();
         }
 
         if (AllEnemiesDead())
@@ -917,10 +952,10 @@ public class CombatManager : MonoBehaviour
             }
         }
         
-        // Check SlimeBoss split after damage
-        if (target.IsAlive() && target.ShouldSplit())
+        // Check SlimeBoss split threshold (deferred until End Turn)
+        if (target.IsAlive())
         {
-            ExecuteSlimeBossSplit(target);
+            target.CheckSplitThreshold();
         }
 
         // Reaction effects are now processed separately via ProcessReactionAfterQTE,
@@ -1103,9 +1138,9 @@ public class CombatManager : MonoBehaviour
                     }
                 }
                 
-                if (enemy.IsAlive() && enemy.ShouldSplit())
+                if (enemy.IsAlive())
                 {
-                    ExecuteSlimeBossSplit(enemy);
+                    enemy.CheckSplitThreshold();
                 }
             }
         }
@@ -2143,6 +2178,16 @@ public class CombatManager : MonoBehaviour
 
     public void OnLootCollected()
     {
+        // Capture combat state BEFORE side-effects (OnNodeCompleted may trigger
+        // StartBossCombat which overwrites currentCombatType / onBossCombatComplete)
+        var completedType = currentCombatType;
+        System.Action<bool> bossCallback = null;
+        if (completedType == CombatType.Boss && onBossCombatComplete != null)
+        {
+            bossCallback = onBossCombatComplete;
+            onBossCombatComplete = null;
+        }
+        
         // Exit in-world combat arena on victory
         if (combatArena != null)
         {
@@ -2165,11 +2210,9 @@ public class CombatManager : MonoBehaviour
         // This prevents player from walking into new combat during exit transition
         
         // Handle boss combat callback after loot collection
-        if (currentCombatType == CombatType.Boss && onBossCombatComplete != null)
+        if (bossCallback != null)
         {
-            var callback = onBossCombatComplete;
-            onBossCombatComplete = null;
-            callback.Invoke(true);
+            bossCallback.Invoke(true);
         }
     }
 
@@ -2207,6 +2250,10 @@ public class CombatManager : MonoBehaviour
         }
         
         if (combatArena == null) return;
+        
+        // Auto-advance target selection if the dead enemy was the selected target
+        combatArena.OnEnemyDied(enemy);
+        
         var unit = combatArena.GetEnemyUnit(enemy);
         if (unit != null)
         {

@@ -38,6 +38,9 @@ public class EnemyData
     public float RebornDamageBonus; // damage bonus after reborn (1.0 = +100%)
     public int[] RebornPattern;     // new attack pattern after reborn
     
+    // Boss: World pool (which worlds this boss can appear in; empty = any world)
+    public int[] Worlds;
+    
     // Boss: Spawn requirement (FallenChampion)
     public string SpawnRequirement;     // "defeatBosses" etc.
     public int SpawnRequirementCount;   // number of bosses to defeat first

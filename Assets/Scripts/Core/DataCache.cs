@@ -115,6 +115,9 @@ public static class DataCache
                 RebornDamageBonus = e.rebornDamageBonus,
                 RebornPattern = e.rebornPattern,
                 
+                // Boss: World pool
+                Worlds = e.worlds,
+                
                 // Boss: Spawn requirement
                 SpawnRequirement = e.spawnRequirement,
                 SpawnRequirementCount = e.spawnRequirementCount,
@@ -185,6 +188,9 @@ public static class DataCache
         public int[] resistanceModifiers;
         public int bonusResistance;
         public EnemyRewardsJson rewards;
+        
+        // Boss: World pool
+        public int[] worlds;
         
         // Boss: Split mechanic (SlimeBoss)
         public float splitThreshold;

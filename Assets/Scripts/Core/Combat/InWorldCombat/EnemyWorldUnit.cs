@@ -406,6 +406,23 @@ public class EnemyWorldUnit : MonoBehaviour
     }
     
     /// <summary>
+    /// Returns the world-space Y position where the target indicator arrow should be placed
+    /// (above the nameplate text with clearance).
+    /// </summary>
+    public float GetIndicatorWorldY()
+    {
+        if (nameText != null)
+        {
+            Vector3[] corners = new Vector3[4];
+            nameText.rectTransform.GetWorldCorners(corners);
+            // corners[1] = top-left, corners[2] = top-right
+            float topY = Mathf.Max(corners[1].y, corners[2].y);
+            return topY + 1.5f;
+        }
+        return transform.position.y + 8f;
+    }
+    
+    /// <summary>
     /// Set this enemy as selected (for targeting)
     /// Note: Visual selection is handled by CombatArena.targetIndicator
     /// </summary>
