@@ -7,7 +7,6 @@ using TMPro;
 public class ShopUI : MonoBehaviour
 {
     private const int POTION_PRICE = 2;
-    private const int RELIC_PRICE = 3;
     private const int REROLL_PRICE = 1;
 
     private GameObject shopPanel;
@@ -147,7 +146,7 @@ public class ShopUI : MonoBehaviour
         labelRect.offsetMin = Vector2.zero;
         labelRect.offsetMax = Vector2.zero;
         var labelText = labelObj.AddComponent<TextMeshProUGUI>();
-        labelText.text = $"RELICS - {RELIC_PRICE} Gold Each";
+        labelText.text = "RELICS";
         labelText.alignment = TextAlignmentOptions.Center;
         labelText.fontSize = 22;
         labelText.color = new Color(0.9f, 0.7f, 0.4f);
@@ -375,9 +374,15 @@ public class ShopUI : MonoBehaviour
             return new List<RelicData>();
         }
 
-        var available = new List<RelicData>(allRelics);
+        // Only show purchasable relics (Common rarity with price > 0) in shop
+        var available = new List<RelicData>();
+        foreach (var r in allRelics)
+        {
+            if (r.Price > 0 && r.Rarity == "Common")
+                available.Add(r);
+        }
+        
         var result = new List<RelicData>();
-
         while (result.Count < count && available.Count > 0)
         {
             int index = UnityEngine.Random.Range(0, available.Count);
@@ -452,7 +457,7 @@ public class ShopUI : MonoBehaviour
         priceRect.offsetMin = Vector2.zero;
         priceRect.offsetMax = Vector2.zero;
         var priceText = priceObj.AddComponent<TextMeshProUGUI>();
-        priceText.text = $"{RELIC_PRICE} Gold";
+        priceText.text = $"{relic.Price} Gold";
         priceText.alignment = TextAlignmentOptions.Center;
         priceText.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
         priceText.overflowMode = TextOverflowModes.Truncate;
@@ -463,25 +468,15 @@ public class ShopUI : MonoBehaviour
 
     private Color GetRelicColor(RelicData relic)
     {
-        // Derive color from effects array
-        if (relic.Effects != null && relic.Effects.Count > 0)
+        // Color based on rarity
+        string rarity = (relic.Rarity ?? "Common").ToLower();
+        switch (rarity)
         {
-            var first = relic.Effects[0];
-            string element = (first.element ?? "").ToLower().Trim();
-            switch (element)
-            {
-                case "fire": return new Color(0.5f, 0.2f, 0.15f);
-                case "ice": return new Color(0.15f, 0.3f, 0.5f);
-                case "water": return new Color(0.1f, 0.25f, 0.45f);
-                case "wind": return new Color(0.2f, 0.4f, 0.25f);
-                case "rock": return new Color(0.35f, 0.28f, 0.2f);
-                case "lightning": return new Color(0.5f, 0.4f, 0.15f);
-                case "all": return new Color(0.4f, 0.3f, 0.5f);
-            }
-            string stat = (first.stat ?? "").ToLower();
-            if (stat == "maxhealth") return new Color(0.4f, 0.2f, 0.3f);
+            case "common":    return new Color(0.2f, 0.3f, 0.25f);
+            case "legendary": return new Color(0.4f, 0.3f, 0.15f);
+            case "cursed":    return new Color(0.4f, 0.15f, 0.15f);
+            default:          return new Color(0.3f, 0.3f, 0.35f);
         }
-        return new Color(0.3f, 0.3f, 0.35f);
     }
 
     private void OnPotionClicked(PotionData potion, GameObject btnObj)
@@ -517,13 +512,14 @@ public class ShopUI : MonoBehaviour
     {
         if (player == null) return;
 
-        if (player.GetGold() < RELIC_PRICE)
+        int price = relic.Price;
+        if (player.GetGold() < price)
         {
-            Debug.Log($"[ShopUI] Not enough gold for {relic.DisplayName}. Need {RELIC_PRICE}, have {player.GetGold()}");
+            Debug.Log($"[ShopUI] Not enough gold for {relic.DisplayName}. Need {price}, have {player.GetGold()}");
             return;
         }
 
-        player.AddGold(-RELIC_PRICE);
+        player.AddGold(-price);
         player.AddRelic(relic);
         RefreshGoldDisplay();
 
@@ -539,7 +535,7 @@ public class ShopUI : MonoBehaviour
             Destroy(btnObj);
         }
 
-        Debug.Log($"[ShopUI] Purchased {relic.DisplayName} for {RELIC_PRICE} gold");
+        Debug.Log($"[ShopUI] Purchased {relic.DisplayName} for {price} gold");
     }
 
     private void OnRerollClicked()

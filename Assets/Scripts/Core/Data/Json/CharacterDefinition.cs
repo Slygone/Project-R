@@ -23,8 +23,8 @@ public class CharacterStats
     public int maxEnergy;
     public int critChance;
     public float critDamage;
-    public int baseResistance;
-    public int bonusResistance;
+    public int physicalResist;
+    public int elementalResist;
 }
 
 [Serializable]

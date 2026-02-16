@@ -3,6 +3,12 @@ using UnityEngine;
 
 public enum CombatType { Normal, Elite, Boss }
 
+/// <summary>
+/// Tracks the current phase within a combat turn.
+/// A full turn = PlayerPhase → EnemyPhase.
+/// </summary>
+public enum CombatPhase { None, PlayerPhase, EnemyPhase }
+
 public class CombatManager : MonoBehaviour
 {
     private List<CombatEnemy> enemies = new List<CombatEnemy>();
@@ -13,6 +19,10 @@ public class CombatManager : MonoBehaviour
     private bool isPlayerTurn = true;
     private bool combatActive = false;
     private bool isEndingCombat = false;
+    
+    // Centralized turn tracking
+    private int currentTurnNumber = 0;
+    private CombatPhase currentPhase = CombatPhase.None;
     
     // MirrorBoss reactive pattern: tracks the player's last action type
     private PlayerLastAction lastPlayerAction = PlayerLastAction.Attack;
@@ -38,6 +48,7 @@ public class CombatManager : MonoBehaviour
     private string pendingReactionId = null;
     private Element pendingReactionFirstElement = Element.None;
     private Element pendingReactionDetonator = Element.None;
+    private ReactionTriggerInfo pendingReactionInfo = null;
 
     public void StartCombat(CombatNode node, Player playerRef)
     {
@@ -128,20 +139,35 @@ public class CombatManager : MonoBehaviour
             eligibleBosses.AddRange(DataCache.BossEnemies.FindAll(b => string.IsNullOrEmpty(b.SpawnRequirement)));
         }
         
+        // Shuffle eligible bosses to get random order, then pick without duplicates
+        var shuffled = new List<EnemyData>(eligibleBosses);
+        for (int j = shuffled.Count - 1; j > 0; j--)
+        {
+            int r = Random.Range(0, j + 1);
+            var temp = shuffled[j];
+            shuffled[j] = shuffled[r];
+            shuffled[r] = temp;
+        }
+        
         for (int i = 0; i < bossCount; i++)
         {
-            var bossData = eligibleBosses[Random.Range(0, eligibleBosses.Count)];
+            // Pick from shuffled list without duplicates; wrap around if more bosses needed than available
+            var bossData = shuffled[i % shuffled.Count];
             enemies.Add(new CombatEnemy(bossData, world));
         }
 
         combatActive = true;
         isPlayerTurn = true;
         isEndingCombat = false;
+        currentTurnNumber = 1;
+        currentPhase = CombatPhase.PlayerPhase;
         
         // Ensure player combat state is reset (sets AP to max, clears per-combat effects)
         if (player != null)
         {
             player.ResetCombatState();
+            player.OnCombatStart();
+            ApplyCombatStartRelicEffects();
         }
 
         string bossNames = string.Join(" & ", enemies.ConvertAll(e => e.Name));
@@ -205,9 +231,15 @@ public class CombatManager : MonoBehaviour
         combatActive = true;
         isPlayerTurn = true;
         isEndingCombat = false;
+        currentTurnNumber = 1;
+        currentPhase = CombatPhase.PlayerPhase;
         
         // Reset player combat state (energy to 0, cooldowns cleared)
         player.ResetCombatState();
+        
+        // Trigger relic combat-start effects
+        player.OnCombatStart();
+        ApplyCombatStartRelicEffects();
 
         // Disable player free roam during combat
         var pc = FindFirstObjectByType<PlayerController>();
@@ -249,7 +281,14 @@ public class CombatManager : MonoBehaviour
     {
         if (!combatActive || !isPlayerTurn) return;
         
-        GameLog.Combat(GameLog.Join("EndTurnClicked"));
+        // Process relic turn-end effects (AP banking, Elemental Drip, Blood Tithe self-damage)
+        if (player != null)
+        {
+            player.OnRelicTurnEnd();
+            ApplyTurnEndRelicEffects();
+        }
+        
+        GameLog.Combat(GameLog.Join("PlayerPhaseEnd", GameLog.KV("turn", currentTurnNumber)));
         
         // Execute any deferred SlimeBoss splits before ending the turn.
         // The split uses the boss's current HP at this moment (not when threshold was crossed).
@@ -263,6 +302,7 @@ public class CombatManager : MonoBehaviour
         }
         
         isPlayerTurn = false;
+        currentPhase = CombatPhase.EnemyPhase;
         StartCoroutine(DelayedEnemyTurn());
     }
 
@@ -305,6 +345,28 @@ public class CombatManager : MonoBehaviour
             GameLog.KV("result", result),
             GameLog.KV("qteMult", qteMultiplier.ToString("F2"))
         ), GameLogVerbosity.Verbose);
+        
+        // Consume marks now (deferred from TriggerMarkReaction)
+        if (pendingReactionInfo != null && pendingTarget != null)
+        {
+            pendingTarget.ConsumeMarksForReaction(pendingReactionInfo);
+            
+            // Perfect Reaction Save Mark relic: restore N marks on Perfect QTE
+            if (result == QTEResult.Perfect && player != null && player.HasPerfectReactionSaveMark())
+            {
+                int saveCount = player.GetPerfectReactionSaveMarkCount();
+                if (pendingReactionInfo.IsSingleElement)
+                {
+                    pendingTarget.AddMarks(pendingReactionInfo.PrimaryElement, saveCount);
+                }
+                else
+                {
+                    pendingTarget.AddMarks(pendingReactionInfo.PrimaryElement, saveCount);
+                    pendingTarget.AddMarks(pendingReactionInfo.SecondaryElement, saveCount);
+                }
+                Debug.Log($"[CombatManager] Perfect Reaction Save Mark: restored {saveCount} mark(s)");
+            }
+        }
         
         // Process reaction effects via data-driven engine (separate from skill/attack damage)
         ProcessReactionAfterQTE(qteMultiplier);
@@ -371,10 +433,18 @@ public class CombatManager : MonoBehaviour
         // Show reaction name floating text after QTE (ensures it's visible)
         ShowReactionToEnemy(pendingTarget, pendingReactionName, 0);
         
+        // Refresh AP display immediately (reaction buffs like BonusAP change AP mid-turn)
+        if (combatArena != null)
+        {
+            combatArena.RefreshAPDisplay();
+        }
+        
         // Create UI chips for reaction effects
         CreateReactionChips(pendingReactionId, pendingReactionName, pendingTarget);
         
         // Check for enemy deaths from reaction damage
+        bool rebornTriggered = false;
+        CombatEnemy rebornTarget = null;
         foreach (var dmgInstance in reactionResult.DamageInstances)
         {
             var t = dmgInstance.Target;
@@ -383,11 +453,12 @@ public class CombatManager : MonoBehaviour
                 if (t.ShouldReborn())
                 {
                     t.ActivateReborn();
+                    rebornTriggered = true;
+                    rebornTarget = t;
                 }
                 else
                 {
                     GameLog.Combat(GameLog.Join("EnemyDefeated", GameLog.KV("target", t.Name), GameLog.KV("source", "Reaction")));
-                    AwardDetonatorXPForKill(t);
                     NotifyEnemyDeath(t);
                 }
             }
@@ -395,6 +466,12 @@ public class CombatManager : MonoBehaviour
             {
                 t.CheckSplitThreshold();
             }
+        }
+        
+        if (rebornTriggered && rebornTarget != null)
+        {
+            ForceEndPlayerTurnForReborn(rebornTarget);
+            return;
         }
         
         if (AllEnemiesDead())
@@ -427,6 +504,7 @@ public class CombatManager : MonoBehaviour
         pendingReactionId = null;
         pendingReactionFirstElement = Element.None;
         pendingReactionDetonator = Element.None;
+        pendingReactionInfo = null;
     }
     
     /// <summary>
@@ -453,8 +531,8 @@ public class CombatManager : MonoBehaviour
         
         pendingReactionName = reactionDef.Name;
         
-        // Consume the marks
-        target.ConsumeMarksForReaction(reactionInfo);
+        // Defer mark consumption until after QTE (Perfect Reaction Save Mark relic)
+        pendingReactionInfo = reactionInfo;
         
         string attackerName = player != null && player.GetCharacter() != null ? player.GetCharacter().DisplayName : "Player";
         GameLog.Reaction(GameLog.Join(
@@ -469,6 +547,14 @@ public class CombatManager : MonoBehaviour
         ));
         
         // Reaction floating text is shown after QTE completes in ProcessReactionAfterQTE
+        
+        // Sigil Renounce: skip reaction QTE entirely, auto-resolve as Good
+        if (player != null && player.IsReactionQTEDisabled())
+        {
+            GameLog.Combat(GameLog.Join("ReactionQTESkipped", GameLog.KV("reason", "ReactionQTEDisabled")));
+            OnQTEComplete(QTEResult.Good);
+            return;
+        }
         
         if (qtePanel == null)
         {
@@ -587,6 +673,8 @@ public class CombatManager : MonoBehaviour
             if (target.ShouldReborn())
             {
                 target.ActivateReborn();
+                ForceEndPlayerTurnForReborn(target);
+                return;
             }
             else
             {
@@ -693,6 +781,14 @@ public class CombatManager : MonoBehaviour
         // Spend AP for this skill
         int apCost = GetSkillAPCost(character, skillNumber);
         player.SpendAP(apCost);
+        
+        // Deadeye Counter: consume guaranteed crit BEFORE incrementing counter
+        // so it applies to the skill AFTER the counter reached its threshold
+        bool deadeyeGuaranteedCrit = player.ConsumeDeadeyeCritIfReady();
+        
+        // Relic triggers: skill used + AP spent tracking
+        player.OnRelicSkillUsed();
+        if (apCost > 0) player.OnRelicAPSpent(apCost);
 
         // Look up SkillDefinition from JSON data
         var skillDef = GetSkillDefinition(skillNumber);
@@ -781,11 +877,11 @@ public class CombatManager : MonoBehaviour
             // Apply variance per hit
             int damage = player.ApplyVariance(baseDamage);
             
-            // Apply crit with temp bonuses
+            // Apply crit with temp bonuses + Deadeye guaranteed crit
             int effectiveCritChance = player.GetCritChance() + tempCritBonus;
             float effectiveCritDmg = player.GetCritDamage() + tempCritDmgBonus;
             int critRoll = Random.Range(0, 100);
-            bool isCrit = critRoll < effectiveCritChance;
+            bool isCrit = deadeyeGuaranteedCrit || critRoll < effectiveCritChance;
             
             int afterCrit = isCrit ? Mathf.RoundToInt(damage * effectiveCritDmg) : damage;
             int afterReaction = Mathf.RoundToInt(afterCrit * reactionMultiplier);
@@ -944,6 +1040,10 @@ public class CombatManager : MonoBehaviour
             {
                 target.ActivateReborn();
                 targetKilled = false;
+                // Apply skill cooldown before ending turn
+                player.UseSkillAndApplyEffects(skillNumber - 1);
+                ForceEndPlayerTurnForReborn(target);
+                return;
             }
             else
             {
@@ -1130,6 +1230,8 @@ public class CombatManager : MonoBehaviour
                     if (enemy.ShouldReborn())
                     {
                         enemy.ActivateReborn();
+                        ForceEndPlayerTurnForReborn(enemy);
+                        return;
                     }
                     else
                     {
@@ -1157,6 +1259,31 @@ public class CombatManager : MonoBehaviour
     private int pendingDefensiveQTEAfterVariance;
     private int pendingDefensiveQTEResistPercent;
     
+    /// <summary>
+    /// Called after FallenChampion reborn: ends the player's turn and gives the reborn enemy an immediate attack.
+    /// </summary>
+    private void ForceEndPlayerTurnForReborn(CombatEnemy rebornEnemy)
+    {
+        isPlayerTurn = false;
+        currentPhase = CombatPhase.EnemyPhase;
+        GameLog.Combat(GameLog.Join("RebornTurnSteal",
+            GameLog.KV("enemy", rebornEnemy.Name),
+            GameLog.KV("turn", currentTurnNumber)));
+        
+        // Give the reborn enemy an immediate turn
+        pendingAttackers.Clear();
+        pendingAttackers.Add(rebornEnemy);
+        currentAttackerIndex = 0;
+        
+        StartCoroutine(DelayedRebornAttack());
+    }
+    
+    private System.Collections.IEnumerator DelayedRebornAttack()
+    {
+        yield return new WaitForSeconds(0.6f);
+        ProcessNextEnemyAttack();
+    }
+    
     private void EnemyTurn()
     {
         StartCoroutine(EnemyTurnCoroutine());
@@ -1164,8 +1291,10 @@ public class CombatManager : MonoBehaviour
     
     private System.Collections.IEnumerator EnemyTurnCoroutine()
     {
+        GameLog.Combat(GameLog.Join("EnemyPhaseStart", GameLog.KV("turn", currentTurnNumber)));
+        
         // Collect all alive enemies that will attack
-        // Turn order: 1) Check stun, 2) Apply DoT (even if stunned), 3) Attack (if not stunned)
+        // Turn order: 1) Check stun/freeze, 2) Apply DoT (even if stunned/frozen), 3) Attack (if not stunned/frozen)
         pendingAttackers.Clear();
         
         foreach (var enemy in enemies)
@@ -1250,7 +1379,7 @@ public class CombatManager : MonoBehaviour
                     continue;
                 }
                 
-                // STEP 3: If stunned, skip attack phase entirely
+                // STEP 3: If stunned or frozen, skip attack phase entirely
                 if (isStunned)
                 {
                     GameLog.Status(GameLog.Join(
@@ -1261,8 +1390,18 @@ public class CombatManager : MonoBehaviour
                     ));
                     continue;
                 }
+                if (isFrozen)
+                {
+                    GameLog.Status(GameLog.Join(
+                        "Tick",
+                        GameLog.KV("target", enemy.Name),
+                        GameLog.KV("type", "Freeze"),
+                        GameLog.KV("tick", "skip")
+                    ));
+                    continue;
+                }
                 
-                // Not stunned, can attack
+                // Not stunned/frozen, can attack
                 pendingAttackers.Add(enemy);
             }
         }
@@ -1375,7 +1514,7 @@ public class CombatManager : MonoBehaviour
         
         pendingDefensiveQTEBaseDamage = Mathf.RoundToInt(baseDamageRaw);
         pendingDefensiveQTEAfterVariance = afterVariance;
-        pendingDefensiveQTEResistPercent = player.CalculateResistance(enemy.Affinity);
+        pendingDefensiveQTEResistPercent = player.CalculateResistance(enemy.DamageElement);
         
         // Check ignoreArmor flag from skill effects
         bool ignoreArmor = false;
@@ -1399,7 +1538,7 @@ public class CombatManager : MonoBehaviour
         }
         else
         {
-            pendingDefensiveQTEDamage = player.ApplyResistance(afterVariance, enemy.Affinity);
+            pendingDefensiveQTEDamage = player.ApplyResistance(afterVariance, enemy.DamageElement);
         }
         
         // Apply Vulnerable debuff: increases damage taken
@@ -1414,7 +1553,7 @@ public class CombatManager : MonoBehaviour
             GameLog.KV("attacker", enemy.Name),
             GameLog.KV("skill", skillName),
             GameLog.KV("target", "Player"),
-            GameLog.KV("element", enemy.Affinity),
+            GameLog.KV("element", enemy.DamageElement),
             GameLog.KV("multiplier", damageMultiplier.ToString("F2")),
             GameLog.KV("base", pendingDefensiveQTEBaseDamage),
             GameLog.KV("variance", pendingDefensiveQTEAfterVariance),
@@ -1425,6 +1564,22 @@ public class CombatManager : MonoBehaviour
 
         if (pendingDefensiveQTEDamage <= 0)
         {
+            OnDefensiveQTEComplete(enemy, DefensiveQTEResult.Bad);
+            return;
+        }
+
+        // Skip defensive QTE if player is stunned — they can't defend
+        if (player.IsPlayerStunned)
+        {
+            GameLog.Combat(GameLog.Join("DefensiveQTESkipped", GameLog.KV("reason", "PlayerStunned")));
+            OnDefensiveQTEComplete(enemy, DefensiveQTEResult.Bad);
+            return;
+        }
+        
+        // Early Guard Override: skip defensive QTE for first N turns
+        if (player.IsDefensiveQTEDisabled(currentTurnNumber))
+        {
+            GameLog.Combat(GameLog.Join("DefensiveQTESkipped", GameLog.KV("reason", "EarlyGuardOverride")));
             OnDefensiveQTEComplete(enemy, DefensiveQTEResult.Bad);
             return;
         }
@@ -1962,6 +2117,8 @@ public class CombatManager : MonoBehaviour
     {
         pendingAttackers.Clear();
         
+        GameLog.Combat(GameLog.Join("EnemyPhaseEnd", GameLog.KV("turn", currentTurnNumber)));
+        
         // If combat is ending, do not process turn advancement
         if (isEndingCombat)
         {
@@ -1978,6 +2135,10 @@ public class CombatManager : MonoBehaviour
             return;
         }
 
+        // ========== BETWEEN-TURN TICKS ==========
+        // These always happen between Enemy Phase end and next Player Phase start,
+        // regardless of whether the player is stunned.
+        
         // Tick temp resist durations for all combatants
         player.TickTempResists();
         foreach (var enemy in enemies)
@@ -1990,7 +2151,7 @@ public class CombatManager : MonoBehaviour
             }
         }
 
-        // Tick player debuff durations at start of player's turn
+        // Tick player debuff durations
         player.TickDebuffs();
         
         // Tick reaction buff durations
@@ -2009,28 +2170,38 @@ public class CombatManager : MonoBehaviour
             }
         }
         
+        // Tick down cooldowns ALWAYS (even when stunned — time still passes)
+        player.TickCooldowns();
+        
+        // ========== ADVANCE TURN ==========
+        currentTurnNumber++;
+        
         // Check player stun (Hydra Tail)
         if (player.CheckAndConsumePlayerStun())
         {
             GameLog.Status(GameLog.Join(
-                "Tick",
-                GameLog.KV("target", "Player"),
-                GameLog.KV("type", "Stun"),
-                GameLog.KV("tick", "skip")
+                "PlayerPhaseSkipped",
+                GameLog.KV("turn", currentTurnNumber),
+                GameLog.KV("reason", "Stunned")
             ));
-            // Skip player turn entirely — go straight to enemy turn
+            // Skip player phase entirely — go straight to enemy phase
             isPlayerTurn = false;
+            currentPhase = CombatPhase.EnemyPhase;
             EnemyTurn();
             return;
         }
         
+        // ========== PLAYER PHASE START ==========
         isPlayerTurn = true;
-        
-        // Tick down cooldowns at start of player's turn
-        player.TickCooldowns();
+        currentPhase = CombatPhase.PlayerPhase;
         
         // Refresh AP at start of player's turn
         player.RefreshAP();
+        
+        // Process relic turn-start effects (AP banking, Siphoning Aura, Mark Echo, Rhythm Discount)
+        player.OnRelicTurnStart();
+        
+        GameLog.Combat(GameLog.Join("PlayerPhaseStart", GameLog.KV("turn", currentTurnNumber)));
         
         // Reset AP in CombatArena UI
         if (combatArena != null)
@@ -2060,12 +2231,109 @@ public class CombatManager : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// Apply relic effects at combat start that need enemy access (status application, marks).
+    /// Called after player.OnCombatStart() which handles player-side effects.
+    /// </summary>
+    private void ApplyCombatStartRelicEffects()
+    {
+        if (player == null) return;
+        
+        var combatStartRelics = player.GetRelicsByTrigger("combatStart");
+        foreach (var relic in combatStartRelics)
+        {
+            if (relic.Effects == null) continue;
+            foreach (var eff in relic.Effects)
+            {
+                if (eff.effectId == "eff_apply_status")
+                {
+                    if (eff.target == "AllEnemies")
+                    {
+                        // Ambush Seal: Weaken+Vulnerable on all enemies
+                        foreach (var enemy in enemies)
+                        {
+                            if (!enemy.IsAlive()) continue;
+                            string s = (eff.status ?? "").ToLower();
+                            if (s.Contains("weak")) enemy.ApplyWeak(eff.duration, eff.magnitude);
+                            else if (s.Contains("vulnerable")) enemy.ApplyTempResistAll(-Mathf.RoundToInt(eff.magnitude), eff.duration);
+                        }
+                        Debug.Log($"[CombatManager] Relic {relic.DisplayName}: applied {eff.status} to all enemies for {eff.duration} turns");
+                    }
+                    else if (eff.target == "Self")
+                    {
+                        // Crippling Weakness / Rustbound Sunder on player
+                        string s = (eff.status ?? "").ToLower();
+                        if (s.Contains("weaken")) player.ApplyWeaken(eff.magnitude, eff.duration);
+                        else if (s.Contains("sunder")) player.ApplySunder(eff.magnitude, eff.duration);
+                        Debug.Log($"[CombatManager] Relic {relic.DisplayName}: applied {eff.status} to player for {eff.duration} turns");
+                    }
+                }
+                // Elemental Broadcast: apply 1 of equipped element mark to all enemies
+                else if (eff.effectId == "eff_apply_equipped_mark")
+                {
+                    Element equipped = player.GetAffinity();
+                    if (equipped != Element.None)
+                    {
+                        foreach (var enemy in enemies)
+                        {
+                            if (!enemy.IsAlive()) continue;
+                            enemy.AddMarks(equipped, eff.extraMarks);
+                        }
+                        Debug.Log($"[CombatManager] Relic {relic.DisplayName}: applied {eff.extraMarks} {equipped} mark(s) to all enemies");
+                    }
+                }
+            }
+        }
+        
+        // Show floating heal text for combat start heal (Field Rations)
+        int combatStartHeal = player.GetLastCombatStartHeal();
+        if (combatStartHeal > 0)
+        {
+            ShowHealToPlayer(combatStartHeal);
+        }
+    }
+    
+    /// <summary>
+    /// Apply relic effects at end of player turn that need enemy access (Elemental Drip).
+    /// Called after player.OnRelicTurnEnd() which handles player-side effects.
+    /// </summary>
+    private void ApplyTurnEndRelicEffects()
+    {
+        if (player == null) return;
+        
+        var turnEndRelics = player.GetRelicsByTrigger("onTurnEnd");
+        foreach (var relic in turnEndRelics)
+        {
+            if (relic.Effects == null) continue;
+            foreach (var eff in relic.Effects)
+            {
+                // Elemental Drip: apply mark of equipped element to random alive enemy
+                if (eff.effectId == "eff_end_turn_mark")
+                {
+                    Element equipped = player.GetAffinity();
+                    if (equipped == Element.None) continue;
+                    
+                    var alive = new List<CombatEnemy>();
+                    foreach (var e in enemies) { if (e.IsAlive()) alive.Add(e); }
+                    
+                    if (alive.Count > 0)
+                    {
+                        var target = alive[Random.Range(0, alive.Count)];
+                        target.AddMarks(equipped, eff.extraMarks);
+                        Debug.Log($"[CombatManager] Relic {relic.DisplayName}: applied {eff.extraMarks} {equipped} mark to {target.Name}");
+                    }
+                }
+            }
+        }
+    }
+    
     private void EndCombat(bool victory)
     {
         // Idempotent: if already ending, skip
         if (isEndingCombat) return;
         isEndingCombat = true;
         combatActive = false;
+        currentPhase = CombatPhase.None;
         
         // If combat ends on player's turn (victory by killing last enemy),
         // the turn is considered completed - tick cooldowns so skills progress
@@ -2088,11 +2356,17 @@ public class CombatManager : MonoBehaviour
 
         if (victory)
         {
+            // Process relic combat-end effects (Field Rations heal, Blood Toll damage)
+            if (player != null) player.OnRelicCombatEnd();
+            
             // Calculate total rewards from all defeated enemies
             int totalXP = 0;
             int totalGold = 0;
             bool dropsSigil = false;
             bool dropsRelic = false;
+            
+            int totalRegularCores = 0;
+            int totalAscendedCores = 0;
             
             foreach (var enemy in enemies)
             {
@@ -2100,8 +2374,9 @@ public class CombatManager : MonoBehaviour
                 // Roll gold within the enemy's gold range
                 totalGold += Random.Range(enemy.RewardGoldMin, enemy.RewardGoldMax + 1);
                 
-                // Roll for sigil drop
-                if (enemy.SigilChance > 0 && Random.Range(0, 100) < enemy.SigilChance)
+                // Roll for sigil drop (suppressed if Sigil Renounce active)
+                if (enemy.SigilChance > 0 && Random.Range(0, 100) < enemy.SigilChance
+                    && (player == null || !player.AreSigilsDisabled()))
                 {
                     dropsSigil = true;
                 }
@@ -2111,9 +2386,25 @@ public class CombatManager : MonoBehaviour
                 {
                     dropsRelic = true;
                 }
+                
+                // Roll for Regular Essence Core drop
+                if (enemy.RegularCoreChance > 0 && Random.Range(0, 100) < enemy.RegularCoreChance)
+                {
+                    totalRegularCores++;
+                }
+                
+                // Roll for Ascended Essence Core drop
+                if (enemy.AscendedCoreChance > 0 && Random.Range(0, 100) < enemy.AscendedCoreChance)
+                {
+                    totalAscendedCores++;
+                }
             }
             
-            GameManager.AddRunXP(totalXP);
+            // Award Essence Cores to player inventory
+            if (totalRegularCores > 0 || totalAscendedCores > 0)
+            {
+                GameManager.AddRunCores(totalRegularCores, totalAscendedCores);
+            }
             
             GameLog.Combat(GameLog.Join(
                 "CombatRewards",
@@ -2121,7 +2412,9 @@ public class CombatManager : MonoBehaviour
                 GameLog.KV("xp", totalXP),
                 GameLog.KV("gold", totalGold),
                 GameLog.KV("sigil", dropsSigil),
-                GameLog.KV("relic", dropsRelic)
+                GameLog.KV("relic", dropsRelic),
+                GameLog.KV("regularCores", totalRegularCores),
+                GameLog.KV("ascendedCores", totalAscendedCores)
             ));
             
             // Hide CombatArena UI before showing loot panel (so it doesn't block input)
@@ -2220,6 +2513,8 @@ public class CombatManager : MonoBehaviour
     public bool IsInCombat() => combatActive;
     public bool IsEndingCombat() => isEndingCombat;
     public bool IsPlayerTurn() => isPlayerTurn;
+    public CombatPhase GetCurrentPhase() => currentPhase;
+    public int GetCurrentTurnNumber() => currentTurnNumber;
     public List<CombatEnemy> GetEnemies() => enemies;
     
     /// <summary>
@@ -2240,6 +2535,32 @@ public class CombatManager : MonoBehaviour
     /// </summary>
     private void NotifyEnemyDeath(CombatEnemy enemy)
     {
+        // Mark Transfer relic: transfer marks from dying enemy to random alive enemy
+        if (player != null && player.HasMarkTransfer())
+        {
+            var marks = enemy.GetMarks();
+            if (marks.Count > 0)
+            {
+                var alive = new List<CombatEnemy>();
+                foreach (var e in enemies) { if (e.IsAlive() && e != enemy) alive.Add(e); }
+                
+                if (alive.Count > 0)
+                {
+                    var recipient = alive[Random.Range(0, alive.Count)];
+                    int transferCount = player.GetMarkTransferCount();
+                    foreach (var kvp in marks)
+                    {
+                        int toTransfer = Mathf.Min(kvp.Value, transferCount);
+                        if (toTransfer > 0)
+                        {
+                            recipient.AddMarks(kvp.Key, toTransfer);
+                        }
+                    }
+                    Debug.Log($"[CombatManager] Mark Transfer: moved marks from {enemy.Name} to {recipient.Name}");
+                }
+            }
+        }
+        
         // Track boss defeats for FallenChampion spawn requirement
         if (enemy.IsBoss && !enemy.SpawnOnly)
         {
@@ -2532,32 +2853,4 @@ public class CombatManager : MonoBehaviour
         }
     }
     
-    /// <summary>
-    /// Awards Elemental Ascension XP to the detonator element when an enemy is killed via reaction.
-    /// XP amount is based on enemy type: Regular=1, Elite=3, Boss=5
-    /// </summary>
-    private void AwardDetonatorXPForKill(CombatEnemy killedEnemy)
-    {
-        if (pendingReactionDetonator == Element.None) return;
-        if (killedEnemy == null) return;
-        
-        int xpAmount = 1; // Regular enemy
-        if (killedEnemy.IsBoss)
-        {
-            xpAmount = 5;
-        }
-        else if (killedEnemy.IsElite)
-        {
-            xpAmount = 3;
-        }
-        
-        GameManager.AddRunXPForDetonator(xpAmount, pendingReactionDetonator);
-        GameLog.Combat(GameLog.Join(
-            "DetonatorXP",
-            GameLog.KV("element", pendingReactionDetonator),
-            GameLog.KV("xp", xpAmount),
-            GameLog.KV("enemy", killedEnemy.Name),
-            GameLog.KV("type", killedEnemy.IsBoss ? "Boss" : killedEnemy.IsElite ? "Elite" : "Regular")
-        ), GameLogVerbosity.Verbose);
-    }
 }

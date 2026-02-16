@@ -15,52 +15,25 @@ public class GameManager : MonoBehaviour
     private static int currentWorld = 1;
     public static int CurrentWorld => currentWorld;
     
-    // XP System (Phase 1 prep)
-    private static int runXP = 0;
-    public static int RunXP => runXP;
-    
-    // Elemental Ascension XP tracking - maps detonator element to XP earned during run
-    private static Dictionary<Element, int> runDetonatorXP = new Dictionary<Element, int>();
+    // Essence Core tracking for current run
+    private static int runRegularCores = 0;
+    private static int runAscendedCores = 0;
+    public static int RunRegularCores => runRegularCores;
+    public static int RunAscendedCores => runAscendedCores;
     
     // Last QTE result for debug overlay
     private static string lastQTEResult = "None";
     public static string LastQTEResult => lastQTEResult;
     
-    public static void AddRunXP(int amount)
-    {
-        runXP += amount;
-        Debug.Log($"[GameManager] Gained {amount} XP. Total: {runXP}");
-    }
-    
     /// <summary>
-    /// Add XP for a specific detonator element (for elemental ascension tracking).
+    /// Add Essence Cores earned from combat to the run total. Persists immediately via MetaProgressionManager.
     /// </summary>
-    public static void AddRunXPForDetonator(int amount, Element detonator)
+    public static void AddRunCores(int regular, int ascended)
     {
-        if (amount <= 0 || detonator == Element.None) return;
+        if (regular > 0) runRegularCores += regular;
+        if (ascended > 0) runAscendedCores += ascended;
         
-        if (!runDetonatorXP.ContainsKey(detonator))
-        {
-            runDetonatorXP[detonator] = 0;
-        }
-        runDetonatorXP[detonator] += amount;
-        
-        Debug.Log($"[GameManager] Detonator XP: {detonator} gained {amount}. Total for element: {runDetonatorXP[detonator]}");
-    }
-    
-    /// <summary>
-    /// Award all accumulated detonator XP to elements at end of run.
-    /// </summary>
-    public static void AwardElementXPFromRun()
-    {
-        foreach (var kvp in runDetonatorXP)
-        {
-            if (kvp.Value > 0)
-            {
-                MetaProgressionManager.Instance.AddElementXP(kvp.Key.ToString(), kvp.Value);
-            }
-        }
-        runDetonatorXP.Clear();
+        MetaProgressionManager.Instance.AddCores(regular, ascended);
     }
 
     public static void SetLastQTEResult(string result)
@@ -68,10 +41,10 @@ public class GameManager : MonoBehaviour
         lastQTEResult = result;
     }
     
-    public static void ResetRunXP()
+    public static void ResetRunCores()
     {
-        runXP = 0;
-        runDetonatorXP.Clear();
+        runRegularCores = 0;
+        runAscendedCores = 0;
     }
 
     void Start()
@@ -79,8 +52,7 @@ public class GameManager : MonoBehaviour
         refs = FindFirstObjectByType<Referencer>();
         currentWorld = 1;
         completedNodes = 0;
-        runXP = 0;
-        runDetonatorXP.Clear();
+        ResetRunCores();
         lastQTEResult = "None";
         UpdateNodeCounter();
         
@@ -154,8 +126,7 @@ public class GameManager : MonoBehaviour
         // Reset world and node tracking
         currentWorld = 1;
         completedNodes = 0;
-        runXP = 0;
-        runDetonatorXP.Clear();
+        ResetRunCores();
         CombatManager.ResetBossDefeatedCount();
         UpdateNodeCounter();
         
@@ -305,20 +276,14 @@ public class GameManager : MonoBehaviour
             refs.playerController.SetCanMove(false);
         }
         
-        // Award ascension level to the character used in this run
-        string ascensionMessage = "";
-        if (currentRunCharacter != null)
+        // Build cores earned summary
+        string coresMessage = "";
+        if (runRegularCores > 0 || runAscendedCores > 0)
         {
-            MetaProgressionManager.Instance.AwardAscension(
-                currentRunCharacter.CharacterID,
-                currentRunCharacter.DisplayName
-            );
-            var progress = MetaProgressionManager.Instance.GetProgress(currentRunCharacter.CharacterID);
-            ascensionMessage = $"\n\n{currentRunCharacter.DisplayName} reached Ascension {progress.AscensionLevel}!";
+            coresMessage = "\n\nEssence Cores Earned:";
+            if (runRegularCores > 0) coresMessage += $"\n  Regular: {runRegularCores}";
+            if (runAscendedCores > 0) coresMessage += $"\n  Ascended: {runAscendedCores}";
         }
-        
-        // Award element XP from this run (meta progression)
-        AwardElementXPFromRun();
         
         var canvas = GameObject.Find("Canvas");
         if (canvas != null)
@@ -343,7 +308,7 @@ public class GameManager : MonoBehaviour
             textRect.offsetMin = Vector2.zero;
             textRect.offsetMax = Vector2.zero;
             var text = textObj.AddComponent<TMPro.TextMeshProUGUI>();
-            text.text = $"CONGRATULATIONS!\nYou beat the run!{ascensionMessage}";
+            text.text = $"CONGRATULATIONS!\nYou beat the run!{coresMessage}";
             text.alignment = TMPro.TextAlignmentOptions.Center;
             text.fontSize = 42;
             text.color = new Color(1f, 0.84f, 0f);
@@ -466,7 +431,7 @@ public class GameManager : MonoBehaviour
         completedNodes = 0;
         characterChosen = false;
         currentRunCharacter = null;
-        ResetRunXP();
+        ResetRunCores();
         
         // Reload the scene to restart fresh
         UnityEngine.SceneManagement.SceneManager.LoadScene(

@@ -1,160 +1,486 @@
 {
   "relics": [
     {
-      "id": "relic_fire_damage",
-      "displayName": "Fire Damage Relic",
-      "relicId": 1,
+      "id": "relic_vital_totem",
+      "displayName": "Vital Totem",
+      "relicID": 1,
       "rarity": "Common",
-      "description": "Increases Fire damage by 10",
+      "description": "Increase Health by 10%.",
+      "trigger": "onAcquire",
+      "price": 5,
       "effects": [
-        {
-          "effectId": "eff_stat_bonus",
-          "target": "Self",
-          "stat": "elementalDamage",
-          "element": "Fire",
-          "value": 10
-        }
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "maxHealthPercent", "value": 10 }
       ]
     },
     {
-      "id": "relic_ice_damage",
-      "displayName": "Ice Damage Relic",
-      "relicId": 2,
+      "id": "relic_sharpened_edge",
+      "displayName": "Sharpened Edge",
+      "relicID": 2,
       "rarity": "Common",
-      "description": "Increases Ice damage by 10",
+      "description": "Increase max damage by +2.",
+      "trigger": "onAcquire",
+      "price": 5,
       "effects": [
-        {
-          "effectId": "eff_stat_bonus",
-          "target": "Self",
-          "stat": "elementalDamage",
-          "element": "Ice",
-          "value": 10
-        }
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "damageMax", "value": 2 }
       ]
     },
     {
-      "id": "relic_water_damage",
-      "displayName": "Water Damage Relic",
-      "relicId": 3,
+      "id": "relic_deadeye_counter",
+      "displayName": "Deadeye Counter",
+      "relicID": 3,
       "rarity": "Common",
-      "description": "Increases Water damage by 10",
+      "description": "Every 10 skills used the next one is guaranteed to be a critical hit. Carries across combats.",
+      "trigger": "onSkillUse",
+      "triggerInterval": 10,
+      "price": 5,
       "effects": [
-        {
-          "effectId": "eff_stat_bonus",
-          "target": "Self",
-          "stat": "elementalDamage",
-          "element": "Water",
-          "value": 10
-        }
+        { "effectId": "eff_temp_crit_bonus", "target": "Self", "critChance": 100, "duration": 1 }
       ]
     },
     {
-      "id": "relic_wind_damage",
-      "displayName": "Wind Damage Relic",
-      "relicId": 4,
+      "id": "relic_first_pulse",
+      "displayName": "First Pulse",
+      "relicID": 4,
       "rarity": "Common",
-      "description": "Increases Wind damage by 10",
+      "description": "On start of combat gain 2 extra AP. First turn only.",
+      "trigger": "combatStart",
+      "price": 5,
       "effects": [
-        {
-          "effectId": "eff_stat_bonus",
-          "target": "Self",
-          "stat": "elementalDamage",
-          "element": "Wind",
-          "value": 10
-        }
+        { "effectId": "eff_ap_delta", "target": "Self", "amount": 2 }
       ]
     },
     {
-      "id": "relic_rock_damage",
-      "displayName": "Rock Damage Relic",
-      "relicId": 5,
+      "id": "relic_mark_echo",
+      "displayName": "Mark Echo",
+      "relicID": 5,
       "rarity": "Common",
-      "description": "Increases Rock damage by 10",
+      "description": "Once every 5 turns your next skill applies 1 extra mark.",
+      "trigger": "onTurnStart",
+      "triggerInterval": 5,
+      "price": 5,
       "effects": [
-        {
-          "effectId": "eff_stat_bonus",
-          "target": "Self",
-          "stat": "elementalDamage",
-          "element": "Rock",
-          "value": 10
-        }
+        { "effectId": "eff_extra_marks", "target": "Self", "extraMarks": 1 }
       ]
     },
     {
-      "id": "relic_lightning_damage",
-      "displayName": "Lightning Damage Relic",
-      "relicId": 6,
+      "id": "relic_last_stand_blade",
+      "displayName": "Last Stand Blade",
+      "relicID": 6,
       "rarity": "Common",
-      "description": "Increases Lightning damage by 10",
+      "description": "Deal Physical Damage equal to % of health missing. Max 30% bonus.",
+      "trigger": "passive",
+      "price": 5,
       "effects": [
-        {
-          "effectId": "eff_stat_bonus",
-          "target": "Self",
-          "stat": "elementalDamage",
-          "element": "Lightning",
-          "value": 10
-        }
+        { "effectId": "eff_missing_hp_damage", "target": "Self", "maxBonusPercent": 30 }
       ]
     },
     {
-      "id": "relic_all_elemental",
-      "displayName": "All Elemental Damage Relic",
-      "relicId": 7,
-      "rarity": "Rare",
-      "description": "Increases all elemental damage by 10",
+      "id": "relic_sunder_ward",
+      "displayName": "Sunder Ward",
+      "relicID": 7,
+      "rarity": "Common",
+      "description": "You are now immune to Sunder status.",
+      "trigger": "onAcquire",
+      "price": 5,
       "effects": [
-        {
-          "effectId": "eff_stat_bonus",
-          "target": "Self",
-          "stat": "elementalDamage",
-          "element": "All",
-          "value": 10
-        }
+        { "effectId": "eff_status_immunity", "target": "Self", "immuneStatus": "status_player_sunder" }
       ]
     },
     {
-      "id": "relic_crit_rate",
-      "displayName": "Crit Rate Relic",
-      "relicId": 8,
-      "rarity": "Uncommon",
-      "description": "Increases critical hit chance by 10%",
+      "id": "relic_weaken_ward",
+      "displayName": "Weaken Ward",
+      "relicID": 8,
+      "rarity": "Common",
+      "description": "You are now immune to Weaken status.",
+      "trigger": "onAcquire",
+      "price": 5,
       "effects": [
-        {
-          "effectId": "eff_stat_bonus",
-          "target": "Self",
-          "stat": "critChance",
-          "value": 10
-        }
+        { "effectId": "eff_status_immunity", "target": "Self", "immuneStatus": "status_player_weaken" }
       ]
     },
     {
-      "id": "relic_crit_damage",
-      "displayName": "Crit Damage Relic",
-      "relicId": 9,
-      "rarity": "Uncommon",
-      "description": "Increases critical hit damage by 20%",
+      "id": "relic_ambush_seal",
+      "displayName": "Ambush Seal",
+      "relicID": 9,
+      "rarity": "Common",
+      "description": "On start of combat apply Weaken and Vulnerable to all enemies for 1 turn. You start combat with 2 AP.",
+      "trigger": "combatStart",
+      "price": 5,
       "effects": [
-        {
-          "effectId": "eff_stat_bonus",
-          "target": "Self",
-          "stat": "critDamage",
-          "value": 20
-        }
+        { "effectId": "eff_apply_status", "target": "AllEnemies", "status": "status_weak", "duration": 1, "magnitude": 25 },
+        { "effectId": "eff_apply_status", "target": "AllEnemies", "status": "status_player_vulnerable", "duration": 1, "magnitude": 25 },
+        { "effectId": "eff_ap_delta", "target": "Self", "amount": -8 }
       ]
     },
     {
-      "id": "relic_bonus_health",
-      "displayName": "Bonus Health Relic",
-      "relicId": 10,
-      "rarity": "Rare",
-      "description": "Increases maximum health by 50",
+      "id": "relic_field_rations",
+      "displayName": "Field Rations",
+      "relicID": 10,
+      "rarity": "Common",
+      "description": "At the start of combat, heal 3% of max HP.",
+      "trigger": "combatStart",
+      "price": 5,
       "effects": [
-        {
-          "effectId": "eff_stat_bonus",
-          "target": "Self",
-          "stat": "maxHealth",
-          "value": 50
-        }
+        { "effectId": "eff_post_combat_heal", "target": "Self", "percentOfMaxHealth": 3 }
+      ]
+    },
+    {
+      "id": "relic_marking_needle",
+      "displayName": "Marking Needle",
+      "relicID": 11,
+      "rarity": "Common",
+      "description": "The first time each turn you apply a mark, apply +1 extra mark (same element) to that target.",
+      "trigger": "passive",
+      "price": 5,
+      "effects": [
+        { "effectId": "eff_first_mark_bonus", "target": "Self", "extraMarks": 1 }
+      ]
+    },
+    {
+      "id": "relic_guard_charm",
+      "displayName": "Guard Charm",
+      "relicID": 12,
+      "rarity": "Common",
+      "description": "Start combat with a Shield equal to 8% of your max HP.",
+      "trigger": "combatStart",
+      "price": 5,
+      "effects": [
+        { "effectId": "eff_combat_shield", "target": "Self", "percentOfMaxHealth": 8 }
+      ]
+    },
+    {
+      "id": "relic_focus_lens",
+      "displayName": "Focus Lens",
+      "relicID": 13,
+      "rarity": "Common",
+      "description": "Perfect QTE grants +1 AP next turn. Once per turn.",
+      "trigger": "passive",
+      "price": 5,
+      "effects": [
+        { "effectId": "eff_perfect_qte_ap", "target": "Self", "amount": 1 }
+      ]
+    },
+    {
+      "id": "relic_reinforced_plates",
+      "displayName": "Reinforced Plates",
+      "relicID": 14,
+      "rarity": "Common",
+      "description": "Gain +10% Physical Resistance.",
+      "trigger": "onAcquire",
+      "price": 5,
+      "effects": [
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "physicalResist", "value": 10 }
+      ]
+    },
+    {
+      "id": "relic_elemental_lining",
+      "displayName": "Elemental Lining",
+      "relicID": 15,
+      "rarity": "Common",
+      "description": "Gain +10% Elemental Resistance.",
+      "trigger": "onAcquire",
+      "price": 5,
+      "effects": [
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "elementalResist", "value": 10 }
+      ]
+    },
+    {
+      "id": "relic_catalyst_splinter",
+      "displayName": "Catalyst Splinter",
+      "relicID": 16,
+      "rarity": "Common",
+      "description": "The first Dual Reaction you trigger each combat requires 2+2 marks instead of 3+3.",
+      "trigger": "passive",
+      "price": 5,
+      "effects": [
+        { "effectId": "eff_reaction_cost_reduction", "target": "Self", "value": 1 }
+      ]
+    },
+    {
+      "id": "relic_reaction_rebate",
+      "displayName": "Reaction Rebate",
+      "relicID": 17,
+      "rarity": "Common",
+      "description": "The first reaction you trigger each turn refunds 1 AP.",
+      "trigger": "passive",
+      "price": 5,
+      "effects": [
+        { "effectId": "eff_reaction_ap_refund", "target": "Self", "amount": 1 }
+      ]
+    },
+    {
+      "id": "relic_elemental_drip",
+      "displayName": "Elemental Drip",
+      "relicID": 18,
+      "rarity": "Common",
+      "description": "At the end of your turn, apply 1 mark of your equipped element to a random enemy.",
+      "trigger": "onTurnEnd",
+      "price": 5,
+      "effects": [
+        { "effectId": "eff_end_turn_mark", "target": "Self", "extraMarks": 1 }
+      ]
+    },
+    {
+      "id": "relic_mark_transfer",
+      "displayName": "Mark Transfer",
+      "relicID": 19,
+      "rarity": "Common",
+      "description": "When an enemy dies, transfer up to 2 marks (random existing marks) to another enemy.",
+      "trigger": "passive",
+      "price": 5,
+      "effects": [
+        { "effectId": "eff_mark_transfer", "target": "Self", "value": 2 }
+      ]
+    },
+    {
+      "id": "relic_clean_trigger",
+      "displayName": "Clean Trigger",
+      "relicID": 20,
+      "rarity": "Common",
+      "description": "If your reaction QTE result is Perfect, 1 mark is not consumed.",
+      "trigger": "passive",
+      "price": 5,
+      "effects": [
+        { "effectId": "eff_perfect_reaction_save_mark", "target": "Self", "value": 1 }
+      ]
+    },
+
+    {
+      "id": "relic_rhythm_discount",
+      "displayName": "Rhythm Discount",
+      "relicID": 21,
+      "rarity": "Legendary",
+      "description": "Every 3 turns reduce AP cost of your next 2 skills by 1.",
+      "trigger": "onTurnStart",
+      "triggerInterval": 3,
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_ap_cost_reduction", "target": "Self", "apReduction": 1, "skillCount": 2 }
+      ]
+    },
+    {
+      "id": "relic_cooldown_lottery",
+      "displayName": "Cooldown Lottery",
+      "relicID": 22,
+      "rarity": "Legendary",
+      "description": "Every 20 AP spent one random skill gets its cooldown refreshed and costs 0 AP. Cannot target Ultimate. Carries over combat.",
+      "trigger": "passive",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_refresh_random_skill", "target": "Self", "apSpentThreshold": 20 }
+      ]
+    },
+    {
+      "id": "relic_early_guard_override",
+      "displayName": "Early Guard Override",
+      "relicID": 23,
+      "rarity": "Legendary",
+      "description": "Disable Defensive QTE for the first 2 turns of combat. Gain 10% more resistances.",
+      "trigger": "combatStart",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_disable_system", "target": "Self", "disableTarget": "defensiveQTE", "disableDuration": 2 },
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "physicalResist", "value": 10 },
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "elementalResist", "value": 10 }
+      ]
+    },
+    {
+      "id": "relic_sigil_renounce",
+      "displayName": "Sigil Renounce",
+      "relicID": 24,
+      "rarity": "Legendary",
+      "description": "Disable Reactions QTE and remove all sigils. Gain 20% more physical damage, 10% crit rating and 20% crit damage. You cannot earn Sigils anymore.",
+      "trigger": "permanent",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_disable_system", "target": "Self", "disableTarget": "reactionQTE", "disableDuration": 0 },
+        { "effectId": "eff_disable_system", "target": "Self", "disableTarget": "sigils", "disableDuration": 0 },
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "damage", "value": 20 },
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "critChance", "value": 10 },
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "critDamage", "value": 20 }
+      ]
+    },
+    {
+      "id": "relic_fracture_revival",
+      "displayName": "Fracture Revival",
+      "relicID": 25,
+      "rarity": "Legendary",
+      "description": "Revives you once per run with 30% health. This relic then breaks and reduces your max HP by 15%.",
+      "trigger": "onDeath",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_reborn", "target": "Self", "healthPercent": 30 },
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "maxHealthPercent", "value": -15 }
+      ]
+    },
+    {
+      "id": "relic_elemental_broadcast",
+      "displayName": "Elemental Broadcast",
+      "relicID": 26,
+      "rarity": "Legendary",
+      "description": "On start of combat apply 1 of your equipped elemental mark type on all enemies.",
+      "trigger": "combatStart",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_apply_equipped_mark", "target": "AllEnemies", "extraMarks": 1 }
+      ]
+    },
+    {
+      "id": "relic_ice_cream_core",
+      "displayName": "Ice Cream Core",
+      "relicID": 27,
+      "rarity": "Legendary",
+      "description": "At the end of your turn, keep unspent AP. Next turn refresh to Max AP then gain saved AP on top. Saved AP can exceed Max AP.",
+      "trigger": "passive",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_ap_banking", "target": "Self" }
+      ]
+    },
+    {
+      "id": "relic_reactor_core",
+      "displayName": "Reactor Core",
+      "relicID": 28,
+      "rarity": "Legendary",
+      "description": "The first reaction you trigger each combat triggers twice. Second trigger at 50% effect.",
+      "trigger": "passive",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_reaction_double", "target": "Self", "multiplier": 0.5 }
+      ]
+    },
+    {
+      "id": "relic_dual_specialist",
+      "displayName": "Dual Specialist",
+      "relicID": 29,
+      "rarity": "Legendary",
+      "description": "When you trigger a Dual Reaction, gain a Shield equal to 5% max HP. Once per combat.",
+      "trigger": "passive",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_dual_reaction_shield", "target": "Self", "percentOfMaxHealth": 5 }
+      ]
+    },
+
+    {
+      "id": "relic_crippling_weakness",
+      "displayName": "Crippling Weakness",
+      "relicID": 30,
+      "rarity": "Cursed",
+      "description": "Start combat with Weaken status on yourself for 2 turns.",
+      "trigger": "combatStart",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_apply_status", "target": "Self", "status": "status_player_weaken", "duration": 2, "magnitude": 25 }
+      ]
+    },
+    {
+      "id": "relic_rustbound_sunder",
+      "displayName": "Rustbound Sunder",
+      "relicID": 31,
+      "rarity": "Cursed",
+      "description": "Start combat with Sundered status on yourself for 2 turns.",
+      "trigger": "combatStart",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_apply_status", "target": "Self", "status": "status_player_sunder", "duration": 2, "magnitude": 25 }
+      ]
+    },
+    {
+      "id": "relic_blood_toll",
+      "displayName": "Blood Toll",
+      "relicID": 32,
+      "rarity": "Cursed",
+      "description": "Every end of combat lose 1 HP.",
+      "trigger": "onCombatEnd",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_deal_damage", "target": "Self", "value": 1 }
+      ]
+    },
+    {
+      "id": "relic_overcharged_ultimate",
+      "displayName": "Overcharged Ultimate",
+      "relicID": 33,
+      "rarity": "Cursed",
+      "description": "Increases the energy requirement of your ultimate by 100%.",
+      "trigger": "onAcquire",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_energy_cost_multiplier", "target": "Self", "multiplier": 2.0 }
+      ]
+    },
+    {
+      "id": "relic_cracked_battery",
+      "displayName": "Cracked Battery",
+      "relicID": 34,
+      "rarity": "Cursed",
+      "description": "Start each combat with -2 AP for 2 turns.",
+      "trigger": "combatStart",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_ap_delta", "target": "Self", "amount": -2, "duration": 2 }
+      ]
+    },
+    {
+      "id": "relic_rusty_blade",
+      "displayName": "Rusty Blade",
+      "relicID": 35,
+      "rarity": "Cursed",
+      "description": "Your Crit Damage is reduced by 20%.",
+      "trigger": "onAcquire",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "critDamage", "value": -20 }
+      ]
+    },
+    {
+      "id": "relic_siphoning_aura",
+      "displayName": "Siphoning Aura",
+      "relicID": 36,
+      "rarity": "Cursed",
+      "description": "Each turn you lose 1 AP at the start of your turn.",
+      "trigger": "onTurnStart",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_ap_delta", "target": "Self", "amount": -1 }
+      ]
+    },
+    {
+      "id": "relic_reaction_exhaustion",
+      "displayName": "Reaction Exhaustion",
+      "relicID": 37,
+      "rarity": "Cursed",
+      "description": "After you trigger a reaction, gain Weaken for 1 turn. Once per turn.",
+      "trigger": "passive",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_reaction_weaken", "target": "Self", "duration": 1 }
+      ]
+    },
+    {
+      "id": "relic_elemental_fog",
+      "displayName": "Elemental Fog",
+      "relicID": 38,
+      "rarity": "Cursed",
+      "description": "You can't see enemy marks (UI hidden), but you gain +1 AP on turn 1.",
+      "trigger": "combatStart",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_hide_marks", "target": "Self", "disableTarget": "enemyMarks", "disableDuration": 0 },
+        { "effectId": "eff_ap_delta", "target": "Self", "amount": 1 }
+      ]
+    },
+    {
+      "id": "relic_overconsumption",
+      "displayName": "Overconsumption",
+      "relicID": 39,
+      "rarity": "Cursed",
+      "description": "Reactions consume +1 extra mark total. Dual consumes 3+4, Mono consumes 7.",
+      "trigger": "passive",
+      "price": 0,
+      "effects": [
+        { "effectId": "eff_reaction_extra_mark_cost", "target": "Self", "value": 1 }
       ]
     }
   ]

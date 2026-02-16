@@ -6,6 +6,6 @@ public class PlayerData
     public int MaxEnergy;
     public int CritChance;
     public float CritDamage;
-    public int BaseResistance;
-    public int BonusResistance;
+    public int PhysicalResist;
+    public int ElementalResist;
 }

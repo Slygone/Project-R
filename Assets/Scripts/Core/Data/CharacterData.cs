@@ -9,8 +9,8 @@ public class CharacterData
     public int MaxEnergy;
     public float CritChance;
     public float CritDamage;
-    public int BaseResistance;
-    public int BonusResistance;
+    public int PhysicalResist;
+    public int ElementalResist;
     public int MaxActionPoints;
     
     // Skill 1

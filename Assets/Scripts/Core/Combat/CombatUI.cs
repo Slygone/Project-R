@@ -257,7 +257,8 @@ public class CombatUI : MonoBehaviour
         if (lootGoldText != null) lootGoldText.text = $"<color=#FFD700>\u2022</color>Gold:+{gold}<size=16>(Click to collect)</size>";
         if (lootXPText != null) lootXPText.text = $"<color=#6CF>\u2022</color>Experience:+{xp}<size=16>(Auto)</size>";
 
-        bool showSigil = dropsSigil || isElite;
+        bool sigilsDisabled = p != null && p.AreSigilsDisabled();
+        bool showSigil = (dropsSigil || isElite) && !sigilsDisabled;
         if (sigilRewardButton != null)
         {
             if (showSigil)
@@ -285,13 +286,23 @@ public class CombatUI : MonoBehaviour
         {
             if (dropsRelic && DataCache.Relics != null && DataCache.Relics.Count > 0)
             {
-                pendingRelic = DataCache.Relics[Random.Range(0, DataCache.Relics.Count)];
-                var ri = relicRewardButton.GetComponent<Image>();
-                if (ri != null) ri.color = new Color(0.6f, 0.4f, 0.8f, 1f);
-                var rt = relicRewardButton.GetComponentInChildren<TextMeshProUGUI>();
-                if (rt != null) rt.text = $"<color=#96f>\u2666</color>{pendingRelic.DisplayName}<size=16>(Click to collect)</size>";
-                relicRewardButton.GetComponent<Button>().interactable = true;
-                relicRewardButton.SetActive(true);
+                // Rarity-based selection: bosses drop Legendary, elites 50/50, regular = Common
+                string dropRarity = isBoss ? "Legendary" : (isElite && Random.value < 0.5f ? "Legendary" : "Common");
+                pendingRelic = GetRandomRelicByRarity(dropRarity);
+                if (pendingRelic == null) pendingRelic = GetRandomRelicByRarity("Common");
+                if (pendingRelic != null)
+                {
+                    var ri = relicRewardButton.GetComponent<Image>();
+                    if (ri != null) ri.color = new Color(0.6f, 0.4f, 0.8f, 1f);
+                    var rt = relicRewardButton.GetComponentInChildren<TextMeshProUGUI>();
+                    if (rt != null) rt.text = $"<color=#96f>\u2666</color>{pendingRelic.DisplayName}<size=16>(Click to collect)</size>";
+                    relicRewardButton.GetComponent<Button>().interactable = true;
+                    relicRewardButton.SetActive(true);
+                }
+                else
+                {
+                    relicRewardButton.SetActive(false);
+                }
             }
             else
             {
@@ -486,6 +497,20 @@ public class CombatUI : MonoBehaviour
         if (enchantOverlay != null) { Destroy(enchantOverlay); enchantOverlay = null; }
         if (combatManager == null) combatManager = FindFirstObjectByType<CombatManager>();
         if (combatManager != null) combatManager.OnLootCollected();
+    }
+    
+    private static RelicData GetRandomRelicByRarity(string rarity)
+    {
+        if (DataCache.Relics == null || DataCache.Relics.Count == 0) return null;
+        
+        var pool = new System.Collections.Generic.List<RelicData>();
+        foreach (var r in DataCache.Relics)
+        {
+            if (r.Rarity == rarity) pool.Add(r);
+        }
+        
+        if (pool.Count == 0) return null;
+        return pool[Random.Range(0, pool.Count)];
     }
 
     #endregion

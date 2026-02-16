@@ -31,6 +31,8 @@ public class MetaProgressionManager : MonoBehaviour
     {
         public List<CharacterProgressData> CharacterProgress = new List<CharacterProgressData>();
         public List<ElementProgressData> ElementProgress = new List<ElementProgressData>();
+        public int RegularCores = 0;
+        public int AscendedCores = 0;
     }
     
     private SaveData saveData = new SaveData();
@@ -46,6 +48,55 @@ public class MetaProgressionManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
         LoadProgress();
     }
+    
+    // ===== ESSENCE CORE INVENTORY =====
+    
+    public int GetRegularCores() => saveData.RegularCores;
+    public int GetAscendedCores() => saveData.AscendedCores;
+    
+    /// <summary>
+    /// Add Essence Cores to the player's inventory. Called after combat rewards.
+    /// </summary>
+    public void AddCores(int regular, int ascended)
+    {
+        if (regular > 0)
+        {
+            saveData.RegularCores += regular;
+            Debug.Log($"[Meta] CoreGained | type=Regular amount={regular} total={saveData.RegularCores}");
+        }
+        if (ascended > 0)
+        {
+            saveData.AscendedCores += ascended;
+            Debug.Log($"[Meta] CoreGained | type=Ascended amount={ascended} total={saveData.AscendedCores}");
+        }
+        if (regular > 0 || ascended > 0)
+        {
+            SaveProgress();
+        }
+    }
+    
+    /// <summary>
+    /// Check if the player can afford the given core cost.
+    /// </summary>
+    public bool CanAfford(int regularCost, int ascendedCost)
+    {
+        return saveData.RegularCores >= regularCost && saveData.AscendedCores >= ascendedCost;
+    }
+    
+    /// <summary>
+    /// Spend cores. Returns false if insufficient funds.
+    /// </summary>
+    private bool SpendCores(int regularCost, int ascendedCost)
+    {
+        if (!CanAfford(regularCost, ascendedCost))
+            return false;
+        
+        saveData.RegularCores -= regularCost;
+        saveData.AscendedCores -= ascendedCost;
+        return true;
+    }
+    
+    // ===== CHARACTER PROGRESSION =====
     
     /// <summary>
     /// Get progress data for a character. Creates default progress if none exists.
@@ -68,15 +119,47 @@ public class MetaProgressionManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Award +1 ascension level to a character and save.
+    /// Check if a character can be leveled up (has enough cores and not at max level).
     /// </summary>
-    public void AwardAscension(int characterId, string characterName = "")
+    public bool CanLevelUpCharacter(int characterId)
     {
         var progress = GetProgress(characterId);
-        progress.AscensionLevel++;
+        int nextLevel = progress.AscensionLevel + 1;
+        int maxLevel = DataCache.GetCharacterMaxAscensionLevel();
+        
+        if (progress.AscensionLevel >= maxLevel)
+            return false;
+        
+        var cost = DataCache.GetCharacterAscensionCost(nextLevel);
+        if (cost == null) return false;
+        
+        return CanAfford(cost.RegularCost, cost.AscendedCost);
+    }
+    
+    /// <summary>
+    /// Try to level up a character by spending Essence Cores.
+    /// Returns true if level-up occurred.
+    /// </summary>
+    public bool TryLevelUpCharacter(int characterId, string characterName = "")
+    {
+        var progress = GetProgress(characterId);
+        int nextLevel = progress.AscensionLevel + 1;
+        int maxLevel = DataCache.GetCharacterMaxAscensionLevel();
+        
+        if (progress.AscensionLevel >= maxLevel)
+            return false;
+        
+        var cost = DataCache.GetCharacterAscensionCost(nextLevel);
+        if (cost == null) return false;
+        
+        if (!SpendCores(cost.RegularCost, cost.AscendedCost))
+            return false;
+        
+        progress.AscensionLevel = nextLevel;
         SaveProgress();
         
-        Debug.Log($"[Meta] AscensionGained | characterId={characterId} name={characterName} newLevel={progress.AscensionLevel}");
+        Debug.Log($"[Meta] CharacterLevelUp | characterId={characterId} name={characterName} newLevel={nextLevel} regularSpent={cost.RegularCost} ascendedSpent={cost.AscendedCost}");
+        return true;
     }
     
     /// <summary>
@@ -115,21 +198,25 @@ public class MetaProgressionManager : MonoBehaviour
     }
     
     /// <summary>
-    /// Add XP to an element's ascension progress.
+    /// Check if an element can be leveled up (has enough cores and not at max level).
     /// </summary>
-    public void AddElementXP(string elementName, int amount)
+    public bool CanLevelUpElement(string elementName)
     {
-        if (amount <= 0) return;
-        
         var progress = GetElementProgress(elementName);
-        progress.AscensionXP += amount;
-        SaveProgress();
+        int maxLevel = DataCache.GetElementMaxLevel(elementName);
         
-        Debug.Log($"[Meta] ElementAscensionXPGranted | element={elementName} gained={amount} totalXP={progress.AscensionXP} level={progress.AscensionLevel}");
+        if (progress.AscensionLevel >= maxLevel)
+            return false;
+        
+        int nextLevel = progress.AscensionLevel + 1;
+        var cost = DataCache.GetElementalAscensionCost(elementName, nextLevel);
+        if (cost == null) return false;
+        
+        return CanAfford(cost.RegularCost, cost.AscendedCost);
     }
     
     /// <summary>
-    /// Try to level up an element if XP threshold is met.
+    /// Try to level up an element by spending Essence Cores.
     /// Returns true if level-up occurred.
     /// </summary>
     public bool TryLevelUpElement(string elementName)
@@ -141,36 +228,20 @@ public class MetaProgressionManager : MonoBehaviour
             return false;
         
         int nextLevel = progress.AscensionLevel + 1;
-        int threshold = DataCache.GetElementXPThreshold(elementName, nextLevel);
+        var cost = DataCache.GetElementalAscensionCost(elementName, nextLevel);
+        if (cost == null) return false;
         
-        if (progress.AscensionXP >= threshold)
-        {
-            progress.AscensionLevel = nextLevel;
-            SaveProgress();
-            
-            Debug.Log($"[Meta] ElementAscensionLevelUp | element={elementName} newLevel={nextLevel} xp={progress.AscensionXP}");
-            return true;
-        }
-        
-        return false;
-    }
-    
-    /// <summary>
-    /// Check if element can level up (has enough XP for next level).
-    /// </summary>
-    public bool CanLevelUpElement(string elementName)
-    {
-        var progress = GetElementProgress(elementName);
-        int maxLevel = DataCache.GetElementMaxLevel(elementName);
-        
-        if (progress.AscensionLevel >= maxLevel)
+        if (!SpendCores(cost.RegularCost, cost.AscendedCost))
             return false;
         
-        int nextLevel = progress.AscensionLevel + 1;
-        int threshold = DataCache.GetElementXPThreshold(elementName, nextLevel);
+        progress.AscensionLevel = nextLevel;
+        SaveProgress();
         
-        return progress.AscensionXP >= threshold;
+        Debug.Log($"[Meta] ElementAscensionLevelUp | element={elementName} newLevel={nextLevel} regularSpent={cost.RegularCost} ascendedSpent={cost.AscendedCost}");
+        return true;
     }
+    
+    // ===== PERSISTENCE =====
     
     /// <summary>
     /// Save all progress to PlayerPrefs.
@@ -197,7 +268,7 @@ public class MetaProgressionManager : MonoBehaviour
                 {
                     saveData = new SaveData();
                 }
-                Debug.Log($"[Meta] ProgressLoaded | characters={saveData.CharacterProgress.Count} elements={saveData.ElementProgress.Count}");
+                Debug.Log($"[Meta] ProgressLoaded | characters={saveData.CharacterProgress.Count} elements={saveData.ElementProgress.Count} regularCores={saveData.RegularCores} ascendedCores={saveData.AscendedCores}");
             }
             catch (Exception e)
             {

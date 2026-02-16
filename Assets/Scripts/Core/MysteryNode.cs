@@ -58,9 +58,9 @@ public class MysteryNode : NodeBase
     {
         isEliteFight = false;
         
-        if (DataCache.Relics.Count > 0)
+        var relic = GetRandomRelicByRarity("Common");
+        if (relic != null)
         {
-            var relic = DataCache.Relics[Random.Range(0, DataCache.Relics.Count)];
             refs.player.AddRelic(relic);
             refs.player.AddGold(NORMAL_GOLD_REWARD);
             
@@ -93,20 +93,23 @@ public class MysteryNode : NodeBase
         
         var relicsGiven = new List<RelicData>();
         
-        var elementMatchingRelic = GetElementMatchingRelic();
-        if (elementMatchingRelic != null)
+        // Elite rewards: 1 Common + 1 Common/Legendary (50/50)
+        var commonRelic = GetRandomRelicByRarity("Common");
+        if (commonRelic != null)
         {
-            refs.player.AddRelic(elementMatchingRelic);
-            relicsGiven.Add(elementMatchingRelic);
-            Debug.Log($"[MysteryNode] Elite reward - Element matching relic: {elementMatchingRelic.DisplayName}");
+            refs.player.AddRelic(commonRelic);
+            relicsGiven.Add(commonRelic);
+            Debug.Log($"[MysteryNode] Elite reward - Common relic: {commonRelic.DisplayName}");
         }
         
-        if (DataCache.Relics.Count > 0)
+        string bonusRarity = Random.value < 0.5f ? "Legendary" : "Common";
+        var bonusRelic = GetRandomRelicByRarity(bonusRarity);
+        if (bonusRelic == null) bonusRelic = GetRandomRelicByRarity("Common");
+        if (bonusRelic != null)
         {
-            var randomRelic = DataCache.Relics[Random.Range(0, DataCache.Relics.Count)];
-            refs.player.AddRelic(randomRelic);
-            relicsGiven.Add(randomRelic);
-            Debug.Log($"[MysteryNode] Elite reward - Random relic: {randomRelic.DisplayName}");
+            refs.player.AddRelic(bonusRelic);
+            relicsGiven.Add(bonusRelic);
+            Debug.Log($"[MysteryNode] Elite reward - {bonusRelic.Rarity} relic: {bonusRelic.DisplayName}");
         }
         
         if (refs.playerStatsUI != null && refs.playerStatsUI.IsOpen())
@@ -124,46 +127,18 @@ public class MysteryNode : NodeBase
         Debug.Log($"[MysteryNode] Elite rewards given: {relicsGiven.Count} relics, {goldReward} gold");
     }
 
-    private RelicData GetElementMatchingRelic()
+    private static RelicData GetRandomRelicByRarity(string rarity)
     {
         if (DataCache.Relics == null || DataCache.Relics.Count == 0) return null;
         
-        Element playerElement = Element.None;
-        
-        if (refs.player.HasAffinity())
+        var pool = new List<RelicData>();
+        foreach (var r in DataCache.Relics)
         {
-            playerElement = refs.player.GetAffinity();
+            if (r.Rarity == rarity) pool.Add(r);
         }
         
-        if (playerElement == Element.None)
-        {
-            return DataCache.Relics[Random.Range(0, DataCache.Relics.Count)];
-        }
-        
-        string elementName = playerElement.ToString().ToLower();
-        var matchingRelics = new List<RelicData>();
-        
-        foreach (var relic in DataCache.Relics)
-        {
-            if (relic.Effects != null)
-            {
-                foreach (var eff in relic.Effects)
-                {
-                    if ((eff.element ?? "").ToLower().Contains(elementName))
-                    {
-                        matchingRelics.Add(relic);
-                        break;
-                    }
-                }
-            }
-        }
-        
-        if (matchingRelics.Count > 0)
-        {
-            return matchingRelics[Random.Range(0, matchingRelics.Count)];
-        }
-        
-        return DataCache.Relics[Random.Range(0, DataCache.Relics.Count)];
+        if (pool.Count == 0) return null;
+        return pool[Random.Range(0, pool.Count)];
     }
 
     private void OnMysteryCompleted()

@@ -280,14 +280,8 @@ public class PlayerStatsUI : MonoBehaviour
         sb.AppendLine();
 
         sb.AppendLine("Resistances:");
-        int baseRes = player.GetBaseResistance();
-        int bonusRes = player.GetBonusResistance();
-        sb.AppendLine($"  {FormatElementResistance(Element.Fire, player, affinity, baseRes, bonusRes)}");
-        sb.AppendLine($"  {FormatElementResistance(Element.Ice, player, affinity, baseRes, bonusRes)}");
-        sb.AppendLine($"  {FormatElementResistance(Element.Water, player, affinity, baseRes, bonusRes)}");
-        sb.AppendLine($"  {FormatElementResistance(Element.Wind, player, affinity, baseRes, bonusRes)}");
-        sb.AppendLine($"  {FormatElementResistance(Element.Rock, player, affinity, baseRes, bonusRes)}");
-        sb.AppendLine($"  {FormatElementResistance(Element.Lightning, player, affinity, baseRes, bonusRes)}");
+        sb.AppendLine($"  <color=#cccccc>Physical:</color> {player.GetPhysicalResist()}%");
+        sb.AppendLine($"  <color=#88bbff>Elemental:</color> {player.GetElementalResist()}%");
 
         statsText.text = sb.ToString();
 
@@ -323,17 +317,6 @@ public class PlayerStatsUI : MonoBehaviour
         }
         
         return $"<color={color}>{element}:</color> +{bonus}{marker}";
-    }
-
-    private string FormatElementResistance(Element element, Player player, Element affinity, int baseRes, int bonusRes)
-    {
-        bool getsBonus = (element == affinity && affinity != Element.None);
-        string marker = getsBonus ? " <-" : "";
-
-        int total = baseRes + (getsBonus ? bonusRes : 0);
-        string color = GetElementColor(element);
-        string bonusMarker = getsBonus ? $" (+{bonusRes}%)" : "";
-        return $"<color={color}>{element}:</color> {total}%{bonusMarker}{marker}";
     }
 
     public static string GetSkillDescription(string skillName)

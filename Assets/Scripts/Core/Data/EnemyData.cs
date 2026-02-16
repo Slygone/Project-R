@@ -4,9 +4,12 @@ public class EnemyData
     public string DisplayName;
     public int EnemyID;
     public int Health;
-    public int Damage; // Base damage value
-    public int BaseResistance;
-    public int BonusResistance;
+    public int Damage; // Base damage value (average of min/max)
+    public int DamageMin;
+    public int DamageMax;
+    public int PhysicalResist;
+    public int ElementalResist;
+    public string DamageElement; // "none" = physical, "fire"/"ice"/etc = elemental
     
     // Skills (skill IDs referencing skills.json)
     public string Skill1Id;
@@ -51,25 +54,27 @@ public class EnemyData
     public int RewardGoldMax;
     public int SigilChance; // 0-100 percent chance to drop sigil
     public int RelicChance; // 0-100 percent chance to drop relic
+    public int RegularCoreChance; // 0-100 percent chance to drop Regular Essence Core
+    public int AscendedCoreChance; // 0-100 percent chance to drop Ascended Essence Core
     
     // World modifiers parsed from JSON data
     // Health/Damage use multipliers (e.g., 1.7 means Health * 1.7)
-    // BaseResistance uses addend (e.g., 10 means BaseResistance + 10)
+    // Resistance uses addend (e.g., 10 means Resist + 10) — applied to BOTH physical and elemental
     public float World2HealthMultiplier = 1f;
     public float World2DamageMultiplier = 1f;
-    public int World2BaseResistanceAddend = 0;
+    public int World2ResistanceAddend = 0;
     
     public float World3HealthMultiplier = 1f;
     public float World3DamageMultiplier = 1f;
-    public int World3BaseResistanceAddend = 0;
+    public int World3ResistanceAddend = 0;
     
     public float World4HealthMultiplier = 1f;
     public float World4DamageMultiplier = 1f;
-    public int World4BaseResistanceAddend = 0;
+    public int World4ResistanceAddend = 0;
     
     public float World5HealthMultiplier = 1f;
     public float World5DamageMultiplier = 1f;
-    public int World5BaseResistanceAddend = 0;
+    public int World5ResistanceAddend = 0;
     
     public bool IsElite => Type == "Elite";
     public bool IsBoss => Type == "Boss";
@@ -102,16 +107,18 @@ public class EnemyData
         return UnityEngine.Mathf.RoundToInt(Damage * multiplier);
     }
     
-    public int GetBaseResistance(int world)
+    public int GetResistanceAddend(int world)
     {
-        int addend = world switch
+        return world switch
         {
-            5 => World5BaseResistanceAddend,
-            4 => World4BaseResistanceAddend,
-            3 => World3BaseResistanceAddend,
-            2 => World2BaseResistanceAddend,
+            5 => World5ResistanceAddend,
+            4 => World4ResistanceAddend,
+            3 => World3ResistanceAddend,
+            2 => World2ResistanceAddend,
             _ => 0
         };
-        return BaseResistance + addend;
     }
+    
+    public int GetPhysicalResist(int world) => PhysicalResist + GetResistanceAddend(world);
+    public int GetElementalResist(int world) => ElementalResist + GetResistanceAddend(world);
 }

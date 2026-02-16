@@ -66,6 +66,8 @@ public class EnemyWorldUnit : MonoBehaviour
     private int lastDisplayedHealth;
     private int lastDisplayedShield;
     
+    // Nameplate tooltip content (rendered via CombatArena screen-space tooltip)
+    
     private bool isSelected = false;
     // Selection indicator removed - using targetIndicator in CombatArena instead
     
@@ -170,27 +172,91 @@ public class EnemyWorldUnit : MonoBehaviour
     
     private void CreateNameplate(Transform parent)
     {
-        GameObject nameObj = new GameObject("Nameplate");
-        nameObj.transform.SetParent(parent, false);
+        // Chip container with background
+        GameObject chipObj = new GameObject("NameplateChip");
+        chipObj.transform.SetParent(parent, false);
+        
+        var chipRect = chipObj.AddComponent<RectTransform>();
+        chipRect.anchorMin = new Vector2(0.5f, 0.5f);
+        chipRect.anchorMax = new Vector2(0.5f, 0.5f);
+        chipRect.pivot = new Vector2(0.5f, 0f);
+        chipRect.anchoredPosition = new Vector2(0f, 22f);
+        chipRect.sizeDelta = new Vector2(220f, 36f);
+        
+        // Dark background
+        var chipBg = chipObj.AddComponent<Image>();
+        chipBg.color = new Color(0.12f, 0.12f, 0.16f, 0.92f);
+        chipBg.raycastTarget = true;
+        
+        // Colored border based on enemy type
+        var chipOutline = chipObj.AddComponent<Outline>();
+        chipOutline.effectColor = GetNameplateBorderColor();
+        chipOutline.effectDistance = new Vector2(2, 2);
+        
+        // Name text inside chip
+        GameObject nameObj = new GameObject("NameText");
+        nameObj.transform.SetParent(chipObj.transform, false);
         
         var nameRect = nameObj.AddComponent<RectTransform>();
-        nameRect.anchorMin = new Vector2(0.5f, 1f);
-        nameRect.anchorMax = new Vector2(0.5f, 1f);
-        nameRect.pivot = new Vector2(0.5f, 0f);
-        nameRect.anchoredPosition = new Vector2(0f, 5f);
-        nameRect.sizeDelta = new Vector2(200f, 30f);
+        nameRect.anchorMin = Vector2.zero;
+        nameRect.anchorMax = Vector2.one;
+        nameRect.offsetMin = new Vector2(6, 0);
+        nameRect.offsetMax = new Vector2(-6, 0);
         
         nameText = nameObj.AddComponent<TextMeshProUGUI>();
         nameText.text = combatEnemy.Name;
-        nameText.fontSize = 36f;  // 28 * 1.3 = ~36 for 30% larger
+        nameText.fontSize = 28f;
         nameText.fontStyle = FontStyles.Bold;
         nameText.color = nameplateColor;
         nameText.alignment = TextAlignmentOptions.Center;
         nameText.textWrappingMode = TextWrappingModes.NoWrap;
+        nameText.raycastTarget = false;
         
-        // Add outline for readability
-        nameText.outlineWidth = 0.4f;
+        nameText.outlineWidth = 0.3f;
         nameText.outlineColor = Color.black;
+        
+        // Add hover events via EventTrigger (tooltip via CombatArena screen-space)
+        var trigger = chipObj.AddComponent<EventTrigger>();
+        
+        var pointerEnter = new EventTrigger.Entry();
+        pointerEnter.eventID = EventTriggerType.PointerEnter;
+        pointerEnter.callback.AddListener((data) => ShowTooltip());
+        trigger.triggers.Add(pointerEnter);
+        
+        var pointerExit = new EventTrigger.Entry();
+        pointerExit.eventID = EventTriggerType.PointerExit;
+        pointerExit.callback.AddListener((data) => HideTooltip());
+        trigger.triggers.Add(pointerExit);
+    }
+    
+    private Color GetNameplateBorderColor()
+    {
+        if (combatEnemy.IsBoss) return new Color(1f, 0.3f, 0.3f, 1f);    // Red for bosses
+        if (combatEnemy.IsElite) return new Color(1f, 0.7f, 0.2f, 1f);   // Gold for elites
+        return new Color(0.5f, 0.7f, 0.9f, 1f);                          // Blue-grey for regular
+    }
+    
+    private string GetTooltipContent()
+    {
+        if (combatEnemy == null) return "";
+        
+        string dmgType = combatEnemy.DamageElement == Element.None ? "Physical" : combatEnemy.DamageElement.ToString();
+        string dmgColor = combatEnemy.DamageElement == Element.None ? "#cccccc" : "#88bbff";
+        
+        return 
+            $"<color=#ff8888>DMG:</color> {combatEnemy.DamageMin}-{combatEnemy.DamageMax} <color={dmgColor}>({dmgType})</color>\n" +
+            $"<color=#cccccc>Phys Resist:</color> {combatEnemy.PhysicalResist}%\n" +
+            $"<color=#88bbff>Elem Resist:</color> {combatEnemy.ElementalResist}%";
+    }
+    
+    private void ShowTooltip()
+    {
+        CombatArena.ShowTooltip(GetTooltipContent());
+    }
+    
+    private void HideTooltip()
+    {
+        CombatArena.HideTooltip();
     }
     
     private void CreateHealthBar(Transform parent)

@@ -6,7 +6,7 @@ using TMPro;
 
 /// <summary>
 /// Element Ascension detail screen showing level ladder and level-up button.
-/// "Genshin Impact-like ascension" screen for element progression.
+/// Clean tier-list layout matching reference design.
 /// </summary>
 public class ElementAscensionDetailUI : MonoBehaviour
 {
@@ -16,10 +16,10 @@ public class ElementAscensionDetailUI : MonoBehaviour
     private GameObject detailPanel;
     private string currentElement;
     private Action onClose;
-    private Button levelUpButton;
-    private TextMeshProUGUI currentLevelText;
-    private TextMeshProUGUI currentXPText;
     private Transform tierListContent;
+    
+    // Accent color for the current element (used for borders, highlights)
+    private Color accentColor;
     
     void Awake()
     {
@@ -52,52 +52,18 @@ public class ElementAscensionDetailUI : MonoBehaviour
         rect.offsetMax = Vector2.zero;
         
         var bg = panel.AddComponent<Image>();
-        bg.color = new Color(0.02f, 0.02f, 0.06f, 0.98f);
-        
-        // Back button
-        CreateBackButton(panel.transform);
+        bg.color = new Color(0.04f, 0.06f, 0.10f, 0.98f);
         
         return panel;
-    }
-    
-    private void CreateBackButton(Transform parent)
-    {
-        var btnObj = new GameObject("BackBtn");
-        btnObj.transform.SetParent(parent, false);
-        var btnRect = btnObj.AddComponent<RectTransform>();
-        btnRect.anchorMin = new Vector2(0.02f, 0.92f);
-        btnRect.anchorMax = new Vector2(0.12f, 0.98f);
-        btnRect.offsetMin = Vector2.zero;
-        btnRect.offsetMax = Vector2.zero;
-        
-        var img = btnObj.AddComponent<Image>();
-        img.color = new Color(0.25f, 0.25f, 0.3f);
-        
-        var btn = btnObj.AddComponent<Button>();
-        btn.targetGraphic = img;
-        btn.onClick.AddListener(OnBackClicked);
-        
-        var textObj = new GameObject("Text");
-        textObj.transform.SetParent(btnObj.transform, false);
-        var textRect = textObj.AddComponent<RectTransform>();
-        textRect.anchorMin = Vector2.zero;
-        textRect.anchorMax = Vector2.one;
-        textRect.offsetMin = Vector2.zero;
-        textRect.offsetMax = Vector2.zero;
-        
-        var text = textObj.AddComponent<TextMeshProUGUI>();
-        text.text = "← BACK";
-        text.alignment = TextAlignmentOptions.Center;
-        text.fontSize = 16;
-        text.color = Color.white;
     }
     
     public void Show(string elementName, Action closeCallback)
     {
         currentElement = elementName;
         onClose = closeCallback;
+        accentColor = GetElementColor(currentElement);
         
-        Debug.Log($"[Meta] ElementAscensionOpen | element={elementName} level={MetaProgressionManager.Instance.GetElementProgress(elementName).AscensionLevel} xp={MetaProgressionManager.Instance.GetElementProgress(elementName).AscensionXP}");
+        Debug.Log($"[Meta] ElementAscensionOpen | element={elementName} level={MetaProgressionManager.Instance.GetElementProgress(elementName).AscensionLevel}");
         
         ClearContent();
         CreateContent();
@@ -112,14 +78,9 @@ public class ElementAscensionDetailUI : MonoBehaviour
     
     private void ClearContent()
     {
-        // Clear dynamic content (keep back button)
         for (int i = detailPanel.transform.childCount - 1; i >= 0; i--)
         {
-            var child = detailPanel.transform.GetChild(i);
-            if (child.name != "BackBtn")
-            {
-                Destroy(child.gameObject);
-            }
+            Destroy(detailPanel.transform.GetChild(i).gameObject);
         }
     }
     
@@ -127,97 +88,66 @@ public class ElementAscensionDetailUI : MonoBehaviour
     {
         var progress = MetaProgressionManager.Instance.GetElementProgress(currentElement);
         int maxLevel = DataCache.GetElementMaxLevel(currentElement);
-        int nextLevelThreshold = DataCache.GetElementXPThreshold(currentElement, progress.AscensionLevel + 1);
         
-        // Element Title
-        var titleObj = new GameObject("ElementTitle");
+        // ── Back Button (top-left) ──
+        CreateBackButton(detailPanel.transform);
+        
+        // ── Title: "WIND ASCENSION" ──
+        var titleObj = new GameObject("Title");
         titleObj.transform.SetParent(detailPanel.transform, false);
         var titleRect = titleObj.AddComponent<RectTransform>();
-        titleRect.anchorMin = new Vector2(0, 0.85f);
-        titleRect.anchorMax = new Vector2(1, 0.92f);
+        titleRect.anchorMin = new Vector2(0f, 0.88f);
+        titleRect.anchorMax = new Vector2(1f, 0.96f);
         titleRect.offsetMin = Vector2.zero;
         titleRect.offsetMax = Vector2.zero;
         var titleText = titleObj.AddComponent<TextMeshProUGUI>();
         titleText.text = $"{currentElement.ToUpper()} ASCENSION";
         titleText.alignment = TextAlignmentOptions.Center;
-        titleText.fontSize = 36;
+        titleText.fontSize = 34;
         titleText.fontStyle = FontStyles.Bold;
-        titleText.color = GetElementColor(currentElement);
+        titleText.color = accentColor;
+        titleText.raycastTarget = false;
         
-        // Current Level/XP display
-        var statusObj = new GameObject("Status");
-        statusObj.transform.SetParent(detailPanel.transform, false);
-        var statusRect = statusObj.AddComponent<RectTransform>();
-        statusRect.anchorMin = new Vector2(0.3f, 0.75f);
-        statusRect.anchorMax = new Vector2(0.7f, 0.84f);
-        statusRect.offsetMin = Vector2.zero;
-        statusRect.offsetMax = Vector2.zero;
+        // ── Subtitle: "Current Tier: X" ──
+        var subtitleObj = new GameObject("Subtitle");
+        subtitleObj.transform.SetParent(detailPanel.transform, false);
+        var subRect = subtitleObj.AddComponent<RectTransform>();
+        subRect.anchorMin = new Vector2(0f, 0.83f);
+        subRect.anchorMax = new Vector2(1f, 0.88f);
+        subRect.offsetMin = Vector2.zero;
+        subRect.offsetMax = Vector2.zero;
+        var subText = subtitleObj.AddComponent<TextMeshProUGUI>();
+        subText.text = progress.AscensionLevel >= maxLevel
+            ? $"Current Tier: {progress.AscensionLevel}  (MAX)"
+            : $"Current Tier: {progress.AscensionLevel}";
+        subText.alignment = TextAlignmentOptions.Center;
+        subText.fontSize = 18;
+        subText.color = new Color(0.8f, 0.8f, 0.8f);
+        subText.raycastTarget = false;
         
-        var vLayout = statusObj.AddComponent<VerticalLayoutGroup>();
-        vLayout.childAlignment = TextAnchor.MiddleCenter;
-        vLayout.spacing = 5;
-        vLayout.childControlWidth = true;
-        vLayout.childControlHeight = false;
+        // ── Tier List (scrollable) ──
+        CreateTierList(progress.AscensionLevel, maxLevel);
         
-        // Level text
-        var levelObj = new GameObject("Level");
-        levelObj.transform.SetParent(statusObj.transform, false);
-        var levelLe = levelObj.AddComponent<LayoutElement>();
-        levelLe.preferredHeight = 30;
-        currentLevelText = levelObj.AddComponent<TextMeshProUGUI>();
-        currentLevelText.text = $"Tier {progress.AscensionLevel}";
-        currentLevelText.fontSize = 24;
-        currentLevelText.alignment = TextAlignmentOptions.Center;
-        currentLevelText.color = Color.white;
-        
-        // XP text
-        var xpObj = new GameObject("XP");
-        xpObj.transform.SetParent(statusObj.transform, false);
-        var xpLe = xpObj.AddComponent<LayoutElement>();
-        xpLe.preferredHeight = 24;
-        currentXPText = xpObj.AddComponent<TextMeshProUGUI>();
-        string xpDisplay = progress.AscensionLevel >= maxLevel 
-            ? $"XP: {progress.AscensionXP} (MAX LEVEL)" 
-            : $"XP: {progress.AscensionXP} / {nextLevelThreshold}";
-        currentXPText.text = xpDisplay;
-        currentXPText.fontSize = 16;
-        currentXPText.alignment = TextAlignmentOptions.Center;
-        currentXPText.color = new Color(0.7f, 0.7f, 0.7f);
-        
-        // Level Up Button
-        CreateLevelUpButton();
-        
-        // Tier Ladder (scrollable)
-        CreateTierLadder();
+        // ── Level Up Button (bottom center) ──
+        CreateLevelUpButton(progress.AscensionLevel, maxLevel);
     }
     
-    private void CreateLevelUpButton()
+    private void CreateBackButton(Transform parent)
     {
-        var progress = MetaProgressionManager.Instance.GetElementProgress(currentElement);
-        bool canLevelUp = MetaProgressionManager.Instance.CanLevelUpElement(currentElement);
-        
-        var btnObj = new GameObject("LevelUpBtn");
-        btnObj.transform.SetParent(detailPanel.transform, false);
+        var btnObj = new GameObject("BackBtn");
+        btnObj.transform.SetParent(parent, false);
         var btnRect = btnObj.AddComponent<RectTransform>();
-        btnRect.anchorMin = new Vector2(0.35f, 0.65f);
-        btnRect.anchorMax = new Vector2(0.65f, 0.73f);
+        btnRect.anchorMin = new Vector2(0.02f, 0.92f);
+        btnRect.anchorMax = new Vector2(0.12f, 0.98f);
         btnRect.offsetMin = Vector2.zero;
         btnRect.offsetMax = Vector2.zero;
         
         var img = btnObj.AddComponent<Image>();
-        img.color = canLevelUp ? new Color(0.2f, 0.5f, 0.3f) : new Color(0.3f, 0.3f, 0.35f);
+        img.color = new Color(0.15f, 0.18f, 0.22f, 0.9f);
         
-        levelUpButton = btnObj.AddComponent<Button>();
-        levelUpButton.targetGraphic = img;
-        levelUpButton.interactable = canLevelUp;
-        levelUpButton.onClick.AddListener(OnLevelUpClicked);
-        
-        if (!canLevelUp)
-        {
-            var colors = levelUpButton.colors;
-            colors.disabledColor = new Color(0.2f, 0.2f, 0.2f, 0.5f);
-            levelUpButton.colors = colors;
-        }
+        var btn = btnObj.AddComponent<Button>();
+        btn.targetGraphic = img;
+        btn.onClick.AddListener(OnBackClicked);
         
         var textObj = new GameObject("Text");
         textObj.transform.SetParent(btnObj.transform, false);
@@ -226,37 +156,38 @@ public class ElementAscensionDetailUI : MonoBehaviour
         textRect.anchorMax = Vector2.one;
         textRect.offsetMin = Vector2.zero;
         textRect.offsetMax = Vector2.zero;
-        
         var text = textObj.AddComponent<TextMeshProUGUI>();
-        text.text = "LEVEL UP";
+        text.text = "← BACK";
         text.alignment = TextAlignmentOptions.Center;
-        text.fontSize = 20;
-        text.fontStyle = FontStyles.Bold;
+        text.fontSize = 16;
         text.color = Color.white;
     }
     
-    private void CreateTierLadder()
+    private void CreateTierList(int currentLevel, int maxLevel)
     {
-        var progress = MetaProgressionManager.Instance.GetElementProgress(currentElement);
-        var tiers = DataCache.ElementalTiers.ContainsKey(currentElement) 
-            ? DataCache.ElementalTiers[currentElement] 
-            : new List<ElementalTierData>();
+        var costs = DataCache.ElementalAscensionCosts.ContainsKey(currentElement) 
+            ? DataCache.ElementalAscensionCosts[currentElement] 
+            : new List<ElementalAscensionCost>();
+        
+        int regularCores = MetaProgressionManager.Instance.GetRegularCores();
+        int ascendedCores = MetaProgressionManager.Instance.GetAscendedCores();
         
         // Scroll container
         var scrollObj = new GameObject("TierScroll");
         scrollObj.transform.SetParent(detailPanel.transform, false);
-        var scrollRect = scrollObj.AddComponent<RectTransform>();
-        scrollRect.anchorMin = new Vector2(0.1f, 0.08f);
-        scrollRect.anchorMax = new Vector2(0.9f, 0.62f);
-        scrollRect.offsetMin = Vector2.zero;
-        scrollRect.offsetMax = Vector2.zero;
+        var scrollRectTransform = scrollObj.AddComponent<RectTransform>();
+        scrollRectTransform.anchorMin = new Vector2(0.08f, 0.14f);
+        scrollRectTransform.anchorMax = new Vector2(0.92f, 0.80f);
+        scrollRectTransform.offsetMin = Vector2.zero;
+        scrollRectTransform.offsetMax = Vector2.zero;
         
         var scrollView = scrollObj.AddComponent<ScrollRect>();
         scrollView.horizontal = false;
         scrollView.vertical = true;
         scrollView.movementType = ScrollRect.MovementType.Clamped;
+        scrollView.scrollSensitivity = 30f;
         
-        // Viewport
+        // Viewport with mask
         var viewport = new GameObject("Viewport");
         viewport.transform.SetParent(scrollObj.transform, false);
         var viewportRect = viewport.AddComponent<RectTransform>();
@@ -264,15 +195,12 @@ public class ElementAscensionDetailUI : MonoBehaviour
         viewportRect.anchorMax = Vector2.one;
         viewportRect.offsetMin = Vector2.zero;
         viewportRect.offsetMax = Vector2.zero;
-        
         var viewportMask = viewport.AddComponent<Mask>();
         viewportMask.showMaskGraphic = false;
-        var viewportImg = viewport.AddComponent<Image>();
-        viewportImg.color = Color.white;
-        
+        viewport.AddComponent<Image>().color = Color.white;
         scrollView.viewport = viewportRect;
         
-        // Content
+        // Content container
         var content = new GameObject("Content");
         content.transform.SetParent(viewport.transform, false);
         var contentRect = content.AddComponent<RectTransform>();
@@ -283,8 +211,8 @@ public class ElementAscensionDetailUI : MonoBehaviour
         contentRect.offsetMax = Vector2.zero;
         
         var vLayout = content.AddComponent<VerticalLayoutGroup>();
-        vLayout.spacing = 8;
-        vLayout.padding = new RectOffset(10, 10, 10, 10);
+        vLayout.spacing = 4;
+        vLayout.padding = new RectOffset(0, 0, 6, 6);
         vLayout.childAlignment = TextAnchor.UpperCenter;
         vLayout.childControlWidth = true;
         vLayout.childControlHeight = false;
@@ -295,95 +223,206 @@ public class ElementAscensionDetailUI : MonoBehaviour
         scrollView.content = contentRect;
         tierListContent = content.transform;
         
-        // Add tier rows
-        foreach (var tier in tiers)
+        // Build element display name (e.g. "Wind Flow Amplification")
+        string elementDisplayName = $"{currentElement} Flow Amplification";
+        
+        // Create rows
+        foreach (var cost in costs)
         {
-            CreateTierRow(tier, progress.AscensionLevel);
+            CreateTierRow(cost, currentLevel, elementDisplayName, regularCores, ascendedCores);
         }
     }
     
-    private void CreateTierRow(ElementalTierData tier, int currentLevel)
+    private void CreateTierRow(ElementalAscensionCost cost, int currentLevel, string elementDisplayName, int ownedRegular, int ownedAscended)
     {
-        bool isUnlocked = currentLevel >= tier.Level;
-        bool isCurrent = currentLevel == tier.Level;
+        bool isUnlocked = currentLevel >= cost.Level;
+        bool isCurrent = currentLevel == cost.Level;
+        bool isNext = currentLevel == cost.Level - 1;
         
-        var rowObj = new GameObject($"Tier_{tier.Level}");
+        float rowHeight = 52f;
+        
+        // Row root
+        var rowObj = new GameObject($"Tier_{cost.Level}");
         rowObj.transform.SetParent(tierListContent, false);
+        var rowLe = rowObj.AddComponent<LayoutElement>();
+        rowLe.preferredHeight = rowHeight;
         
+        // Row background
         var rowBg = rowObj.AddComponent<Image>();
         if (isCurrent)
-            rowBg.color = new Color(0.15f, 0.25f, 0.15f, 0.9f);
+            rowBg.color = new Color(accentColor.r * 0.15f, accentColor.g * 0.15f, accentColor.b * 0.15f, 0.9f);
+        else if (isNext)
+            rowBg.color = new Color(0.10f, 0.12f, 0.16f, 0.9f);
         else if (isUnlocked)
-            rowBg.color = new Color(0.1f, 0.1f, 0.15f, 0.9f);
+            rowBg.color = new Color(0.08f, 0.09f, 0.12f, 0.85f);
         else
-            rowBg.color = new Color(0.08f, 0.08f, 0.1f, 0.6f);
+            rowBg.color = new Color(0.06f, 0.07f, 0.09f, 0.7f);
         
-        var rowLayout = rowObj.AddComponent<LayoutElement>();
-        rowLayout.preferredHeight = 50;
+        // Left accent border (element color)
+        var accentObj = new GameObject("Accent");
+        accentObj.transform.SetParent(rowObj.transform, false);
+        var accentRect = accentObj.AddComponent<RectTransform>();
+        accentRect.anchorMin = new Vector2(0f, 0f);
+        accentRect.anchorMax = new Vector2(0.005f, 1f);
+        accentRect.offsetMin = Vector2.zero;
+        accentRect.offsetMax = Vector2.zero;
+        var accentImg = accentObj.AddComponent<Image>();
+        accentImg.color = isUnlocked || isNext ? accentColor : new Color(accentColor.r * 0.4f, accentColor.g * 0.4f, accentColor.b * 0.4f);
         
-        // Level number - left
-        var levelObj = new GameObject("Level");
-        levelObj.transform.SetParent(rowObj.transform, false);
-        var levelRect = levelObj.AddComponent<RectTransform>();
-        levelRect.anchorMin = new Vector2(0.02f, 0);
-        levelRect.anchorMax = new Vector2(0.12f, 1);
-        levelRect.offsetMin = Vector2.zero;
-        levelRect.offsetMax = Vector2.zero;
-        var levelText = levelObj.AddComponent<TextMeshProUGUI>();
-        levelText.text = $"{tier.Level}";
-        levelText.fontSize = 18;
-        levelText.fontStyle = FontStyles.Bold;
-        levelText.alignment = TextAlignmentOptions.Center;
-        levelText.color = isUnlocked ? Color.white : new Color(0.5f, 0.5f, 0.5f);
+        // "Tier X" label (left column)
+        var tierLabelObj = new GameObject("TierLabel");
+        tierLabelObj.transform.SetParent(rowObj.transform, false);
+        var tierLabelRect = tierLabelObj.AddComponent<RectTransform>();
+        tierLabelRect.anchorMin = new Vector2(0.02f, 0f);
+        tierLabelRect.anchorMax = new Vector2(0.12f, 1f);
+        tierLabelRect.offsetMin = Vector2.zero;
+        tierLabelRect.offsetMax = Vector2.zero;
+        var tierLabel = tierLabelObj.AddComponent<TextMeshProUGUI>();
+        tierLabel.text = $"Tier {cost.Level}";
+        tierLabel.fontSize = 16;
+        tierLabel.fontStyle = FontStyles.Bold;
+        tierLabel.alignment = TextAlignmentOptions.MidlineLeft;
+        tierLabel.color = isUnlocked ? Color.white : new Color(0.55f, 0.55f, 0.55f);
         
-        // XP threshold - middle-left
-        var xpObj = new GameObject("XP");
-        xpObj.transform.SetParent(rowObj.transform, false);
-        var xpRect = xpObj.AddComponent<RectTransform>();
-        xpRect.anchorMin = new Vector2(0.14f, 0);
-        xpRect.anchorMax = new Vector2(0.28f, 1);
-        xpRect.offsetMin = Vector2.zero;
-        xpRect.offsetMax = Vector2.zero;
-        var xpText = xpObj.AddComponent<TextMeshProUGUI>();
-        xpText.text = $"{tier.XPRequiredToReachLevel} XP";
-        xpText.fontSize = 13;
-        xpText.alignment = TextAlignmentOptions.Left;
-        xpText.color = isUnlocked ? new Color(0.7f, 0.7f, 0.7f) : new Color(0.4f, 0.4f, 0.4f);
+        // Element name + placeholder bonus (middle column)
+        var nameObj = new GameObject("Name");
+        nameObj.transform.SetParent(rowObj.transform, false);
+        var nameRect = nameObj.AddComponent<RectTransform>();
+        nameRect.anchorMin = new Vector2(0.14f, 0f);
+        nameRect.anchorMax = new Vector2(0.68f, 1f);
+        nameRect.offsetMin = Vector2.zero;
+        nameRect.offsetMax = Vector2.zero;
+        var nameText = nameObj.AddComponent<TextMeshProUGUI>();
+        nameText.text = $"<b>{elementDisplayName}</b> <color=#888888><size=12>(Bonus description will be added)</size></color>";
+        nameText.fontSize = 14;
+        nameText.alignment = TextAlignmentOptions.MidlineLeft;
+        nameText.color = isUnlocked ? new Color(0.9f, 0.9f, 0.9f) : new Color(0.5f, 0.5f, 0.5f);
+        nameText.richText = true;
+        nameText.overflowMode = TextOverflowModes.Ellipsis;
         
-        // Bonus text - right
-        var bonusObj = new GameObject("Bonus");
-        bonusObj.transform.SetParent(rowObj.transform, false);
-        var bonusRect = bonusObj.AddComponent<RectTransform>();
-        bonusRect.anchorMin = new Vector2(0.30f, 0);
-        bonusRect.anchorMax = new Vector2(0.98f, 1);
-        bonusRect.offsetMin = Vector2.zero;
-        bonusRect.offsetMax = Vector2.zero;
-        var bonusText = bonusObj.AddComponent<TextMeshProUGUI>();
-        bonusText.text = tier.Bonus;
-        bonusText.fontSize = 13;
-        bonusText.alignment = TextAlignmentOptions.Left;
-        bonusText.color = isUnlocked ? new Color(0.5f, 0.85f, 0.5f) : new Color(0.35f, 0.45f, 0.35f);
+        // Core cost (right column) — e.g. "0/3 Regular Cores"
+        var costObj = new GameObject("Cost");
+        costObj.transform.SetParent(rowObj.transform, false);
+        var costRect = costObj.AddComponent<RectTransform>();
+        costRect.anchorMin = new Vector2(0.70f, 0f);
+        costRect.anchorMax = new Vector2(0.98f, 1f);
+        costRect.offsetMin = Vector2.zero;
+        costRect.offsetMax = Vector2.zero;
+        var costText = costObj.AddComponent<TextMeshProUGUI>();
+        costText.fontSize = 13;
+        costText.alignment = TextAlignmentOptions.MidlineRight;
+        costText.richText = true;
         
-        // Current level indicator
+        if (isUnlocked)
+        {
+            costText.text = "<color=#55cc77>Unlocked</color>";
+            costText.color = Color.white;
+        }
+        else
+        {
+            string costStr = BuildCostString(cost, ownedRegular, ownedAscended);
+            costText.text = costStr;
+            costText.color = new Color(0.75f, 0.75f, 0.75f);
+        }
+        
+        // Current tier highlight bar (bottom)
         if (isCurrent)
         {
-            var indicatorObj = new GameObject("CurrentIndicator");
-            indicatorObj.transform.SetParent(rowObj.transform, false);
-            var indRect = indicatorObj.AddComponent<RectTransform>();
-            indRect.anchorMin = new Vector2(0, 0.4f);
-            indRect.anchorMax = new Vector2(0.01f, 0.6f);
-            indRect.offsetMin = Vector2.zero;
-            indRect.offsetMax = Vector2.zero;
-            var indImg = indicatorObj.AddComponent<Image>();
-            indImg.color = new Color(0.3f, 0.9f, 0.4f);
+            var highlightObj = new GameObject("CurrentHighlight");
+            highlightObj.transform.SetParent(rowObj.transform, false);
+            var hlRect = highlightObj.AddComponent<RectTransform>();
+            hlRect.anchorMin = new Vector2(0f, 0f);
+            hlRect.anchorMax = new Vector2(1f, 0.04f);
+            hlRect.offsetMin = Vector2.zero;
+            hlRect.offsetMax = Vector2.zero;
+            var hlImg = highlightObj.AddComponent<Image>();
+            hlImg.color = accentColor;
         }
+    }
+    
+    private string BuildCostString(ElementalAscensionCost cost, int ownedRegular, int ownedAscended)
+    {
+        string result = "";
+        if (cost.RegularCost > 0)
+        {
+            string regColor = ownedRegular >= cost.RegularCost ? "#ccaa44" : "#ff5555";
+            result += $"<color={regColor}>{ownedRegular}/{cost.RegularCost}</color> Regular Core";
+            if (cost.RegularCost > 1) result += "s";
+        }
+        if (cost.RegularCost > 0 && cost.AscendedCost > 0)
+        {
+            result += "\n";
+        }
+        if (cost.AscendedCost > 0)
+        {
+            string ascColor = ownedAscended >= cost.AscendedCost ? "#aa66ff" : "#ff5555";
+            result += $"<color={ascColor}>{ownedAscended}/{cost.AscendedCost}</color> Ascended Core";
+            if (cost.AscendedCost > 1) result += "s";
+        }
+        if (cost.RegularCost == 0 && cost.AscendedCost == 0)
+        {
+            result = "<color=#55cc77>Free</color>";
+        }
+        return result;
+    }
+    
+    private void CreateLevelUpButton(int currentLevel, int maxLevel)
+    {
+        bool canLevelUp = MetaProgressionManager.Instance.CanLevelUpElement(currentElement);
+        bool isMaxed = currentLevel >= maxLevel;
+        
+        var btnObj = new GameObject("LevelUpBtn");
+        btnObj.transform.SetParent(detailPanel.transform, false);
+        var btnRect = btnObj.AddComponent<RectTransform>();
+        btnRect.anchorMin = new Vector2(0.30f, 0.03f);
+        btnRect.anchorMax = new Vector2(0.70f, 0.11f);
+        btnRect.offsetMin = Vector2.zero;
+        btnRect.offsetMax = Vector2.zero;
+        
+        var img = btnObj.AddComponent<Image>();
+        if (isMaxed)
+            img.color = new Color(0.15f, 0.15f, 0.18f, 0.8f);
+        else if (canLevelUp)
+            img.color = accentColor;
+        else
+            img.color = new Color(0.2f, 0.2f, 0.25f, 0.8f);
+        
+        // Border effect
+        var outline = btnObj.AddComponent<Outline>();
+        outline.effectColor = canLevelUp ? new Color(accentColor.r * 1.3f, accentColor.g * 1.3f, accentColor.b * 1.3f, 0.8f) : new Color(0.3f, 0.3f, 0.35f, 0.6f);
+        outline.effectDistance = new Vector2(2, 2);
+        
+        var btn = btnObj.AddComponent<Button>();
+        btn.targetGraphic = img;
+        btn.interactable = canLevelUp;
+        btn.onClick.AddListener(OnLevelUpClicked);
+        
+        if (!canLevelUp)
+        {
+            var colors = btn.colors;
+            colors.disabledColor = new Color(0.2f, 0.2f, 0.2f, 0.6f);
+            btn.colors = colors;
+        }
+        
+        var textObj = new GameObject("Text");
+        textObj.transform.SetParent(btnObj.transform, false);
+        var textRect = textObj.AddComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = Vector2.zero;
+        textRect.offsetMax = Vector2.zero;
+        var text = textObj.AddComponent<TextMeshProUGUI>();
+        text.text = isMaxed ? "MAX LEVEL" : "Level Up!";
+        text.alignment = TextAlignmentOptions.Center;
+        text.fontSize = 24;
+        text.fontStyle = FontStyles.Bold;
+        text.color = isMaxed ? new Color(0.5f, 0.5f, 0.5f) : new Color(0.05f, 0.05f, 0.08f);
     }
     
     private void OnLevelUpClicked()
     {
         if (MetaProgressionManager.Instance.TryLevelUpElement(currentElement))
         {
-            // Refresh the UI
             ClearContent();
             CreateContent();
         }

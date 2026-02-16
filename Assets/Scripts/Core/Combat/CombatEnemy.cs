@@ -20,9 +20,11 @@ public class CombatEnemy
     public int Damage; // Base damage value (can be modified by reborn bonus)
     public int BaseDamage; // Original base damage (before reborn)
     public int EnemyID;
-    public int BaseResistance;
-    public int BonusResistance;
-    public Element Affinity;
+    public int PhysicalResist;
+    public int ElementalResist;
+    public Element DamageElement; // What type of damage this enemy deals (None = physical)
+    public int DamageMin; // For tooltip display
+    public int DamageMax; // For tooltip display
     public bool IsBoss;
     public bool IsElite;
     
@@ -32,6 +34,8 @@ public class CombatEnemy
     public int RewardGoldMax;
     public int SigilChance;
     public int RelicChance;
+    public int RegularCoreChance;
+    public int AscendedCoreChance;
     
     // Skill system
     public string Skill1Id;
@@ -178,8 +182,9 @@ public class CombatEnemy
         Damage = data.GetDamage(world);
         BaseDamage = Damage;
         EnemyID = data.EnemyID;
-        BaseResistance = data.GetBaseResistance(world);
-        BonusResistance = data.BonusResistance;
+        PhysicalResist = data.GetPhysicalResist(world);
+        ElementalResist = data.GetElementalResist(world);
+        DamageElement = ParseElement(data.DamageElement);
         IsBoss = data.IsBoss;
         IsElite = data.IsElite;
         SpawnOnly = data.SpawnOnly;
@@ -190,6 +195,8 @@ public class CombatEnemy
         RewardGoldMax = data.RewardGoldMax;
         SigilChance = data.SigilChance;
         RelicChance = data.RelicChance;
+        RegularCoreChance = data.RegularCoreChance;
+        AscendedCoreChance = data.AscendedCoreChance;
         
         // Load skill system
         Skill1Id = data.Skill1Id;
@@ -224,14 +231,9 @@ public class CombatEnemy
         HasReborn = false;
         IsReborn = false;
         
-        if (data.IsBoss)
-        {
-            Affinity = Element.None;
-        }
-        else
-        {
-            Affinity = GetRandomElement();
-        }
+        // DamageMin/DamageMax for tooltip display
+        DamageMin = data.DamageMin;
+        DamageMax = data.DamageMax;
     }
     
     // ========== SKILL SELECTION ==========
@@ -407,7 +409,16 @@ public class CombatEnemy
         };
         
         string skillId = GetSkillIdByNumber(skillNumber);
-        return skillId ?? Skill1Id;
+        string resolvedId = skillId ?? Skill1Id;
+        GameLog.Combat(GameLog.Join(
+            "ReactiveSkill",
+            GameLog.KV("enemy", Name),
+            GameLog.KV("playerAction", lastAction.ToString()),
+            GameLog.KV("skillNum", skillNumber),
+            GameLog.KV("skillId", resolvedId ?? "null"),
+            GameLog.KV("fallback", skillId == null)
+        ));
+        return resolvedId;
     }
     
     // ========== ENEMY SHIELD ==========
@@ -625,10 +636,19 @@ public class CombatEnemy
         return UnityEngine.Mathf.RoundToInt(Damage * GetDamageMultiplier() * variance);
     }
 
-    private Element GetRandomElement()
+    private static Element ParseElement(string elementStr)
     {
-        var elements = new Element[] { Element.Fire, Element.Ice, Element.Water, Element.Wind, Element.Rock, Element.Lightning };
-        return elements[UnityEngine.Random.Range(0, elements.Length)];
+        if (string.IsNullOrEmpty(elementStr) || elementStr == "none") return Element.None;
+        switch (elementStr.ToLower())
+        {
+            case "fire": return Element.Fire;
+            case "ice": return Element.Ice;
+            case "water": return Element.Water;
+            case "wind": return Element.Wind;
+            case "rock": return Element.Rock;
+            case "lightning": return Element.Lightning;
+            default: return Element.None;
+        }
     }
 
     public void TakeDamage(int amount)
@@ -650,30 +670,30 @@ public class CombatEnemy
         if (Health < 0) Health = 0;
     }
 
-    public int CalculateResistance(Element attackerAffinity)
+    /// <summary>
+    /// Calculate total resistance against an attack. If attackElement is None, uses PhysicalResist.
+    /// Otherwise uses ElementalResist. Frost Shield bonus applies to elemental only.
+    /// </summary>
+    public int CalculateResistance(Element attackElement)
     {
-        int totalResistance = BaseResistance;
+        bool isElemental = attackElement != Element.None;
+        int totalResistance = isElemental ? ElementalResist : PhysicalResist;
         
-        if (Affinity != Element.None && attackerAffinity == Affinity)
-        {
-            totalResistance += BonusResistance;
-        }
-        
-        // Frost Shield resistance bonus
-        if (FrostShieldActive && FrostShieldResistBonus > 0)
+        // Frost Shield resistance bonus (elemental only)
+        if (FrostShieldActive && FrostShieldResistBonus > 0 && isElemental)
         {
             totalResistance += FrostShieldResistBonus;
         }
         
-        // Temp resist from status effects
-        totalResistance += GetTempResist(attackerAffinity);
+        // Temp resist from status effects (general buff)
+        totalResistance += GetTempResist(attackElement);
         
         return totalResistance;
     }
 
-    public int ApplyResistance(int damage, Element attackerAffinity)
+    public int ApplyResistance(int damage, Element attackElement)
     {
-        int resistance = CalculateResistance(attackerAffinity);
+        int resistance = CalculateResistance(attackElement);
         float multiplier = 1f - (resistance / 100f);
         if (multiplier < 0f) multiplier = 0f;
         return UnityEngine.Mathf.RoundToInt(damage * multiplier);

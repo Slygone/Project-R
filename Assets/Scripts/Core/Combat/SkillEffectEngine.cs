@@ -139,6 +139,34 @@ public static class SkillEffectEngine
                 ProcessStatBonus(eff, ref ctx, ref result);
                 break;
 
+            // Relic-specific effects — handled by Player relic trigger system, not here
+            case "eff_status_immunity":
+            case "eff_ap_delta":
+            case "eff_extra_marks":
+            case "eff_missing_hp_damage":
+            case "eff_ap_cost_reduction":
+            case "eff_refresh_random_skill":
+            case "eff_energy_cost_multiplier":
+            case "eff_disable_system":
+            case "eff_ap_banking":
+            case "eff_post_combat_heal":
+            case "eff_first_mark_bonus":
+            case "eff_combat_shield":
+            case "eff_perfect_qte_ap":
+            case "eff_reaction_cost_reduction":
+            case "eff_reaction_ap_refund":
+            case "eff_end_turn_mark":
+            case "eff_mark_transfer":
+            case "eff_perfect_reaction_save_mark":
+            case "eff_apply_equipped_mark":
+            case "eff_reaction_double":
+            case "eff_dual_reaction_shield":
+            case "eff_reaction_weaken":
+            case "eff_hide_marks":
+            case "eff_reaction_extra_mark_cost":
+                // These are processed by Player.AddRelic / OnRelicTurnStart / OnRelicTurnEnd / etc.
+                break;
+
             default:
                 GameLog.Warn(GameLogCategory.System, "[SkillEffectEngine]",
                     GameLog.Join("UnknownEffect", GameLog.KV("effectId", eff.effectId)));

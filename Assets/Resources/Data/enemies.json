@@ -12,10 +12,11 @@
       "baseDamageMin": 10,
       "baseDamageMax": 12,
       "damageModifiers": [1.0, 1.15, 1.3, 1.5, 1.7],
-      "baseResistance": 12,
+      "physicalResist": 15,
+      "elementalResist": 8,
       "resistanceModifiers": [0, 4, 7, 10, 14],
-      "bonusResistance": 15,
-      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
+      "damageElement": "none",
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0, "regularCoreChance": 30, "ascendedCoreChance": 0 }
     },
     {
       "type": "Enemy",
@@ -29,10 +30,11 @@
       "baseDamageMin": 10,
       "baseDamageMax": 13,
       "damageModifiers": [1.0, 1.15, 1.3, 1.5, 1.7],
-      "baseResistance": 14,
+      "physicalResist": 10,
+      "elementalResist": 14,
       "resistanceModifiers": [0, 4, 7, 10, 14],
-      "bonusResistance": 15,
-      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
+      "damageElement": "none",
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0, "regularCoreChance": 30, "ascendedCoreChance": 0 }
     },
     {
       "type": "Enemy",
@@ -46,10 +48,11 @@
       "baseDamageMin": 11,
       "baseDamageMax": 13,
       "damageModifiers": [1.0, 1.15, 1.3, 1.5, 1.7],
-      "baseResistance": 10,
+      "physicalResist": 8,
+      "elementalResist": 18,
       "resistanceModifiers": [0, 4, 7, 10, 14],
-      "bonusResistance": 18,
-      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
+      "damageElement": "fire",
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0, "regularCoreChance": 25, "ascendedCoreChance": 0 }
     },
     {
       "type": "Enemy",
@@ -63,10 +66,11 @@
       "baseDamageMin": 9,
       "baseDamageMax": 11,
       "damageModifiers": [1.0, 1.15, 1.3, 1.5, 1.7],
-      "baseResistance": 18,
+      "physicalResist": 10,
+      "elementalResist": 22,
       "resistanceModifiers": [0, 4, 7, 10, 14],
-      "bonusResistance": 20,
-      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
+      "damageElement": "none",
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0, "regularCoreChance": 30, "ascendedCoreChance": 0 }
     },
     {
       "type": "Enemy",
@@ -80,10 +84,11 @@
       "baseDamageMin": 9,
       "baseDamageMax": 11,
       "damageModifiers": [1.0, 1.15, 1.3, 1.5, 1.7],
-      "baseResistance": 15,
+      "physicalResist": 10,
+      "elementalResist": 20,
       "resistanceModifiers": [0, 4, 7, 10, 14],
-      "bonusResistance": 20,
-      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
+      "damageElement": "ice",
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0, "regularCoreChance": 30, "ascendedCoreChance": 0 }
     },
     {
       "type": "Enemy",
@@ -97,10 +102,11 @@
       "baseDamageMin": 9,
       "baseDamageMax": 11,
       "damageModifiers": [1.0, 1.15, 1.3, 1.5, 1.7],
-      "baseResistance": 16,
+      "physicalResist": 12,
+      "elementalResist": 18,
       "resistanceModifiers": [0, 4, 7, 10, 14],
-      "bonusResistance": 18,
-      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
+      "damageElement": "water",
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0, "regularCoreChance": 30, "ascendedCoreChance": 0 }
     },
     {
       "type": "Enemy",
@@ -114,10 +120,11 @@
       "baseDamageMin": 10,
       "baseDamageMax": 12,
       "damageModifiers": [1.0, 1.15, 1.3, 1.5, 1.7],
-      "baseResistance": 20,
+      "physicalResist": 18,
+      "elementalResist": 10,
       "resistanceModifiers": [0, 4, 7, 10, 14],
-      "bonusResistance": 12,
-      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
+      "damageElement": "none",
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0, "regularCoreChance": 35, "ascendedCoreChance": 0 }
     },
     {
       "type": "Enemy",
@@ -131,10 +138,11 @@
       "baseDamageMin": 8,
       "baseDamageMax": 10,
       "damageModifiers": [1.0, 1.15, 1.3, 1.5, 1.7],
-      "baseResistance": 22,
+      "physicalResist": 25,
+      "elementalResist": 12,
       "resistanceModifiers": [0, 4, 7, 10, 14],
-      "bonusResistance": 12,
-      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0 }
+      "damageElement": "none",
+      "rewards": { "xp": 1, "goldMin": 1, "goldMax": 3, "sigilChance": 0, "relicChance": 0, "regularCoreChance": 35, "ascendedCoreChance": 0 }
     },
     {
       "type": "Elite",
@@ -148,10 +156,11 @@
       "baseDamageMin": 15,
       "baseDamageMax": 18,
       "damageModifiers": [1.0, 1.2, 1.4, 1.65, 1.9],
-      "baseResistance": 25,
+      "physicalResist": 28,
+      "elementalResist": 15,
       "resistanceModifiers": [0, 5, 9, 13, 18],
-      "bonusResistance": 18,
-      "rewards": { "xp": 3, "goldMin": 6, "goldMax": 9, "sigilChance": 100, "relicChance": 50 }
+      "damageElement": "none",
+      "rewards": { "xp": 3, "goldMin": 6, "goldMax": 9, "sigilChance": 100, "relicChance": 50, "regularCoreChance": 70, "ascendedCoreChance": 40 }
     },
     {
       "type": "Elite",
@@ -165,10 +174,11 @@
       "baseDamageMin": 16,
       "baseDamageMax": 19,
       "damageModifiers": [1.0, 1.2, 1.4, 1.65, 1.9],
-      "baseResistance": 20,
+      "physicalResist": 15,
+      "elementalResist": 25,
       "resistanceModifiers": [0, 5, 9, 13, 18],
-      "bonusResistance": 22,
-      "rewards": { "xp": 3, "goldMin": 6, "goldMax": 9, "sigilChance": 100, "relicChance": 50 }
+      "damageElement": "none",
+      "rewards": { "xp": 3, "goldMin": 6, "goldMax": 9, "sigilChance": 100, "relicChance": 50, "regularCoreChance": 70, "ascendedCoreChance": 40 }
     },
     {
       "type": "Elite",
@@ -182,10 +192,11 @@
       "baseDamageMin": 15,
       "baseDamageMax": 17,
       "damageModifiers": [1.0, 1.2, 1.4, 1.65, 1.9],
-      "baseResistance": 22,
+      "physicalResist": 18,
+      "elementalResist": 22,
       "resistanceModifiers": [0, 5, 9, 13, 18],
-      "bonusResistance": 20,
-      "rewards": { "xp": 3, "goldMin": 6, "goldMax": 9, "sigilChance": 100, "relicChance": 50 }
+      "damageElement": "lightning",
+      "rewards": { "xp": 3, "goldMin": 6, "goldMax": 9, "sigilChance": 100, "relicChance": 50, "regularCoreChance": 80, "ascendedCoreChance": 40 }
     },
     {
       "type": "Elite",
@@ -199,16 +210,17 @@
       "baseDamageMin": 13,
       "baseDamageMax": 16,
       "damageModifiers": [1.0, 1.2, 1.4, 1.65, 1.9],
-      "baseResistance": 28,
+      "physicalResist": 30,
+      "elementalResist": 18,
       "resistanceModifiers": [0, 5, 9, 13, 18],
-      "bonusResistance": 18,
-      "rewards": { "xp": 3, "goldMin": 6, "goldMax": 9, "sigilChance": 100, "relicChance": 50 }
+      "damageElement": "ice",
+      "rewards": { "xp": 3, "goldMin": 6, "goldMax": 9, "sigilChance": 100, "relicChance": 50, "regularCoreChance": 80, "ascendedCoreChance": 50 }
     },
     {
       "type": "Boss",
       "displayName": "SlimeBoss",
       "enemyId": 7,
-      "worlds": [1, 2],
+      "worlds": [1, 2, 3, 4],
       "baseHealth": 420,
       "healthModifiers": [1.0, 1.4, 1.8, 2.3, 2.8],
       "skill1": "enemy_slime_slam",
@@ -224,10 +236,11 @@
       "baseDamageMin": 14,
       "baseDamageMax": 16,
       "damageModifiers": [1.0, 1.25, 1.5, 1.75, 2.0],
-      "baseResistance": 28,
+      "physicalResist": 25,
+      "elementalResist": 20,
       "resistanceModifiers": [0, 6, 11, 16, 22],
-      "bonusResistance": 18,
-      "rewards": { "xp": 9, "goldMin": 12, "goldMax": 16, "sigilChance": 100, "relicChance": 100 }
+      "damageElement": "none",
+      "rewards": { "xp": 9, "goldMin": 12, "goldMax": 16, "sigilChance": 100, "relicChance": 100, "regularCoreChance": 100, "ascendedCoreChance": 100 }
     },
     {
       "type": "Boss",
@@ -243,10 +256,11 @@
       "baseDamageMin": 8,
       "baseDamageMax": 10,
       "damageModifiers": [1.0, 1.25, 1.5, 1.75, 2.0],
-      "baseResistance": 14,
+      "physicalResist": 12,
+      "elementalResist": 10,
       "resistanceModifiers": [0, 6, 11, 16, 22],
-      "bonusResistance": 10,
-      "rewards": { "xp": 4, "goldMin": 6, "goldMax": 8, "sigilChance": 100, "relicChance": 50 }
+      "damageElement": "none",
+      "rewards": { "xp": 4, "goldMin": 6, "goldMax": 8, "sigilChance": 100, "relicChance": 50, "regularCoreChance": 100, "ascendedCoreChance": 50 }
     },
     {
       "type": "Boss",
@@ -262,16 +276,17 @@
       "baseDamageMin": 8,
       "baseDamageMax": 10,
       "damageModifiers": [1.0, 1.25, 1.5, 1.75, 2.0],
-      "baseResistance": 14,
+      "physicalResist": 12,
+      "elementalResist": 10,
       "resistanceModifiers": [0, 6, 11, 16, 22],
-      "bonusResistance": 10,
-      "rewards": { "xp": 4, "goldMin": 6, "goldMax": 8, "sigilChance": 100, "relicChance": 50 }
+      "damageElement": "none",
+      "rewards": { "xp": 4, "goldMin": 6, "goldMax": 8, "sigilChance": 100, "relicChance": 50, "regularCoreChance": 100, "ascendedCoreChance": 50 }
     },
     {
       "type": "Boss",
       "displayName": "MirrorBoss",
       "enemyId": 8,
-      "worlds": [2, 3],
+      "worlds": [1, 2, 3, 4],
       "baseHealth": 380,
       "healthModifiers": [1.0, 1.4, 1.8, 2.3, 2.8],
       "skill1": "enemy_mirror_strike",
@@ -286,16 +301,17 @@
       "baseDamageMin": 16,
       "baseDamageMax": 19,
       "damageModifiers": [1.0, 1.25, 1.5, 1.75, 2.0],
-      "baseResistance": 24,
+      "physicalResist": 20,
+      "elementalResist": 24,
       "resistanceModifiers": [0, 6, 11, 16, 22],
-      "bonusResistance": 20,
-      "rewards": { "xp": 9, "goldMin": 12, "goldMax": 16, "sigilChance": 100, "relicChance": 100 }
+      "damageElement": "none",
+      "rewards": { "xp": 9, "goldMin": 12, "goldMax": 16, "sigilChance": 100, "relicChance": 100, "regularCoreChance": 100, "ascendedCoreChance": 100 }
     },
     {
       "type": "Boss",
       "displayName": "ElementalHydra",
       "enemyId": 15,
-      "worlds": [3, 4],
+      "worlds": [1, 2, 3, 4],
       "baseHealth": 400,
       "healthModifiers": [1.0, 1.4, 1.8, 2.3, 2.8],
       "skill1": "enemy_hydra_bite",
@@ -307,16 +323,17 @@
       "baseDamageMin": 16,
       "baseDamageMax": 19,
       "damageModifiers": [1.0, 1.25, 1.5, 1.75, 2.0],
-      "baseResistance": 28,
+      "physicalResist": 22,
+      "elementalResist": 28,
       "resistanceModifiers": [0, 6, 11, 16, 22],
-      "bonusResistance": 22,
-      "rewards": { "xp": 9, "goldMin": 12, "goldMax": 16, "sigilChance": 100, "relicChance": 100 }
+      "damageElement": "fire",
+      "rewards": { "xp": 9, "goldMin": 12, "goldMax": 16, "sigilChance": 100, "relicChance": 100, "regularCoreChance": 100, "ascendedCoreChance": 100 }
     },
     {
       "type": "Boss",
       "displayName": "FallenChampion",
       "enemyId": 16,
-      "worlds": [4, 5],
+      "worlds": [5],
       "baseHealth": 450,
       "healthModifiers": [1.0, 1.4, 1.8, 2.3, 2.8],
       "skill1": "enemy_champion_strike",
@@ -334,10 +351,11 @@
       "baseDamageMin": 15,
       "baseDamageMax": 18,
       "damageModifiers": [1.0, 1.25, 1.5, 1.75, 2.0],
-      "baseResistance": 30,
+      "physicalResist": 28,
+      "elementalResist": 22,
       "resistanceModifiers": [0, 6, 11, 16, 22],
-      "bonusResistance": 20,
-      "rewards": { "xp": 9, "goldMin": 12, "goldMax": 16, "sigilChance": 100, "relicChance": 100 }
+      "damageElement": "none",
+      "rewards": { "xp": 9, "goldMin": 12, "goldMax": 16, "sigilChance": 100, "relicChance": 100, "regularCoreChance": 100, "ascendedCoreChance": 100 }
     }
   ]
 }

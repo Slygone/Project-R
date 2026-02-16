@@ -1,197 +1,58 @@
-## GDD
+### Relic list
 
-### Enemies
-- Currently enemies have only 2 skills in their json file, but they only have attack as a skill inside the game. Let's change that. 
-
-Enemies should have 2 skills.
-
-Regular enemies Rules:
-- One skill should be a basic skill. 
-- The basic skill has no cooldown.
-- One skill should be a special skill.
-- The special skill should be a skill that is unique to the enemy.
-- The special skill should have a cooldown.
-- First turn is always a basic skill.
-- The special skill should be always casted when off cooldown by the enemy after the first turn. 
-- Each regular enemy should have a different special skill. 
-
-      "type": "Enemy",
-      "displayName": "Thug",
-      "skill1": "Quick stab", // Basic Skill 1.0 damage modifier
-      "skill2": "Weaken", // Special Skill reduces the players damage by 50% for 2 turns
-      "skill2Cooldown": 3,
-
-      "type": "Enemy",
-      "displayName": "Archer",
-      "skill1": "Arrow", // Basic Skill 1.0 damage modifier
-      "skill2": "Piercing Arrow", // Special Skill 1.0 damage modifier ignores resistance & shields.
-      "skill2Cooldown": 2,
-
-      "type": "Enemy",
-      "displayName": "Pyromaniac",
-      "skill1": "Fireball", // Basic Skill 1.0 damage modifier
-      "skill2": "Ignite", // Special Skill applies a damage over time effect to the player. 3 turns of 1.5 damage modifier.
-      "skill2Cooldown": 2,
+Relic rules:
+- Relics can drop from bosses, elite enemies and be bought from shop.
+- Relics have three rarites. Common Relics, Legendary Relic and Cursed Relics.
+- Common Relics are droped from Elits and Shops.
+- Legendary Relics are droped from Bosses and special events.
+- Cursed Relics are droped from special events and have negative effects.
+- Relic should have a name (first word) and should also have a type displayed (common or legendary) and should then have the effect description.
 
 
-      "type": "Enemy",
-      "displayName": "Wizard",
-      "skill1": "Arcane Bolt", // Basic Skill 1.0 damage modifier
-      "skill2": "Arcane Shield", // Special Skill applies a shield to the enemy for 50% of enemy max health.
-      "skill2Cooldown": 2,
+Common Relics:
 
-      "type": "Enemy",
-      "displayName": "Frostcaller",
-      "skill1": "Frost Nova", // Basic Skill 1.0 damage modifier
-      "skill2": "Frost Shield", // Special Skill applies a shield to the enemy increasing resistances by 20% for 1 turn. If broken the player takes 1.5 damage modifier. Brake point = 20% of max health recived while shiled is active.
-      "skill2Cooldown": 2,
+- Vital Totem — Icrease Health by 10%
+- Sharpened Edge — Increase max damage by +2.
+- Deadeye Counter — Every 10 skills used the next one is guaranteed to be a critical hit. (Carries across combats)
+- First Pulse — On start of combat give 2 extra AP (First turn only)  
+- Mark Echo — Once every 5 turns your next skill applies 1 extra mark.
+- Last Stand Blade — Deal Physical Damage equal to % of health missing. Max 30% bonus.
+- Sunder Ward — You are now immune to Sunder Status.
+- Weaken Ward — You are now immune to Weaken Status.
+- Ambush Seal — On start of combat apply weaken and vaunrable status to all enemies. Lasts 1 turn. You start combat with 2 AP.
+- Field Rations — After each combat, heal 3% of max HP
+- Marking Needle — The first time each turn you apply a mark, apply +1 extra mark (same element) to that target.
+- Guard Charm — Start combat with a Shield equal to 8% of your max HP
+- Focus Lens — Perfect QTE grants +1 AP next turn (once per turn)
+- Reinforced Plates — Gain +10% Physical Resistance.
+- Elemental Lining — Gain +10% Elemental Resistance.
+- Catalyst Splinter — The first Dual Reaction you trigger each combat requires 2 marks + 2 marks instead of 3 + 3.
+- Reaction Rebate — The first reaction you trigger each turn refunds 1 AP.
+- Elemental Drip — At the end of your turn, apply 1 mark of your equipped element to a random enemy.
+- Mark Transfer — When an enemy dies, transfer up to 2 marks (random existing marks) to another enemy.
+- Clean Trigger — If your reaction QTE result is Perfect, 1 mark is not consumed.
 
-      "type": "Enemy",
-      "displayName": "TideShaman",
-      "skill1": "Tidal Wave", // Basic Skill 1.0 damage modifier
-      "skill2": "Monsoon", // Special Skill applies a healing over time effect to the enemys. Healing them for 5% of max health per turn.
-      "skill2Cooldown": 2,
+Legendary Relics:
 
-      "type": "Enemy",
-      "displayName": "Deserter",
-      "skill1": "Slash", // Basic Skill 1.0 damage modifier
-      "skill2": "Battle Shout", // Special Skill increases the enemys damage by 20% for 2 turns.
-      "skill2Cooldown": 3,
+- Rhythm Discount — Every 3 turns reduce AP cost of your next 2 skills by 1.
+- Cooldown Lottery — Every 20 AP spent (Carries over combat) one random skill gets its cooldown refreshed and becomes costs 0 AP to cast. If no skill is on cooldown then its just 0 AP to cast. Cannot target Ultimate.
+- Early Guard Override — Disable Defensive QTE for the first 2 turns of combat. Gain 10% more resistances.
+- Sigil Renounce — Disable Reactions QTE and removes all sigils from skills. Gain 20% more physical damage, 10% crit rating and 20% crit damage for the rest of the run. You cannot earn Sigils anymore.
+- Fracture Revival — Revives you once per run. You come back with 30% health. This relic is then broken and cannot be used again it also reduces your max HP by 15% for the rest of the run.
+- Elemental Broadcast — On start of combat apply 1 of your equipped elemental mark type on all enemies.
+- Ice Cream Core — At the end of your turn, you keep any unspent AP instead of losing it. At the start of your next turn, you refresh to your Max AP as normal, then gain the saved AP on top. Saved AP can exceed Max AP and is spent first.
+- Reactor Core — The first reaction you trigger each combat triggers twice (second trigger at 50% effect).
+- Dual Specialist — When you trigger a Dual Reaction, gain a Shield = 5% max HP. (once per combat)
 
-      "type": "Enemy",
-      "displayName": "Shieldbearer",
-      "skill1": "Shield Slam", // Basic Skill 1.0 damage modifier
-      "skill2": "Retaliation", // Special Skill the enemy returns the players attacks this turn. Each attack the enemy deals 1.0 damage modifier.
-      "skill2Cooldown": 4,
-   
+Cursed Relics:
 
-Elite enemies Rules:
-- One skill should be a basic skill.
-- One skill should be a special skill.
-- The special skill should be a skill that is unique to the enemy.
-- The special skill should have a cooldown.
-- First turn is always a basic skill.
-- The special skill should be always casted when off cooldown by the enemy after the first turn.
-- Each regular enemy should have a different special skill. 
- 
-
-
-      "type": "Elite", 
-      "displayName": "Juggernaut",      
-      "skill1": "Sunder Smash", // Basic Skill 1.0 damage modifier. Each attack the enemy leaves a mark on the player. Increasing damage taken by 10% for 2 turns. This can stack up to 50%
-      "skill2": "Brutal Strikes", // Special Skill 0.7 damage modifier. Attacks 3 times in a row. 
-      "skill2Cooldown": 2,
-
-      "type": "Elite",
-      "displayName": "Spellbreaker",
-      "skill1": "Spell blade", // Basic Skill 1.0 damage modifier.If player has a shield it deals 1.5 damage modifier to shileds. 
-      "skill2": "Syphon Magic", // Special Skill steals all shield from the player. Deals 1.0 damage for each point of shield stolen.
-      "skill2Cooldown": 3,
-
-      "type": "Elite",
-      "displayName": "StormCaptain",
-      "skill1": "Lighting Cutlass", // Basic Skill 1.0 damage modifier. 
-      "skill2": "Null Sigil", // Special Skill blocks all marks being applied to enemies for 2 turns. Deals 0.5 damage modifier to the player for each sigil blocked. (5 sigils = 2.5 damage modifier)
-      "skill2Cooldown": 3,
-      
-    
-      "type": "Elite",
-      "displayName": "StoneColossus",      
-      "skill1": "Crush", // Basic Skill 1.0 damage modifier.
-      "skill2": "Granite Bastion", // Special Skill applies a shield to the enemy shielding them for 20% of max health for the combat. Each stack of Granite Bastion increases the damage of the crush skill by 10% damage modifier. 
-      "skill2Cooldown": 2,
-  
-  Boss enemies Rules:
-  - Bosses have varied skills.
-  - Bosses have attack patterns. 
-  
-      "type": "Boss",
-      "displayName": "SlimeBoss",
-      "skill1": "Slam", // Basic Skill 1.0 damage modifier.
-      "skill2": "Weaken", // Special Skill applies an effect weaken the player reducing damage done by 50% for 2 turns.
-      "skill2Cooldown": 2,
-      "skill3": "Sunder", // Special Skill applies an effect Sunder the player reducing shield gain by 50% for 2 turns.
-      "skill3Cooldown": 2,
-      "skill4": "Split", // Special Skill splits the SlimeBoss into 2 slimes. Each slime has 50% of the SlimeBoss current health. Split is Casted when Slimeboss is <= 66% of max health. 
-
-      SlimeBoss Attack Pattern:
-      - SlimeBoss attacks with Slam Turn 1
-      - SlimeBoss attacks with Weaken Turn 2
-      - SlimeBoss attacks with Slam Turn 3
-      - SlimeBoss attacks with Sunder Turn 4
-      - Repeat
-      
-      "type": "Boss",
-      "displayName": "MadSlime", //MadSlime is a an enemy that can only be spawned when SlimeBoss splits.
-      "skill1": "Slam", // Basic Skill 1.0 damage modifier.
-      "skill2": "Weaken", // Special Skill applies an effect weaken the player reducing damage done by 50% for 2 turns.
-      "skill2Cooldown": 2,
-
-      MadSlime Attack Pattern:
-      - MadSlime attacks with Slam Turn 1
-      - MadSlime attacks with Weaken Turn 2
-      - MadSlime attacks with Slam Turn 3
-      - Repeat
-
-      "type": "Boss", 
-      "displayName": "SadSlime", //SadSlime is a an enemy that can only be spawned when SlimeBoss splits.
-      "skill1": "Slam", // Basic Skill 1.0 damage modifier.
-      "skill2": "Sunder", // Special Skill applies an effect Sunder the player reducing shield gain by 50% for 2 turns.
-      "skill2Cooldown": 2,
-
-      SadSlime Attack Pattern:
-      - SadSlime attacks with Slam Turn 1
-      - SadSlime attacks with Sunder Turn 2
-      - SadSlime attacks with Slam Turn 3
-      - Repeat
-
-      "type": "Boss",
-      "displayName": "MirrorBoss",
-      "skill1": "Strike", // Basic Skill 1.0 damage modifier.
-      "skill2": "Mirror Shield", // Special Skill applies a shield to the MirrorBoss. 20% of max health.
-      "skill3": "Mirror Reaction", // Special Skill mirrors the players last elemental reaction. 
-      "skill4": "Mirror Strike", // Special Skill mirrors the players last attack. Deals 1.5 damage modifier.
-
-      MirrorBoss Attack Pattern:
-      - MirrorBoss attacks with Strike Turn 1
-      - MirrorBoss attacks with Mirror Shield if player gains a shield.
-      - MirrorBoss attacks with Mirror Reaction if player casts a reaction.
-      - MirrorBoss attacks with Mirror Strike if player casts an attack. 
-      // Mirror Attacks are casted in addition to the Mirror Boss Strike. If a player attacks, gains a shield and casts a reaction the MirrorBoss attacks with all 4 skills.
-      - Repeat
-    
-      "type": "Boss",
-      "displayName": "ElementalHydra",
-      "skill1": "Hydera Bite", // Basic Skill 1.0 damage modifier. Heals the Hydra for 15% of damge dealt. 
-      "skill2": "Hydra Breath", // Special Skill applies a damage over time effect to the player. 3 turns of 1.5 damage modifier.
-      "skill2Cooldown": 2,
-      "skill3": "Hydra Tail", // Special Skill stuns the enemy for 1 turn. Weakens and Sunders for 2 turns. 
-      "skill3Cooldown": 4,
-      
-
-      Hydra Attack Pattern:
-      - Hydra attacks with Hydera Bite Turn 1
-      - Hydra attacks with Hydra Breath Turn 2
-      - Hydra attacks with Hydra Tail Turn 3
-      - Repeat
-
-
-      "type": "Boss",
-      "displayName": "FallenChampion",
-      "skill1": "Champion Strike", // Basic Skill 2.0 damage modifier. 
-      "skill2": "Short Combo", // Special Skill Attacks 3 times in a row. Each attack deals 1.2 damage modifier. If each attack is perfectly timed by the player the Short Combo skill deals 0 damage. If not the player takes full damage.
-      "skill2Cooldown": 2,
-      "skill3": "Long Combo", // Special Skill Attacks 6 times in a row. Each attack deals 1.5 damage modifier. If each 
-      attack is perfectly timed by the player the Long Combo skill deals 0 damage. If not the player takes full damage. 
-      "skill3Cooldown": 2,
-      "skill4": "Reborn", // Special Skill revives the FallenChampion with 100% of max health and gains 100% more damage modifier. Removes cooldown on Long Combo. Can only happen once per combat.
-
-      FallenChampion Attack Pattern:
-      - FallenChampion attacks with Champion Strike Turn 1
-      - FallenChampion attacks with Short Combo Turn 2
-      - FallenChampion attacks with Long Combo Turn 3
-      - Repeat
-      
-      Reborn FallenChampion Attack Pattern:
-      - FallenChampion attacks with Long Combo Turn 1
-      - Repeat
+- Crippling Weakness — Start combat with Weaken status on yourself lasts 2 turns.
+- Rustbound Sunder — Start combat with Sundered status on yourself lasts 2 turns.
+- Blood Toll — Every end of combat lose 1 hp.
+- Overcharged Ultimate — Increases the energy requirment of your ultimate by 100%
+- Cracked Battery — Start each combat with -2 AP for 2 turns.
+- Rusty Blade — Your Crit Damage is reduced by 20%
+- Siphoning Aura — Each turn you lose 1 AP at the start of your turn. (Max AP is not affected you basically start 9/10 each turn)
+- Reaction Exhaustion — After you trigger a reaction, gain Weaken (1 turn). (once per turn)
+- Elemental Fog — You can’t see enemy marks (UI hidden), but you gain +1 AP on turn 1.
+- Overconsumption — Reactions consume +1 extra mark total (Dual consumes 3 + 4, Mono consumes 7).

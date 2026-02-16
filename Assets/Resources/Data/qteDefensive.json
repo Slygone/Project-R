@@ -9,16 +9,16 @@
     },
     {
       "result": "Good",
-      "description": "Gain 3% max HP as shield",
+      "description": "Gain 2% max HP as shield",
       "effects": [
-        { "effectId": "eff_shield_gain", "target": "Self", "percentOfMaxHealth": 3 }
+        { "effectId": "eff_shield_gain", "target": "Self", "percentOfMaxHealth": 2 }
       ]
     },
     {
       "result": "Perfect",
-      "description": "Gain 5% max HP as shield",
+      "description": "Gain 3% max HP as shield",
       "effects": [
-        { "effectId": "eff_shield_gain", "target": "Self", "percentOfMaxHealth": 5 }
+        { "effectId": "eff_shield_gain", "target": "Self", "percentOfMaxHealth": 3 }
       ]
     }
   ]

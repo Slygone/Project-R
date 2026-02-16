@@ -80,9 +80,7 @@ public class CombatArena : MonoBehaviour
     
     // Targeting system
     private int selectedEnemyIndex = 0;
-    private int? pendingSkillNumber = null;
     private GameObject targetIndicator;
-    private bool isSelectingTarget = false;
     
     // Health and Energy UI containers
     private GameObject healthContainer;
@@ -187,35 +185,22 @@ public class CombatArena : MonoBehaviour
             }
         }
         
-        // Handle target selection with arrow keys
-        if (isSelectingTarget)
+        // Handle target switching with Tab, arrow up/down
+        if (Input.GetKeyDown(KeyCode.Tab) || Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.DownArrow))
         {
-            if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.UpArrow))
-            {
-                SelectPreviousEnemy();
-            }
-            else if (Input.GetKeyDown(KeyCode.RightArrow) || Input.GetKeyDown(KeyCode.DownArrow))
-            {
-                SelectNextEnemy();
-            }
-            else if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space))
-            {
-                ConfirmTargetSelection();
-            }
-            else if (Input.GetKeyDown(KeyCode.Escape))
-            {
-                CancelTargetSelection();
-            }
+            SelectNextEnemy();
         }
-        else
+        else if (Input.GetKeyDown(KeyCode.LeftArrow) || Input.GetKeyDown(KeyCode.UpArrow))
         {
-            // Handle keyboard input for skills (1-5)
-            if (Input.GetKeyDown(KeyCode.Alpha1)) OnSkillClicked(1);
-            if (Input.GetKeyDown(KeyCode.Alpha2)) OnSkillClicked(2);
-            if (Input.GetKeyDown(KeyCode.Alpha3)) OnSkillClicked(3);
-            if (Input.GetKeyDown(KeyCode.Alpha4)) OnSkillClicked(4);
-            if (Input.GetKeyDown(KeyCode.Alpha5)) OnSkillClicked(5);
+            SelectPreviousEnemy();
         }
+        
+        // Handle keyboard input for skills (1-5) — executes on currently selected target
+        if (Input.GetKeyDown(KeyCode.Alpha1)) OnSkillClicked(1);
+        if (Input.GetKeyDown(KeyCode.Alpha2)) OnSkillClicked(2);
+        if (Input.GetKeyDown(KeyCode.Alpha3)) OnSkillClicked(3);
+        if (Input.GetKeyDown(KeyCode.Alpha4)) OnSkillClicked(4);
+        if (Input.GetKeyDown(KeyCode.Alpha5)) OnSkillClicked(5);
         
         // Update target indicator position
         UpdateTargetIndicator();
@@ -490,11 +475,11 @@ public class CombatArena : MonoBehaviour
         visual.transform.localPosition = Vector3.zero;
         visual.transform.localScale = new Vector3(enemyScale, enemyScale * 1.5f, enemyScale);
         
-        // Set color based on enemy affinity or index
+        // Set color based on enemy damage element or index
         var renderer = visual.GetComponent<Renderer>();
         if (renderer != null)
         {
-            Color color = GetColorForElement(enemyData.Affinity);
+            Color color = GetColorForElement(enemyData.DamageElement);
             if (color == Color.white && index < enemyColors.Length)
             {
                 color = enemyColors[index];
@@ -892,7 +877,7 @@ public class CombatArena : MonoBehaviour
         skillButtonsData.Add(data);
         
         // Apply element color to button background if skill has element
-        if (!string.IsNullOrEmpty(element) && element.ToLower() != "none")
+        if (!string.IsNullOrEmpty(element) && element.ToLower() != "physical")
         {
             Color elemColor = GetElementColor(element);
             bgImage.color = new Color(elemColor.r * 0.3f, elemColor.g * 0.3f, elemColor.b * 0.3f);
@@ -911,7 +896,7 @@ public class CombatArena : MonoBehaviour
             case Element.Wind: return "wind";
             case Element.Rock: return "rock";
             case Element.Lightning: return "lightning";
-            default: return "none";
+            default: return "Physical";
         }
     }
     
@@ -968,7 +953,7 @@ public class CombatArena : MonoBehaviour
                 else
                 {
                     // Normal state - use element color if applicable
-                    if (!string.IsNullOrEmpty(data.baseElement) && data.baseElement.ToLower() != "none")
+                    if (!string.IsNullOrEmpty(data.baseElement) && data.baseElement.ToLower() != "physical")
                     {
                         Color elemColor = GetElementColor(data.baseElement);
                         data.bgImage.color = new Color(elemColor.r * 0.3f, elemColor.g * 0.3f, elemColor.b * 0.3f);
@@ -985,6 +970,19 @@ public class CombatArena : MonoBehaviour
     
     private void UpdateAPDisplay()
     {
+        // Sync maxAP from Player in case BonusAP buff changed it mid-turn
+        if (currentPlayer != null)
+        {
+            int playerMax = currentPlayer.GetMaxAP();
+            if (playerMax != maxAP)
+            {
+                int diff = playerMax - maxAP;
+                maxAP = playerMax;
+                // If max increased mid-turn (BonusAP buff), also increase current AP
+                if (diff > 0) currentAP += diff;
+            }
+        }
+        
         if (apDisplayText != null)
         {
             apDisplayText.text = $"AP: {currentAP} / {maxAP}";
@@ -1002,7 +1000,6 @@ public class CombatArena : MonoBehaviour
     private void OnSkillClicked(int skillNumber)
     {
         if (combatManager == null || currentPlayer == null) return;
-        if (isSelectingTarget) return; // Already selecting target
         if (combatManager.IsQTEActive()) return; // Block skills during QTE
         
         // Find the skill data to get AP cost
@@ -1028,51 +1025,37 @@ public class CombatArena : MonoBehaviour
         int cooldown = currentPlayer.GetSkillCooldown(skillNumber - 1);
         if (cooldown > 0) return;
         
-        // Count alive enemies
-        int aliveCount = 0;
-        foreach (var enemy in spawnedEnemies)
-        {
-            if (enemy != null && enemy.IsAlive) aliveCount++;
-        }
+        // Execute skill on currently selected target (no confirmation needed)
+        // Ensure selected target is valid and alive
+        EnsureValidTarget();
         
-        // If only one enemy, execute directly on them
-        if (aliveCount == 1)
+        if (selectedEnemyIndex >= 0 && selectedEnemyIndex < spawnedEnemies.Count)
         {
-            // Find the single alive enemy (don't rely on selectedEnemyIndex which may be stale)
-            CombatEnemy target = null;
-            for (int i = 0; i < spawnedEnemies.Count; i++)
+            var selectedUnit = spawnedEnemies[selectedEnemyIndex];
+            if (selectedUnit != null && selectedUnit.IsAlive)
             {
-                if (spawnedEnemies[i] != null && spawnedEnemies[i].IsAlive)
+                CombatEnemy target = selectedUnit.CombatEnemy;
+                if (target != null && combatManager != null)
                 {
-                    target = spawnedEnemies[i].CombatEnemy;
-                    selectedEnemyIndex = i;
-                    break;
+                    currentAP -= skillData.apCost;
+                    combatManager.OnPlayerSkillTarget(skillNumber, target);
                 }
             }
-            
-            if (target != null && combatManager != null)
-            {
-                // Deduct AP cost only when we have a valid target
-                currentAP -= skillData.apCost;
-                combatManager.OnPlayerSkillTarget(skillNumber, target);
-            }
-            
-            // Update UI
-            UpdateAPDisplay();
-            UpdateSkillButtonStates();
         }
-        else if (aliveCount > 1)
-        {
-            // Multiple enemies - need to select target
-            // Store the AP cost to deduct after confirmation
-            pendingSkillNumber = skillNumber;
-            
-            // Deduct AP cost now (will be refunded if cancelled)
-            currentAP -= skillData.apCost;
-            UpdateAPDisplay();
-            
-            StartTargetSelection(skillNumber);
-        }
+        
+        // Update UI
+        UpdateAPDisplay();
+        UpdateSkillButtonStates();
+    }
+    
+    /// <summary>
+    /// Called after mid-turn effects (e.g. reaction buffs) change AP values.
+    /// Syncs AP from Player and refreshes display + skill states.
+    /// </summary>
+    public void RefreshAPDisplay()
+    {
+        UpdateAPDisplay();
+        UpdateSkillButtonStates();
     }
     
     /// <summary>
@@ -1082,6 +1065,8 @@ public class CombatArena : MonoBehaviour
     {
         if (currentPlayer != null && currentPlayer.HasCharacter())
         {
+            // Sync maxAP from Player (may have changed due to BonusAP reaction buff)
+            maxAP = currentPlayer.GetMaxAP();
             currentAP = maxAP;
             UpdateAPDisplay();
             UpdateSkillButtonStates();
@@ -1291,7 +1276,7 @@ public class CombatArena : MonoBehaviour
     
     private void CreateDebuffContainer()
     {
-        // Horizontal container above the health bar for debuff chips
+        // Grid container above the health bar for debuff chips
         debuffContainer = new GameObject("DebuffContainer");
         debuffContainer.transform.SetParent(combatCanvas.transform, false);
         
@@ -1299,21 +1284,25 @@ public class CombatArena : MonoBehaviour
         containerRect.anchorMin = new Vector2(0f, 0f);
         containerRect.anchorMax = new Vector2(0f, 0f);
         containerRect.pivot = new Vector2(0f, 0f);
-        containerRect.anchoredPosition = new Vector2(20, 62); // Above health bar (health at y=20, height=36)
-        containerRect.sizeDelta = new Vector2(400, 28);
+        containerRect.anchoredPosition = new Vector2(20, 62);
+        containerRect.sizeDelta = new Vector2(500, 0);
         
-        // Horizontal layout for debuff chips
-        var layout = debuffContainer.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 6;
-        layout.childAlignment = TextAnchor.MiddleLeft;
-        layout.childForceExpandWidth = false;
-        layout.childForceExpandHeight = true;
-        layout.padding = new RectOffset(0, 0, 0, 0);
+        var grid = debuffContainer.AddComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(100, 24);
+        grid.spacing = new Vector2(4, 4);
+        grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        grid.childAlignment = TextAnchor.UpperLeft;
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = 5;
+        
+        var csf = debuffContainer.AddComponent<ContentSizeFitter>();
+        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
     }
     
     private void CreateBuffContainer()
     {
-        // Horizontal container above the debuff container for reaction buff chips
+        // Grid container above the debuff container for reaction + relic buff chips
         buffContainer = new GameObject("BuffContainer");
         buffContainer.transform.SetParent(combatCanvas.transform, false);
         
@@ -1321,22 +1310,29 @@ public class CombatArena : MonoBehaviour
         containerRect.anchorMin = new Vector2(0f, 0f);
         containerRect.anchorMax = new Vector2(0f, 0f);
         containerRect.pivot = new Vector2(0f, 0f);
-        containerRect.anchoredPosition = new Vector2(20, 96); // Above debuff container (debuff at y=62, height=28)
-        containerRect.sizeDelta = new Vector2(400, 28);
+        containerRect.anchoredPosition = new Vector2(20, 96);
+        containerRect.sizeDelta = new Vector2(500, 0);
         
-        var layout = buffContainer.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 6;
-        layout.childAlignment = TextAnchor.MiddleLeft;
-        layout.childForceExpandWidth = false;
-        layout.childForceExpandHeight = true;
-        layout.padding = new RectOffset(0, 0, 0, 0);
+        var grid = buffContainer.AddComponent<GridLayoutGroup>();
+        grid.cellSize = new Vector2(100, 24);
+        grid.spacing = new Vector2(4, 4);
+        grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
+        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
+        grid.childAlignment = TextAnchor.UpperLeft;
+        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
+        grid.constraintCount = 5;
+        
+        var csf = buffContainer.AddComponent<ContentSizeFitter>();
+        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
     }
     
     private void UpdateBuffDisplay()
     {
         if (currentPlayer == null || buffContainer == null) return;
         
-        var activeChips = currentPlayer.GetReactionChips();
+        // Combine reaction chips + relic buff chips
+        var activeChips = new List<ReactionChipInfo>(currentPlayer.GetReactionChips());
+        activeChips.AddRange(currentPlayer.GetRelicBuffChips());
         
         // Remove UI chips no longer active
         for (int i = buffChips.Count - 1; i >= 0; i--)
@@ -1393,31 +1389,23 @@ public class CombatArena : MonoBehaviour
         outline.effectColor = new Color(0.3f, 0.8f, 0.4f, 0.8f);
         outline.effectDistance = new Vector2(1, 1);
         
-        // Size via LayoutElement — same size as debuff chips
-        var layoutElem = chip.chipObj.AddComponent<LayoutElement>();
-        layoutElem.preferredHeight = 24;
-        layoutElem.minWidth = 20;
-        
-        var fitter = chip.chipObj.AddComponent<ContentSizeFitter>();
-        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
-        
-        var hLayout = chip.chipObj.AddComponent<HorizontalLayoutGroup>();
-        hLayout.padding = new RectOffset(8, 8, 2, 2);
-        hLayout.childAlignment = TextAnchor.MiddleCenter;
-        hLayout.childForceExpandWidth = false;
-        hLayout.childForceExpandHeight = true;
-        
-        // Name text
+        // Name text (fills the grid cell)
         var textObj = new GameObject("BuffName");
         textObj.transform.SetParent(chip.chipObj.transform, false);
         
+        var textRect = textObj.AddComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = new Vector2(4f, 0f);
+        textRect.offsetMax = new Vector2(-4f, 0f);
+        
         chip.nameText = textObj.AddComponent<TextMeshProUGUI>();
         chip.nameText.text = chipName;
-        chip.nameText.fontSize = 14;
+        chip.nameText.fontSize = 12;
         chip.nameText.color = new Color(0.6f, 1f, 0.7f);
         chip.nameText.alignment = TextAlignmentOptions.Center;
         chip.nameText.textWrappingMode = TextWrappingModes.NoWrap;
+        chip.nameText.overflowMode = TextOverflowModes.Ellipsis;
         chip.nameText.raycastTarget = false;
         
         // EventTrigger for tooltip hover
@@ -1519,33 +1507,23 @@ public class CombatArena : MonoBehaviour
         outline.effectColor = new Color(0.8f, 0.2f, 0.2f, 0.8f);
         outline.effectDistance = new Vector2(1, 1);
         
-        // Size via LayoutElement
-        var layoutElem = chip.chipObj.AddComponent<LayoutElement>();
-        layoutElem.preferredHeight = 24;
-        layoutElem.minWidth = 20;
-        
-        // ContentSizeFitter to auto-width based on text
-        var fitter = chip.chipObj.AddComponent<ContentSizeFitter>();
-        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
-        
-        // Horizontal padding layout
-        var hLayout = chip.chipObj.AddComponent<HorizontalLayoutGroup>();
-        hLayout.padding = new RectOffset(8, 8, 2, 2);
-        hLayout.childAlignment = TextAnchor.MiddleCenter;
-        hLayout.childForceExpandWidth = false;
-        hLayout.childForceExpandHeight = true;
-        
-        // Name text
+        // Name text (fills the grid cell)
         var textObj = new GameObject("DebuffName");
         textObj.transform.SetParent(chip.chipObj.transform, false);
         
+        var textRect = textObj.AddComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = new Vector2(4f, 0f);
+        textRect.offsetMax = new Vector2(-4f, 0f);
+        
         chip.nameText = textObj.AddComponent<TextMeshProUGUI>();
         chip.nameText.text = name;
-        chip.nameText.fontSize = 14;
+        chip.nameText.fontSize = 12;
         chip.nameText.color = new Color(1f, 0.7f, 0.7f);
         chip.nameText.alignment = TextAlignmentOptions.Center;
         chip.nameText.textWrappingMode = TextWrappingModes.NoWrap;
+        chip.nameText.overflowMode = TextOverflowModes.Ellipsis;
         chip.nameText.raycastTarget = false;
         
         // EventTrigger for tooltip hover
@@ -1727,6 +1705,9 @@ public class CombatArena : MonoBehaviour
         mat.color = new Color(1f, 0.9f, 0.2f); // Yellow
         meshRenderer.material = mat;
         
+        // Render behind enemy world-space canvas (sortingOrder=100)
+        meshRenderer.sortingOrder = 90;
+        
         targetIndicator.transform.localScale = Vector3.one * 1.5f;
         targetIndicator.SetActive(false);
     }
@@ -1853,80 +1834,19 @@ public class CombatArena : MonoBehaviour
         }
     }
     
-    private void StartTargetSelection(int skillNumber)
+    /// <summary>
+    /// Ensures the currently selected enemy index points to a valid alive enemy.
+    /// If the current selection is invalid or dead, auto-selects the next alive enemy.
+    /// </summary>
+    private void EnsureValidTarget()
     {
-        pendingSkillNumber = skillNumber;
-        isSelectingTarget = true;
-        
-        // Ensure we have a valid target selected
-        if (selectedEnemyIndex < 0 || selectedEnemyIndex >= spawnedEnemies.Count ||
-            spawnedEnemies[selectedEnemyIndex] == null || !spawnedEnemies[selectedEnemyIndex].IsAlive)
+        if (selectedEnemyIndex >= 0 && selectedEnemyIndex < spawnedEnemies.Count &&
+            spawnedEnemies[selectedEnemyIndex] != null && spawnedEnemies[selectedEnemyIndex].IsAlive)
         {
-            // Find first alive enemy
-            for (int i = 0; i < spawnedEnemies.Count; i++)
-            {
-                if (spawnedEnemies[i] != null && spawnedEnemies[i].IsAlive)
-                {
-                    selectedEnemyIndex = i;
-                    break;
-                }
-            }
+            return; // Current selection is valid
         }
         
-        UpdateEnemySelection();
-    }
-    
-    private void ConfirmTargetSelection()
-    {
-        if (!pendingSkillNumber.HasValue) return;
-        if (selectedEnemyIndex < 0 || selectedEnemyIndex >= spawnedEnemies.Count) return;
-        
-        var selectedEnemy = spawnedEnemies[selectedEnemyIndex];
-        if (selectedEnemy == null || !selectedEnemy.IsAlive) return;
-        
-        int skillNumber = pendingSkillNumber.Value;
-        isSelectingTarget = false;
-        pendingSkillNumber = null;
-        
-        // Execute the skill on the selected target
-        if (combatManager != null)
-        {
-            combatManager.OnPlayerSkillTarget(skillNumber, selectedEnemy.CombatEnemy);
-        }
-        
-        // Update UI
-        UpdateAPDisplay();
-        UpdateSkillButtonStates();
-    }
-    
-    private void CancelTargetSelection()
-    {
-        if (!pendingSkillNumber.HasValue)
-        {
-            isSelectingTarget = false;
-            return;
-        }
-        
-        // Refund AP since skill was cancelled
-        SkillButtonData skillData = null;
-        foreach (var data in skillButtonsData)
-        {
-            if (data.skillNumber == pendingSkillNumber.Value)
-            {
-                skillData = data;
-                break;
-            }
-        }
-        
-        if (skillData != null)
-        {
-            currentAP += skillData.apCost;
-            UpdateAPDisplay();
-            UpdateSkillButtonStates();
-        }
-        
-        isSelectingTarget = false;
-        pendingSkillNumber = null;
+        SelectNextAliveEnemy();
     }
     
     /// <summary>
@@ -1974,14 +1894,10 @@ public class CombatArena : MonoBehaviour
     {
         if (playerTransform == null || currentPlayer == null) return;
         
-        // Create world-space canvas for player nameplate - EXACTLY like EnemyWorldUnit
-        // NOTE: We parent to playerTransform but use WORLD position for the nameplate
-        // This avoids inheriting player's combat scale which would make text huge
+        // Create world-space canvas for player nameplate
         GameObject canvasObj = new GameObject("PlayerUI");
         canvasObj.transform.SetParent(playerTransform);
         
-        // Use the serialized playerNameplateHeight (should match enemy healthBarYOffset = 4f)
-        // Divide by player scale to get correct local position that results in world height
         float localY = playerNameplateHeight / playerCombatScale.y;
         canvasObj.transform.localPosition = new Vector3(0f, localY, 0f);
         
@@ -1990,38 +1906,85 @@ public class CombatArena : MonoBehaviour
         playerWorldCanvas.sortingOrder = 100;
         
         var canvasRect = canvasObj.GetComponent<RectTransform>();
-        canvasRect.sizeDelta = new Vector2(325f, 50f); // Same as enemy: healthBarWidth * 100f
-        // Counter-scale to match enemy: enemy uses 0.01f with no parent scale
-        // Player has parent scale, so we divide by it
-        float scaleCompensation = 0.01f / playerCombatScale.x; // Use X scale for uniform compensation
+        canvasRect.sizeDelta = new Vector2(325f, 120f);
+        float scaleCompensation = 0.01f / playerCombatScale.x;
         canvasRect.localScale = Vector3.one * scaleCompensation;
         
-        // Add canvas scaler for proper sizing - same as enemy
         var scaler = canvasObj.AddComponent<CanvasScaler>();
         scaler.dynamicPixelsPerUnit = 100f;
         
-        // Create nameplate text - EXACTLY like EnemyWorldUnit.CreateNameplate
-        GameObject nameObj = new GameObject("Nameplate");
-        nameObj.transform.SetParent(canvasObj.transform, false);
+        // GraphicRaycaster required for pointer events (tooltip hover)
+        canvasObj.AddComponent<UnityEngine.UI.GraphicRaycaster>();
+        
+        // Chip container with background
+        GameObject chipObj = new GameObject("NameplateChip");
+        chipObj.transform.SetParent(canvasObj.transform, false);
+        
+        var chipRect = chipObj.AddComponent<RectTransform>();
+        chipRect.anchorMin = new Vector2(0.5f, 0.5f);
+        chipRect.anchorMax = new Vector2(0.5f, 0.5f);
+        chipRect.pivot = new Vector2(0.5f, 0.5f);
+        chipRect.anchoredPosition = Vector2.zero;
+        chipRect.sizeDelta = new Vector2(220f, 36f);
+        
+        // Dark background
+        var chipBg = chipObj.AddComponent<UnityEngine.UI.Image>();
+        chipBg.color = new Color(0.12f, 0.12f, 0.16f, 0.92f);
+        chipBg.raycastTarget = true;
+        
+        // Green border for player
+        var chipOutline = chipObj.AddComponent<UnityEngine.UI.Outline>();
+        chipOutline.effectColor = new Color(0.3f, 0.9f, 0.4f, 1f);
+        chipOutline.effectDistance = new Vector2(2, 2);
+        
+        // Name text inside chip
+        GameObject nameObj = new GameObject("NameText");
+        nameObj.transform.SetParent(chipObj.transform, false);
         
         var nameRect = nameObj.AddComponent<RectTransform>();
-        nameRect.anchorMin = new Vector2(0.5f, 1f);
-        nameRect.anchorMax = new Vector2(0.5f, 1f);
-        nameRect.pivot = new Vector2(0.5f, 0f);
-        nameRect.anchoredPosition = new Vector2(0f, 5f);
-        nameRect.sizeDelta = new Vector2(200f, 30f);
+        nameRect.anchorMin = Vector2.zero;
+        nameRect.anchorMax = Vector2.one;
+        nameRect.offsetMin = new Vector2(6, 0);
+        nameRect.offsetMax = new Vector2(-6, 0);
         
         playerNameText = nameObj.AddComponent<TextMeshProUGUI>();
         playerNameText.text = currentPlayer.HasCharacter() ? currentPlayer.GetCharacter().DisplayName : "Player";
-        playerNameText.fontSize = 36f;
+        playerNameText.fontSize = 28f;
         playerNameText.fontStyle = FontStyles.Bold;
         playerNameText.color = Color.white;
         playerNameText.alignment = TextAlignmentOptions.Center;
         playerNameText.textWrappingMode = TextWrappingModes.NoWrap;
+        playerNameText.raycastTarget = false;
         
-        // Add outline for readability - same as enemy
-        playerNameText.outlineWidth = 0.4f;
+        playerNameText.outlineWidth = 0.3f;
         playerNameText.outlineColor = Color.black;
+        
+        // Add hover events via EventTrigger (tooltip via screen-space)
+        var trigger = chipObj.AddComponent<UnityEngine.EventSystems.EventTrigger>();
+        
+        var pointerEnter = new UnityEngine.EventSystems.EventTrigger.Entry();
+        pointerEnter.eventID = UnityEngine.EventSystems.EventTriggerType.PointerEnter;
+        pointerEnter.callback.AddListener((data) => ShowPlayerTooltip());
+        trigger.triggers.Add(pointerEnter);
+        
+        var pointerExit = new UnityEngine.EventSystems.EventTrigger.Entry();
+        pointerExit.eventID = UnityEngine.EventSystems.EventTriggerType.PointerExit;
+        pointerExit.callback.AddListener((data) => HideTooltipInternal());
+        trigger.triggers.Add(pointerExit);
+    }
+    
+    private void ShowPlayerTooltip()
+    {
+        if (currentPlayer == null) return;
+        
+        string dmgRange = currentPlayer.HasCharacter() ? currentPlayer.GetCharacter().DamageRangeLabel : "?";
+        
+        string content = 
+            $"<color=#ff8888>DMG:</color> {dmgRange}\n" +
+            $"<color=#cccccc>Phys Resist:</color> {currentPlayer.GetPhysicalResist()}%\n" +
+            $"<color=#88bbff>Elem Resist:</color> {currentPlayer.GetElementalResist()}%";
+        
+        ShowTooltipInternal(content);
     }
     
     private void DestroyPlayerNameplate()

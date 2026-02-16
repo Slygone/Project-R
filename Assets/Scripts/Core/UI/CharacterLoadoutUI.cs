@@ -116,7 +116,7 @@ public class CharacterLoadoutUI : MonoBehaviour
         backRect.offsetMax = Vector2.zero;
         
         var backImg = backBtn.AddComponent<Image>();
-        backImg.color = new Color(0.3f, 0.3f, 0.35f);
+        backImg.color = new Color(0.15f, 0.18f, 0.22f, 0.9f);
         
         var backButton = backBtn.AddComponent<Button>();
         backButton.targetGraphic = backImg;
@@ -130,7 +130,7 @@ public class CharacterLoadoutUI : MonoBehaviour
         backTextRect.offsetMin = Vector2.zero;
         backTextRect.offsetMax = Vector2.zero;
         var backText = backTextObj.AddComponent<TextMeshProUGUI>();
-        backText.text = "< BACK";
+        backText.text = "← BACK";
         backText.alignment = TextAlignmentOptions.Center;
         backText.fontSize = 16;
         backText.color = Color.white;
@@ -149,12 +149,13 @@ public class CharacterLoadoutUI : MonoBehaviour
         titleText.fontSize = 28;
         titleText.fontStyle = FontStyles.Bold;
         titleText.color = new Color(1f, 0.85f, 0.2f);
+        titleText.raycastTarget = false;
         
         // Ascension level subtitle
         var levelObj = new GameObject("Level");
         levelObj.transform.SetParent(loadoutPanel.transform, false);
         var levelRect = levelObj.AddComponent<RectTransform>();
-        levelRect.anchorMin = new Vector2(0.2f, 0.87f);
+        levelRect.anchorMin = new Vector2(0.2f, 0.88f);
         levelRect.anchorMax = new Vector2(0.8f, 0.92f);
         levelRect.offsetMin = Vector2.zero;
         levelRect.offsetMax = Vector2.zero;
@@ -163,6 +164,7 @@ public class CharacterLoadoutUI : MonoBehaviour
         levelText.alignment = TextAlignmentOptions.Center;
         levelText.fontSize = 16;
         levelText.color = new Color(0.7f, 0.85f, 1f);
+        levelText.raycastTarget = false;
     }
     
     private void CreateCoreStatsRow()
@@ -170,8 +172,8 @@ public class CharacterLoadoutUI : MonoBehaviour
         var statsRow = new GameObject("CoreStatsRow");
         statsRow.transform.SetParent(loadoutPanel.transform, false);
         var statsRect = statsRow.AddComponent<RectTransform>();
-        statsRect.anchorMin = new Vector2(0.05f, 0.78f);
-        statsRect.anchorMax = new Vector2(0.95f, 0.86f);
+        statsRect.anchorMin = new Vector2(0.05f, 0.82f);
+        statsRect.anchorMax = new Vector2(0.95f, 0.88f);
         statsRect.offsetMin = Vector2.zero;
         statsRect.offsetMax = Vector2.zero;
         
@@ -193,7 +195,8 @@ public class CharacterLoadoutUI : MonoBehaviour
         AddCompactStat(statsRow.transform, "Energy", currentCharacter.MaxEnergy.ToString(), new Color(0.4f, 0.7f, 1f));
         AddCompactStat(statsRow.transform, "Crit", $"{currentCharacter.CritChance}%", new Color(1f, 0.7f, 0.3f));
         AddCompactStat(statsRow.transform, "CritDMG", $"{currentCharacter.CritDamage}x", new Color(1f, 0.7f, 0.3f));
-        AddCompactStat(statsRow.transform, "Resist", $"{currentCharacter.BaseResistance}%", new Color(0.6f, 0.6f, 0.8f));
+        AddCompactStat(statsRow.transform, "PhysRes", $"{currentCharacter.PhysicalResist}%", new Color(0.7f, 0.7f, 0.7f));
+        AddCompactStat(statsRow.transform, "ElemRes", $"{currentCharacter.ElementalResist}%", new Color(0.5f, 0.7f, 1f));
     }
     
     private void AddCompactStat(Transform parent, string label, string value, Color valueColor)
@@ -467,14 +470,42 @@ public class CharacterLoadoutUI : MonoBehaviour
         }
         else
         {
-            // Locked message
-            var lockedObj = new GameObject("Locked");
-            lockedObj.transform.SetParent(rowObj.transform, false);
-            var lockedText = lockedObj.AddComponent<TextMeshProUGUI>();
-            lockedText.text = $"Unlock at Ascension {requiredLevel}";
-            lockedText.alignment = TextAlignmentOptions.Center;
-            lockedText.fontSize = 13;
-            lockedText.color = new Color(0.45f, 0.45f, 0.45f);
+            // Locked — show A/B options with core cost; clicking levels up if affordable
+            var charCost = DataCache.GetCharacterAscensionCost(requiredLevel);
+            bool canAfford = MetaProgressionManager.Instance.CanLevelUpCharacter(currentCharacter.CharacterID);
+            int maxCharLevel = DataCache.GetCharacterMaxAscensionLevel();
+            bool isMaxLevel = currentProgress.AscensionLevel >= maxCharLevel;
+            
+            string costLabel = "";
+            if (isMaxLevel)
+            {
+                costLabel = "MAX";
+            }
+            else if (charCost != null)
+            {
+                var parts = new System.Collections.Generic.List<string>();
+                if (charCost.RegularCost > 0) parts.Add($"<color=#ccaa44>{charCost.RegularCost}</color> Reg");
+                if (charCost.AscendedCost > 0) parts.Add($"<color=#aa66ff>{charCost.AscendedCost}</color> Asc");
+                costLabel = string.Join(" + ", parts);
+            }
+            
+            // Option A (locked, shows cost)
+            tierButtons[tierIndex][0] = CreateLockedTalentButton(rowObj.transform, tierIndex, true, perkA, costLabel, canAfford && !isMaxLevel);
+            
+            // OR label
+            var orObj = new GameObject("Or");
+            orObj.transform.SetParent(rowObj.transform, false);
+            var orLayout = orObj.AddComponent<LayoutElement>();
+            orLayout.preferredWidth = 20;
+            orLayout.flexibleWidth = 0;
+            var orText = orObj.AddComponent<TextMeshProUGUI>();
+            orText.text = "OR";
+            orText.alignment = TextAlignmentOptions.Center;
+            orText.fontSize = 10;
+            orText.color = new Color(0.35f, 0.35f, 0.35f);
+            
+            // Option B (locked, shows cost)
+            tierButtons[tierIndex][1] = CreateLockedTalentButton(rowObj.transform, tierIndex, false, perkB, costLabel, canAfford && !isMaxLevel);
         }
     }
     
@@ -509,6 +540,61 @@ public class CharacterLoadoutUI : MonoBehaviour
         text.alignment = TextAlignmentOptions.Center;
         text.fontSize = 12;
         text.color = Color.white;
+        text.textWrappingMode = TextWrappingModes.Normal;
+        
+        return btn;
+    }
+    
+    private Button CreateLockedTalentButton(Transform parent, int tierIndex, bool isOptionA, string perkId, string costLabel, bool canAfford)
+    {
+        var btnObj = new GameObject($"Locked_{(isOptionA ? "A" : "B")}");
+        btnObj.transform.SetParent(parent, false);
+        
+        var btnImage = btnObj.AddComponent<Image>();
+        btnImage.color = canAfford 
+            ? new Color(0.18f, 0.35f, 0.25f, 1f)  // Affordable dark green
+            : new Color(0.12f, 0.12f, 0.15f, 1f);  // Locked dark gray
+        
+        var btn = btnObj.AddComponent<Button>();
+        btn.targetGraphic = btnImage;
+        btn.interactable = canAfford;
+        
+        int capturedTier = tierIndex;
+        bool capturedIsA = isOptionA;
+        string capturedPerkId = perkId;
+        int capturedCharId = currentCharacter.CharacterID;
+        string capturedCharName = currentCharacter.DisplayName;
+        btn.onClick.AddListener(() =>
+        {
+            // Level up first, then select the talent
+            if (MetaProgressionManager.Instance.TryLevelUpCharacter(capturedCharId, capturedCharName))
+            {
+                currentProgress = MetaProgressionManager.Instance.GetProgress(capturedCharId);
+                // Now select the talent choice
+                int choice = capturedIsA ? 1 : 2;
+                MetaProgressionManager.Instance.SetTalentChoice(capturedCharId, capturedCharName, capturedTier, choice, capturedPerkId);
+                currentProgress = MetaProgressionManager.Instance.GetProgress(capturedCharId);
+                ClearContent();
+                CreateContent();
+            }
+        });
+        
+        var textObj = new GameObject("Text");
+        textObj.transform.SetParent(btnObj.transform, false);
+        var textRect = textObj.AddComponent<RectTransform>();
+        textRect.anchorMin = Vector2.zero;
+        textRect.anchorMax = Vector2.one;
+        textRect.offsetMin = new Vector2(3, 3);
+        textRect.offsetMax = new Vector2(-3, -3);
+        
+        var text = textObj.AddComponent<TextMeshProUGUI>();
+        string perkLabel = FormatPerkIdCompact(perkId);
+        text.text = canAfford 
+            ? $"<b>{(isOptionA ? "A" : "B")}</b> - <size=10>{perkLabel}</size>\n<size=9>{costLabel}</size>"
+            : $"<b>{(isOptionA ? "A" : "B")}</b> - <size=10>{perkLabel}</size>\n<size=9><color=#666>{costLabel}</color></size>";
+        text.alignment = TextAlignmentOptions.Center;
+        text.fontSize = 12;
+        text.color = canAfford ? new Color(0.7f, 1f, 0.8f) : new Color(0.4f, 0.4f, 0.4f);
         text.textWrappingMode = TextWrappingModes.Normal;
         
         return btn;

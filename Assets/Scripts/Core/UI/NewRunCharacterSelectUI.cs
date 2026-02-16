@@ -424,7 +424,7 @@ public class NewRunCharacterSelectUI : MonoBehaviour
     private void CreateElementCard(Transform parent, string elementName)
     {
         var progress = MetaProgressionManager.Instance.GetElementProgress(elementName);
-        int nextThreshold = DataCache.GetElementXPThreshold(elementName, progress.AscensionLevel + 1);
+        int maxLevel = DataCache.GetElementMaxLevel(elementName);
         
         var cardObj = new GameObject($"Element_{elementName}");
         cardObj.transform.SetParent(parent, false);
@@ -448,7 +448,8 @@ public class NewRunCharacterSelectUI : MonoBehaviour
         textRect.offsetMax = new Vector2(-3, -3);
         
         var text = textObj.AddComponent<TextMeshProUGUI>();
-        text.text = $"<b>{elementName}</b>\nTier {progress.AscensionLevel}\n<size=9>{progress.AscensionXP}/{nextThreshold} XP</size>";
+        string levelStr = progress.AscensionLevel >= maxLevel ? "MAX" : $"{progress.AscensionLevel}";
+        text.text = $"<b>{elementName}</b>\nTier {levelStr}";
         text.fontSize = 11;
         text.alignment = TextAlignmentOptions.Center;
         text.color = Color.white;

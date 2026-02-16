@@ -14,7 +14,8 @@ public static class DataCache
     public static Dictionary<string, float> QTEOffensiveMultipliers { get; private set; }
     public static Dictionary<string, int> QTEDefensiveShield { get; private set; }
     public static Dictionary<string, ReactionData> Reactions { get; private set; }
-    public static Dictionary<string, List<ElementalTierData>> ElementalTiers { get; private set; }
+    public static Dictionary<string, List<ElementalAscensionCost>> ElementalAscensionCosts { get; private set; }
+    public static List<CharacterAscensionCost> CharacterAscensionCosts { get; private set; }
     public static Dictionary<int, WorldEncounterData> WorldEncounters { get; private set; }
 
     public static bool IsLoaded { get; private set; }
@@ -30,11 +31,11 @@ public static class DataCache
         Relics = LoadRelics();
         LoadQTEEffects();
         Reactions = LoadReactions();
-        ElementalTiers = LoadElementalTiers();
+        LoadProgressionCosts();
         WorldEncounters = LoadWorldEncounters();
 
         IsLoaded = true;
-        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEOffensiveMultipliers.Count} QTE offensive, {QTEDefensiveShield.Count} QTE defensive, {Reactions.Count} reactions, {ElementalTiers.Count} element tier groups, {WorldEncounters.Count} world encounters");
+        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEOffensiveMultipliers.Count} QTE offensive, {QTEDefensiveShield.Count} QTE defensive, {Reactions.Count} reactions, {ElementalAscensionCosts.Count} element ascension groups, {CharacterAscensionCosts.Count} char ascension levels, {WorldEncounters.Count} world encounters");
     }
 
     /// <summary>
@@ -84,8 +85,11 @@ public static class DataCache
                 EnemyID = e.enemyId,
                 Health = e.baseHealth,
                 Damage = baseDamage,
-                BaseResistance = e.baseResistance,
-                BonusResistance = e.bonusResistance,
+                DamageMin = e.baseDamageMin,
+                DamageMax = e.baseDamageMax,
+                PhysicalResist = e.physicalResist,
+                ElementalResist = e.elementalResist,
+                DamageElement = e.damageElement ?? "none",
                 
                 // Skills
                 Skill1Id = e.skill1,
@@ -128,20 +132,22 @@ public static class DataCache
                 RewardGoldMax = e.rewards != null ? e.rewards.goldMax : 0,
                 SigilChance = e.rewards != null ? e.rewards.sigilChance : 0,
                 RelicChance = e.rewards != null ? e.rewards.relicChance : 0,
+                RegularCoreChance = e.rewards != null ? e.rewards.regularCoreChance : 0,
+                AscendedCoreChance = e.rewards != null ? e.rewards.ascendedCoreChance : 0,
                 
                 // World scaling
                 World2HealthMultiplier = e.healthModifiers.Length > 1 ? e.healthModifiers[1] : 1f,
                 World2DamageMultiplier = e.damageModifiers.Length > 1 ? e.damageModifiers[1] : 1f,
-                World2BaseResistanceAddend = e.resistanceModifiers.Length > 1 ? e.resistanceModifiers[1] : 0,
+                World2ResistanceAddend = e.resistanceModifiers.Length > 1 ? e.resistanceModifiers[1] : 0,
                 World3HealthMultiplier = e.healthModifiers.Length > 2 ? e.healthModifiers[2] : 1f,
                 World3DamageMultiplier = e.damageModifiers.Length > 2 ? e.damageModifiers[2] : 1f,
-                World3BaseResistanceAddend = e.resistanceModifiers.Length > 2 ? e.resistanceModifiers[2] : 0,
+                World3ResistanceAddend = e.resistanceModifiers.Length > 2 ? e.resistanceModifiers[2] : 0,
                 World4HealthMultiplier = e.healthModifiers.Length > 3 ? e.healthModifiers[3] : 1f,
                 World4DamageMultiplier = e.damageModifiers.Length > 3 ? e.damageModifiers[3] : 1f,
-                World4BaseResistanceAddend = e.resistanceModifiers.Length > 3 ? e.resistanceModifiers[3] : 0,
+                World4ResistanceAddend = e.resistanceModifiers.Length > 3 ? e.resistanceModifiers[3] : 0,
                 World5HealthMultiplier = e.healthModifiers.Length > 4 ? e.healthModifiers[4] : 1f,
                 World5DamageMultiplier = e.damageModifiers.Length > 4 ? e.damageModifiers[4] : 1f,
-                World5BaseResistanceAddend = e.resistanceModifiers.Length > 4 ? e.resistanceModifiers[4] : 0
+                World5ResistanceAddend = e.resistanceModifiers.Length > 4 ? e.resistanceModifiers[4] : 0
             };
             
             list.Add(enemy);
@@ -184,9 +190,10 @@ public static class DataCache
         public int baseDamageMin;
         public int baseDamageMax;
         public float[] damageModifiers;
-        public int baseResistance;
+        public int physicalResist;
+        public int elementalResist;
         public int[] resistanceModifiers;
-        public int bonusResistance;
+        public string damageElement;
         public EnemyRewardsJson rewards;
         
         // Boss: World pool
@@ -221,6 +228,8 @@ public static class DataCache
         public int goldMax;
         public int sigilChance;
         public int relicChance;
+        public int regularCoreChance;
+        public int ascendedCoreChance;
     }
 
     private static List<RestData> LoadRestOptions()
@@ -337,6 +346,9 @@ public static class DataCache
                 RelicID = r.relicID,
                 Rarity = r.rarity,
                 Description = r.description,
+                Trigger = string.IsNullOrEmpty(r.trigger) ? "onAcquire" : r.trigger,
+                TriggerInterval = r.triggerInterval,
+                Price = r.price,
                 Effects = r.effects ?? new List<EffectEntry>()
             });
         }
@@ -376,6 +388,9 @@ public static class DataCache
         public int relicID;
         public string rarity;
         public string description;
+        public string trigger;
+        public int triggerInterval;
+        public int price;
         public List<EffectEntry> effects;
     }
 
@@ -585,119 +600,156 @@ public static class DataCache
             : $"{b}_{a}";
     }
     
-    private static Dictionary<string, List<ElementalTierData>> LoadElementalTiers()
+    private static void LoadProgressionCosts()
     {
-        var result = new Dictionary<string, List<ElementalTierData>>();
-        
-        var json = Resources.Load<TextAsset>("Data/elementalTier");
+        var json = Resources.Load<TextAsset>("Data/progressionCosts");
         if (json == null)
         {
-            throw new System.Exception("Missing elementalTier.json. Expected at Resources/Data/elementalTier.json");
+            throw new System.Exception("Missing progressionCosts.json. Expected at Resources/Data/progressionCosts.json");
         }
         
-        var wrapper = JsonUtility.FromJson<ElementalTierWrapper>(json.text);
-        if (wrapper == null || wrapper.elementalTiers == null)
+        var wrapper = JsonUtility.FromJson<ProgressionCostsWrapper>(json.text);
+        if (wrapper == null)
         {
-            throw new System.Exception("Failed to parse elementalTier.json or elementalTiers is null");
+            throw new System.Exception("Failed to parse progressionCosts.json");
         }
         
-        foreach (var t in wrapper.elementalTiers)
+        // Load elemental ascension costs grouped by element
+        ElementalAscensionCosts = new Dictionary<string, List<ElementalAscensionCost>>();
+        if (wrapper.elementalAscension != null)
         {
-            if (string.IsNullOrEmpty(t.element)) continue;
-            
-            var tierData = new ElementalTierData
+            foreach (var entry in wrapper.elementalAscension)
             {
-                Element = t.element,
-                Level = t.level,
-                XPRequiredToReachLevel = t.xpRequired,
-                Bonus = t.bonus
-            };
-            
-            if (!result.ContainsKey(t.element))
-            {
-                result[t.element] = new List<ElementalTierData>();
+                if (string.IsNullOrEmpty(entry.element)) continue;
+                
+                var cost = new ElementalAscensionCost
+                {
+                    Element = entry.element,
+                    Level = entry.level,
+                    RegularCost = entry.regularCost,
+                    AscendedCost = entry.ascendedCost
+                };
+                
+                if (!ElementalAscensionCosts.ContainsKey(entry.element))
+                {
+                    ElementalAscensionCosts[entry.element] = new List<ElementalAscensionCost>();
+                }
+                ElementalAscensionCosts[entry.element].Add(cost);
             }
-            result[t.element].Add(tierData);
+            
+            foreach (var kvp in ElementalAscensionCosts)
+            {
+                kvp.Value.Sort((a, b) => a.Level.CompareTo(b.Level));
+            }
         }
         
-        foreach (var kvp in result)
+        // Load character ascension costs
+        CharacterAscensionCosts = new List<CharacterAscensionCost>();
+        if (wrapper.characterAscension != null)
         {
-            kvp.Value.Sort((a, b) => a.Level.CompareTo(b.Level));
+            foreach (var entry in wrapper.characterAscension)
+            {
+                CharacterAscensionCosts.Add(new CharacterAscensionCost
+                {
+                    Level = entry.level,
+                    RegularCost = entry.regularCost,
+                    AscendedCost = entry.ascendedCost
+                });
+            }
+            CharacterAscensionCosts.Sort((a, b) => a.Level.CompareTo(b.Level));
         }
-        
-        return result;
     }
     
     [System.Serializable]
-    private class ElementalTierWrapper
+    private class ProgressionCostsWrapper
     {
-        public ElementalTierJsonEntry[] elementalTiers;
+        public ElementalAscensionJsonEntry[] elementalAscension;
+        public CharacterAscensionJsonEntry[] characterAscension;
     }
     
     [System.Serializable]
-    private class ElementalTierJsonEntry
+    private class ElementalAscensionJsonEntry
     {
         public string element;
         public int level;
-        public int xpRequired;
-        public string bonus;
+        public int regularCost;
+        public int ascendedCost;
     }
     
-    /// <summary>
-    /// Get the XP required to reach a specific level for an element.
-    /// </summary>
-    public static int GetElementXPThreshold(string element, int level)
+    [System.Serializable]
+    private class CharacterAscensionJsonEntry
     {
-        if (ElementalTiers == null || !ElementalTiers.ContainsKey(element))
-            return int.MaxValue;
-        
-        var tiers = ElementalTiers[element];
-        foreach (var tier in tiers)
-        {
-            if (tier.Level == level)
-                return tier.XPRequiredToReachLevel;
-        }
-        return int.MaxValue;
+        public int level;
+        public int regularCost;
+        public int ascendedCost;
     }
     
     /// <summary>
-    /// Get the bonus text for a specific element level.
+    /// Get the Essence Core cost to reach a specific level for an element.
+    /// Returns null if level not found.
     /// </summary>
-    public static string GetElementBonus(string element, int level)
+    public static ElementalAscensionCost GetElementalAscensionCost(string element, int level)
     {
-        if (ElementalTiers == null || !ElementalTiers.ContainsKey(element))
-            return "";
+        if (ElementalAscensionCosts == null || !ElementalAscensionCosts.ContainsKey(element))
+            return null;
         
-        var tiers = ElementalTiers[element];
-        foreach (var tier in tiers)
+        foreach (var cost in ElementalAscensionCosts[element])
         {
-            if (tier.Level == level)
-                return tier.Bonus;
+            if (cost.Level == level)
+                return cost;
         }
-        return "";
+        return null;
     }
     
     /// <summary>
-    /// Get the max level for an element from JSON data.
+    /// Get the max level for an element from progression cost data.
+    /// Max level = highest level entry + 1 (since costs are for leveling TO that level, and level 1 is free).
+    /// Actually: max level = highest level entry in the costs (level 10 is the target of the last cost).
     /// </summary>
     public static int GetElementMaxLevel(string element)
     {
-        if (ElementalTiers == null || !ElementalTiers.ContainsKey(element))
+        if (ElementalAscensionCosts == null || !ElementalAscensionCosts.ContainsKey(element))
             return 1;
         
-        var tiers = ElementalTiers[element];
-        if (tiers.Count == 0) return 1;
-        return tiers[tiers.Count - 1].Level;
+        var costs = ElementalAscensionCosts[element];
+        if (costs.Count == 0) return 1;
+        return costs[costs.Count - 1].Level;
     }
     
     /// <summary>
-    /// Get list of all elements from JSON data.
+    /// Get list of all elements from progression cost data.
     /// </summary>
     public static List<string> GetAllElements()
     {
-        if (ElementalTiers == null)
+        if (ElementalAscensionCosts == null)
             return new List<string>();
-        return new List<string>(ElementalTiers.Keys);
+        return new List<string>(ElementalAscensionCosts.Keys);
+    }
+    
+    /// <summary>
+    /// Get the Essence Core cost for a character ascension level.
+    /// Returns null if level not found.
+    /// </summary>
+    public static CharacterAscensionCost GetCharacterAscensionCost(int level)
+    {
+        if (CharacterAscensionCosts == null) return null;
+        
+        foreach (var cost in CharacterAscensionCosts)
+        {
+            if (cost.Level == level)
+                return cost;
+        }
+        return null;
+    }
+    
+    /// <summary>
+    /// Get the max character ascension level from progression cost data.
+    /// </summary>
+    public static int GetCharacterMaxAscensionLevel()
+    {
+        if (CharacterAscensionCosts == null || CharacterAscensionCosts.Count == 0)
+            return 1;
+        return CharacterAscensionCosts[CharacterAscensionCosts.Count - 1].Level;
     }
     
     private static Dictionary<int, WorldEncounterData> LoadWorldEncounters()

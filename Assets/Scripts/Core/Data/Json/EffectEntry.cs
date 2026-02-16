@@ -72,6 +72,80 @@ public class EffectEntry
     // eff_reborn
     public int healthPercent;           // revive at this % of max health
     public float damageBonus;           // bonus damage multiplier after reborn (1.0 = +100%)
+
+    // eff_status_immunity (relics)
+    public string immuneStatus;         // status id to become immune to (e.g., "status_player_sunder")
+
+    // eff_ap_delta (relics — modify AP at trigger time)
+    // uses 'amount' field above
+
+    // eff_extra_marks (relics — apply extra elemental marks per skill)
+    public int extraMarks;              // number of extra marks to apply
+
+    // eff_missing_hp_damage (relics — bonus damage based on missing HP)
+    public int maxBonusPercent;         // maximum bonus damage % (e.g., 30)
+
+    // eff_ap_cost_reduction (relics — reduce AP cost of skills)
+    public int apReduction;             // amount to reduce AP cost by
+    public int skillCount;              // number of skills affected (0 = all skills this turn)
+
+    // eff_refresh_random_skill (relics — refresh a random skill cooldown)
+    public int apSpentThreshold;        // AP spent before triggering (e.g., 20)
+
+    // eff_energy_cost_multiplier (relics — modify ultimate energy cost)
+    // uses 'multiplier' field above (e.g., 2.0 = 100% increase)
+
+    // eff_disable_system (relics — disable game systems)
+    public string disableTarget;        // "defensiveQTE", "reactionQTE", "sigils", "enemyMarks"
+    public int disableDuration;         // turns to disable (0 = permanent)
+
+    // eff_ap_banking (relics — keep unspent AP between turns)
+    // no extra fields needed, flag-based
+
+    // eff_post_combat_heal (relics — heal after combat)
+    // uses 'percentOfMaxHealth' field above
+
+    // eff_first_mark_bonus (relics — first mark each turn applies extra)
+    // uses 'extraMarks' field above
+
+    // eff_combat_shield (relics — gain shield at combat start)
+    // uses 'percentOfMaxHealth' field above
+
+    // eff_perfect_qte_ap (relics — perfect QTE grants AP)
+    // uses 'amount' field above
+
+    // eff_reaction_cost_reduction (relics — reduce dual reaction mark cost)
+    // uses 'value' field above (marks reduced per element)
+
+    // eff_reaction_ap_refund (relics — first reaction refunds AP)
+    // uses 'amount' field above
+
+    // eff_end_turn_mark (relics — apply mark at end of turn)
+    // uses 'extraMarks' field above
+
+    // eff_mark_transfer (relics — transfer marks on enemy death)
+    // uses 'value' field above (number of marks to transfer)
+
+    // eff_perfect_reaction_save_mark (relics — perfect reaction saves marks)
+    // uses 'value' field above (number of marks saved)
+
+    // eff_apply_equipped_mark (relics — apply equipped element mark to all enemies)
+    // uses 'extraMarks' field above
+
+    // eff_reaction_double (relics — first reaction triggers twice)
+    // uses 'multiplier' field above (effect multiplier for second trigger)
+
+    // eff_dual_reaction_shield (relics — dual reaction grants shield)
+    // uses 'percentOfMaxHealth' field above
+
+    // eff_reaction_weaken (relics — reaction causes weaken)
+    // uses 'duration' field above
+
+    // eff_hide_marks (relics — hide enemy marks UI)
+    // uses 'disableTarget' field above
+
+    // eff_reaction_extra_mark_cost (relics — reactions cost extra marks)
+    // uses 'value' field above
 }
 
 /// <summary>

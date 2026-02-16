@@ -25,6 +25,10 @@ public class Referencer : MonoBehaviour
     public NewRunCharacterSelectUI newRunCharacterSelectUI;
     public CharacterLoadoutUI characterLoadoutUI;
     
+    // Relic UI
+    public RelicDisplayUI relicDisplayUI;
+    public RelicCheatPanel relicCheatPanel;
+    
     public GameObject nodePopupPanel;
     public GameObject victoryPanel;
     public TextMeshProUGUI nodeCounterText;
@@ -137,6 +141,20 @@ public class Referencer : MonoBehaviour
         {
             var clObj = new GameObject("CharacterLoadoutUI");
             characterLoadoutUI = clObj.AddComponent<CharacterLoadoutUI>();
+        }
+        
+        relicDisplayUI = FindFirstObjectByType<RelicDisplayUI>();
+        if (relicDisplayUI == null)
+        {
+            var rdObj = new GameObject("RelicDisplayUI");
+            relicDisplayUI = rdObj.AddComponent<RelicDisplayUI>();
+        }
+        
+        relicCheatPanel = FindFirstObjectByType<RelicCheatPanel>();
+        if (relicCheatPanel == null)
+        {
+            var rcpObj = new GameObject("RelicCheatPanel");
+            relicCheatPanel = rcpObj.AddComponent<RelicCheatPanel>();
         }
 
         // Set up Cinemachine freeroam camera target
