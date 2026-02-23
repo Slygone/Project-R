@@ -17,6 +17,7 @@ public static class DataCache
     public static Dictionary<string, List<ElementalAscensionCost>> ElementalAscensionCosts { get; private set; }
     public static List<CharacterAscensionCost> CharacterAscensionCosts { get; private set; }
     public static Dictionary<int, WorldEncounterData> WorldEncounters { get; private set; }
+    public static Dictionary<string, StatusDefinition> StatusDefinitions { get; private set; }
 
     public static bool IsLoaded { get; private set; }
 
@@ -33,9 +34,10 @@ public static class DataCache
         Reactions = LoadReactions();
         LoadProgressionCosts();
         WorldEncounters = LoadWorldEncounters();
+        StatusDefinitions = LoadStatusDefinitions();
 
         IsLoaded = true;
-        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEOffensiveMultipliers.Count} QTE offensive, {QTEDefensiveShield.Count} QTE defensive, {Reactions.Count} reactions, {ElementalAscensionCosts.Count} element ascension groups, {CharacterAscensionCosts.Count} char ascension levels, {WorldEncounters.Count} world encounters");
+        Debug.Log($"[DataCache] Loaded: {Enemies.Count} enemies, {RestOptions.Count} rest options, {Characters.Count} characters, {Potions.Count} potions, {Relics.Count} relics, {QTEOffensiveMultipliers.Count} QTE offensive, {QTEDefensiveShield.Count} QTE defensive, {Reactions.Count} reactions, {ElementalAscensionCosts.Count} element ascension groups, {CharacterAscensionCosts.Count} char ascension levels, {WorldEncounters.Count} world encounters, {StatusDefinitions.Count} status definitions");
     }
 
     /// <summary>
@@ -392,6 +394,65 @@ public static class DataCache
         public int triggerInterval;
         public int price;
         public List<EffectEntry> effects;
+    }
+
+    // ════════════════════════════════════════════════════════════
+    //  STATUS DEFINITIONS
+    // ════════════════════════════════════════════════════════════
+
+    private static Dictionary<string, StatusDefinition> LoadStatusDefinitions()
+    {
+        var json = Resources.Load<TextAsset>("Data/effects");
+        if (json == null)
+        {
+            throw new System.Exception("Missing effects.json. Expected at Resources/Data/effects.json");
+        }
+        
+        var wrapper = JsonUtility.FromJson<EffectsFileWrapper>(json.text);
+        if (wrapper == null || wrapper.statuses == null)
+        {
+            throw new System.Exception("Failed to parse effects.json statuses array");
+        }
+        
+        var dict = new Dictionary<string, StatusDefinition>();
+        foreach (var s in wrapper.statuses)
+        {
+            dict[s.id] = new StatusDefinition
+            {
+                Id = s.id,
+                Name = s.name,
+                Type = s.type,
+                Category = s.category,
+                Description = s.description
+            };
+        }
+        return dict;
+    }
+
+    /// <summary>
+    /// Look up a StatusDefinition by id. Returns null if not found.
+    /// </summary>
+    public static StatusDefinition GetStatusDef(string statusId)
+    {
+        if (StatusDefinitions == null || string.IsNullOrEmpty(statusId)) return null;
+        StatusDefinitions.TryGetValue(statusId, out var def);
+        return def;
+    }
+
+    [System.Serializable]
+    private class EffectsFileWrapper
+    {
+        public StatusJsonData[] statuses;
+    }
+
+    [System.Serializable]
+    private class StatusJsonData
+    {
+        public string id;
+        public string name;
+        public string type;
+        public string category;
+        public string description;
     }
 
     private static void LoadQTEEffects()

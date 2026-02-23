@@ -35,6 +35,11 @@ public class RelicDisplayUI : MonoBehaviour
     private static readonly Color HighlightBorder = new Color(1f, 0.95f, 0.5f, 1f);  // gold glow
     private static readonly Color HighlightBg = new Color(0.25f, 0.22f, 0.1f, 0.95f);
     
+    // Broken relic colors (grayed out)
+    private static readonly Color BrokenBorder = new Color(0.4f, 0.4f, 0.4f, 0.6f);
+    private static readonly Color BrokenBg = new Color(0.15f, 0.15f, 0.15f, 0.7f);
+    private static readonly Color BrokenText = new Color(0.5f, 0.5f, 0.5f, 0.7f);
+    
     private class RelicChipData
     {
         public string RelicId;
@@ -118,7 +123,7 @@ public class RelicDisplayUI : MonoBehaviour
         var states = player.GetRelicStates();
         
         // Build lookup
-        var stateMap = new Dictionary<string, Player.RelicStateInfo>();
+        var stateMap = new Dictionary<string, RelicManager.RelicStateInfo>();
         foreach (var s in states)
             stateMap[s.RelicId] = s;
         
@@ -133,8 +138,12 @@ public class RelicDisplayUI : MonoBehaviour
             int currentCount = -1;
             int maxCount = -1;
             
+            // Check broken state directly from player
+            bool isBroken = player.Relics != null && player.Relics.IsRelicBroken(chip.RelicId);
+            
             if (stateMap.TryGetValue(chip.RelicId, out var state))
             {
+                isBroken = isBroken || state.IsBroken;
                 isReady = state.IsReady;
                 justTriggered = state.JustTriggered;
                 if (state.MaxCount > 0)
@@ -159,8 +168,15 @@ public class RelicDisplayUI : MonoBehaviour
                 }
             }
             
-            // Update highlight
-            if (isReady)
+            // Update highlight / broken visual
+            if (isBroken)
+            {
+                chip.BgImage.color = BrokenBg;
+                chip.OutlineComp.effectColor = BrokenBorder;
+                chip.OutlineComp.effectDistance = new Vector2(1, 1);
+                chip.NameText.color = BrokenText;
+            }
+            else if (isReady)
             {
                 chip.BgImage.color = HighlightBg;
                 chip.OutlineComp.effectColor = HighlightBorder;

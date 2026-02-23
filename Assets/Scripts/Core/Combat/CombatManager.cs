@@ -49,6 +49,10 @@ public class CombatManager : MonoBehaviour
     private Element pendingReactionFirstElement = Element.None;
     private Element pendingReactionDetonator = Element.None;
     private ReactionTriggerInfo pendingReactionInfo = null;
+    
+    // Reactor Core: tracks whether we're processing the second (50% damage) trigger
+    private bool reactorCoreSecondTrigger = false;
+    private float reactorCoreDamageMultiplier = 1f;
 
     public void StartCombat(CombatNode node, Player playerRef)
     {
@@ -166,8 +170,11 @@ public class CombatManager : MonoBehaviour
         if (player != null)
         {
             player.ResetCombatState();
-            player.OnCombatStart();
-            ApplyCombatStartRelicEffects();
+            int combatStartHeal = player.Relics.OnCombatStart(enemies);
+            if (combatStartHeal > 0) ShowHealToPlayer(combatStartHeal);
+            
+            // Process turn-1 relic effects (First Pulse AP delta, Cracked Battery, etc.)
+            player.Relics.OnTurnStart(currentTurnNumber);
         }
 
         string bossNames = string.Join(" & ", enemies.ConvertAll(e => e.Name));
@@ -237,9 +244,13 @@ public class CombatManager : MonoBehaviour
         // Reset player combat state (energy to 0, cooldowns cleared)
         player.ResetCombatState();
         
-        // Trigger relic combat-start effects
-        player.OnCombatStart();
-        ApplyCombatStartRelicEffects();
+        // Trigger relic combat-start effects via centralized RelicManager
+        int startHeal = player.Relics.OnCombatStart(enemies);
+        if (startHeal > 0) ShowHealToPlayer(startHeal);
+        
+        // Process turn-1 relic effects (First Pulse AP delta, Cracked Battery, etc.)
+        // ResetCombatState already set AP to max, so OnTurnStart applies on top of that
+        player.Relics.OnTurnStart(currentTurnNumber);
 
         // Disable player free roam during combat
         var pc = FindFirstObjectByType<PlayerController>();
@@ -284,8 +295,7 @@ public class CombatManager : MonoBehaviour
         // Process relic turn-end effects (AP banking, Elemental Drip, Blood Tithe self-damage)
         if (player != null)
         {
-            player.OnRelicTurnEnd();
-            ApplyTurnEndRelicEffects();
+            player.Relics.OnTurnEnd(enemies);
         }
         
         GameLog.Combat(GameLog.Join("PlayerPhaseEnd", GameLog.KV("turn", currentTurnNumber)));
@@ -343,13 +353,27 @@ public class CombatManager : MonoBehaviour
         GameLog.Combat(GameLog.Join(
             "ReactionQTEComplete",
             GameLog.KV("result", result),
-            GameLog.KV("qteMult", qteMultiplier.ToString("F2"))
+            GameLog.KV("qteMult", qteMultiplier.ToString("F2")),
+            GameLog.KV("reactorCore2nd", reactorCoreSecondTrigger)
         ), GameLogVerbosity.Verbose);
         
-        // Consume marks now (deferred from TriggerMarkReaction)
+        // Reactor Core second trigger: damage only at 50% effect, no mark consumption
+        if (reactorCoreSecondTrigger)
+        {
+            reactorCoreSecondTrigger = false;
+            float secondMultiplier = qteMultiplier * reactorCoreDamageMultiplier;
+            ProcessReactionAfterQTE(secondMultiplier);
+            if (player != null) player.Relics.OnReactionComplete();
+            ClearPendingAction();
+            return;
+        }
+        
+        // Consume marks now (deferred from TriggerMarkReaction) using configurable thresholds
         if (pendingReactionInfo != null && pendingTarget != null)
         {
-            pendingTarget.ConsumeMarksForReaction(pendingReactionInfo);
+            int dualPerElement = player != null ? player.Relics.GetDualPerElementThreshold() : 3;
+            int dualExtraTotal = player != null ? player.GetReactionExtraMarkCost() : 0;
+            pendingTarget.ConsumeMarksForReaction(pendingReactionInfo, dualPerElement, dualExtraTotal);
             
             // Perfect Reaction Save Mark relic: restore N marks on Perfect QTE
             if (result == QTEResult.Perfect && player != null && player.HasPerfectReactionSaveMark())
@@ -370,6 +394,37 @@ public class CombatManager : MonoBehaviour
         
         // Process reaction effects via data-driven engine (separate from skill/attack damage)
         ProcessReactionAfterQTE(qteMultiplier);
+        
+        // Reactor Core: check if first reaction this combat should trigger twice
+        if (player != null && pendingReactionInfo != null)
+        {
+            bool isDual = !pendingReactionInfo.IsSingleElement;
+            bool shouldDouble = player.Relics.OnReactionTriggered(isDual);
+            if (shouldDouble)
+            {
+                reactorCoreSecondTrigger = true;
+                reactorCoreDamageMultiplier = player.GetReactionDoubleMultiplier();
+                GameLog.Combat(GameLog.Join("ReactorCoreSecondTrigger", GameLog.KV("mult", reactorCoreDamageMultiplier)));
+                
+                // Show a second QTE for the Reactor Core trigger
+                if (player.IsReactionQTEDisabled())
+                {
+                    OnQTEComplete(QTEResult.Good);
+                }
+                else if (qtePanel != null)
+                {
+                    qtePanel.Show($"{pendingReactionName} (Reactor Core)", OnQTEComplete);
+                }
+                else
+                {
+                    OnQTEComplete(QTEResult.Good);
+                }
+                return;
+            }
+            
+            // Reaction Exhaustion: apply weaken after reaction
+            player.Relics.OnReactionComplete();
+        }
         
         ClearPendingAction();
     }
@@ -439,8 +494,7 @@ public class CombatManager : MonoBehaviour
             combatArena.RefreshAPDisplay();
         }
         
-        // Create UI chips for reaction effects
-        CreateReactionChips(pendingReactionId, pendingReactionName, pendingTarget);
+        // Status display now reads directly from entity GetActiveStatuses() — no chip creation needed
         
         // Check for enemy deaths from reaction damage
         bool rebornTriggered = false;
@@ -787,8 +841,8 @@ public class CombatManager : MonoBehaviour
         bool deadeyeGuaranteedCrit = player.ConsumeDeadeyeCritIfReady();
         
         // Relic triggers: skill used + AP spent tracking
-        player.OnRelicSkillUsed();
-        if (apCost > 0) player.OnRelicAPSpent(apCost);
+        player.Relics.OnSkillUsed(skillNumber, apCost);
+        if (apCost > 0) player.Relics.OnAPSpent(apCost);
 
         // Look up SkillDefinition from JSON data
         var skillDef = GetSkillDefinition(skillNumber);
@@ -947,12 +1001,16 @@ public class CombatManager : MonoBehaviour
             int markChance = GetSkillMarkChance(character, skillNumber);
             int markCount = GetSkillMarkCount(character, skillNumber);
             
+            // Mark Echo relic: add extra marks this turn
+            int extraMarks = player.GetExtraMarksThisTurn();
+            markCount += extraMarks;
+            
             if (markElement != Element.None && markChance > 0 && markCount > 0)
             {
                 int roll = Random.Range(0, 100);
                 if (roll < markChance)
                 {
-                    bool reactionTriggered = target.AddMarks(markElement, markCount);
+                    target.AddMarks(markElement, markCount);
                     
                     GameLog.Combat(GameLog.Join(
                         "MarkApply",
@@ -961,13 +1019,19 @@ public class CombatManager : MonoBehaviour
                         GameLog.KV("chance", $"{markChance}%"),
                         GameLog.KV("roll", roll),
                         GameLog.KV("marks", markCount),
+                        GameLog.KV("extraMarks", extraMarks),
                         GameLog.KV("target", target.Name)
                     ));
                     
-                    // Check if reaction was triggered
-                    if (reactionTriggered)
+                    // Get mark thresholds from RelicManager (Overconsumption + Catalyst Splinter)
+                    int monoThreshold = 6 + player.GetReactionExtraMarkCost();
+                    int dualPerElement = player.Relics.GetDualPerElementThreshold();
+                    int dualExtraTotal = player.GetReactionExtraMarkCost();
+                    
+                    // Check if reaction was triggered using configurable thresholds
+                    if (target.CheckReactionTrigger(monoThreshold, dualPerElement, dualExtraTotal))
                     {
-                        var reactionInfo = target.GetReactionTriggerInfo();
+                        var reactionInfo = target.GetReactionTriggerInfo(monoThreshold, dualPerElement, dualExtraTotal);
                         if (reactionInfo != null)
                         {
                             string reactionId = reactionInfo.GetReactionId();
@@ -980,16 +1044,17 @@ public class CombatManager : MonoBehaviour
                                 GameLog.KV("target", target.Name)
                             ));
                             
-                            // Trigger reaction effect (QTE panel or direct execution)
-                            // Note: marks are consumed inside TriggerMarkReaction
+                            // Consume Catalyst Splinter if it was a dual reaction and Catalyst is active
+                            if (!reactionInfo.IsSingleElement && player.Relics.HasCatalystSplinter())
+                            {
+                                player.ConsumeCatalystSplinter();
+                            }
+                            
                             lastPlayerAction = PlayerLastAction.Reaction;
                             pendingSkillNumber = skillNumber;
                             TriggerMarkReaction(target, reactionInfo);
                         }
                     }
-                    
-                    // Update enemy UI to show marks
-                    
                 }
             }
         }
@@ -1119,15 +1184,23 @@ public class CombatManager : MonoBehaviour
     
     private int GetSkillAPCost(CharacterData character, int skillNumber)
     {
-        switch (skillNumber)
+        int baseCost = skillNumber switch
         {
-            case 1: return character.Skill1APCost;
-            case 2: return character.Skill2APCost;
-            case 3: return character.Skill3APCost;
-            case 4: return character.Skill4APCost;
-            case 5: return character.Skill5APCost;
-            default: return 2;
+            1 => character.Skill1APCost,
+            2 => character.Skill2APCost,
+            3 => character.Skill3APCost,
+            4 => character.Skill4APCost,
+            5 => character.Skill5APCost,
+            _ => 2
+        };
+        
+        // Apply relic AP modifiers (Rhythm Discount, Cooldown Lottery, Elemental Fog)
+        // Skills 1-4 only (not ultimate)
+        if (player != null && player.Relics != null && skillNumber >= 1 && skillNumber <= 4)
+        {
+            return player.Relics.GetEffectiveAPCost(skillNumber - 1, baseCost);
         }
+        return baseCost;
     }
     
     private int GetSkillMarkChance(CharacterData character, int skillNumber)
@@ -1825,7 +1898,7 @@ public class CombatManager : MonoBehaviour
         
         switch (status)
         {
-            case "status_player_weaken":
+            case "status_weaken":
                 if (target == "Player")
                 {
                     player.ApplyWeaken(magnitude, duration);
@@ -1835,7 +1908,7 @@ public class CombatManager : MonoBehaviour
                 }
                 break;
                 
-            case "status_player_sunder":
+            case "status_sunder":
                 if (target == "Player")
                 {
                     player.ApplySunder(magnitude, duration);
@@ -1845,7 +1918,7 @@ public class CombatManager : MonoBehaviour
                 }
                 break;
                 
-            case "status_player_vulnerable":
+            case "status_vulnerable":
                 if (target == "Player")
                 {
                     player.ApplyVulnerable(magnitude, duration, eff.maxStacks);
@@ -1856,7 +1929,7 @@ public class CombatManager : MonoBehaviour
                 }
                 break;
                 
-            case "status_player_stun":
+            case "status_stun":
                 if (target == "Player")
                 {
                     player.ApplyStun(duration);
@@ -1866,7 +1939,7 @@ public class CombatManager : MonoBehaviour
                 }
                 break;
                 
-            case "status_enemy_damage_up":
+            case "status_empowered":
                 // Apply to all allies (all enemies)
                 if (target == "AllAllies")
                 {
@@ -1884,7 +1957,7 @@ public class CombatManager : MonoBehaviour
                 }
                 break;
                 
-            case "status_enemy_hot":
+            case "status_regenerating":
                 // Apply HoT to all allies (all enemies)
                 if (target == "AllAllies")
                 {
@@ -2147,7 +2220,6 @@ public class CombatManager : MonoBehaviour
             {
                 enemy.TickTempResists();
                 enemy.TickReactionDebuffs();
-                enemy.TickReactionChips();
             }
         }
 
@@ -2156,7 +2228,6 @@ public class CombatManager : MonoBehaviour
         
         // Tick reaction buff durations
         player.TickReactionBuffs();
-        player.TickReactionChips();
         
         // Tick player DoT
         int playerDotDmg = player.TickPlayerDoT();
@@ -2199,7 +2270,7 @@ public class CombatManager : MonoBehaviour
         player.RefreshAP();
         
         // Process relic turn-start effects (AP banking, Siphoning Aura, Mark Echo, Rhythm Discount)
-        player.OnRelicTurnStart();
+        player.Relics.OnTurnStart(currentTurnNumber);
         
         GameLog.Combat(GameLog.Join("PlayerPhaseStart", GameLog.KV("turn", currentTurnNumber)));
         
@@ -2231,102 +2302,6 @@ public class CombatManager : MonoBehaviour
         return true;
     }
 
-    /// <summary>
-    /// Apply relic effects at combat start that need enemy access (status application, marks).
-    /// Called after player.OnCombatStart() which handles player-side effects.
-    /// </summary>
-    private void ApplyCombatStartRelicEffects()
-    {
-        if (player == null) return;
-        
-        var combatStartRelics = player.GetRelicsByTrigger("combatStart");
-        foreach (var relic in combatStartRelics)
-        {
-            if (relic.Effects == null) continue;
-            foreach (var eff in relic.Effects)
-            {
-                if (eff.effectId == "eff_apply_status")
-                {
-                    if (eff.target == "AllEnemies")
-                    {
-                        // Ambush Seal: Weaken+Vulnerable on all enemies
-                        foreach (var enemy in enemies)
-                        {
-                            if (!enemy.IsAlive()) continue;
-                            string s = (eff.status ?? "").ToLower();
-                            if (s.Contains("weak")) enemy.ApplyWeak(eff.duration, eff.magnitude);
-                            else if (s.Contains("vulnerable")) enemy.ApplyTempResistAll(-Mathf.RoundToInt(eff.magnitude), eff.duration);
-                        }
-                        Debug.Log($"[CombatManager] Relic {relic.DisplayName}: applied {eff.status} to all enemies for {eff.duration} turns");
-                    }
-                    else if (eff.target == "Self")
-                    {
-                        // Crippling Weakness / Rustbound Sunder on player
-                        string s = (eff.status ?? "").ToLower();
-                        if (s.Contains("weaken")) player.ApplyWeaken(eff.magnitude, eff.duration);
-                        else if (s.Contains("sunder")) player.ApplySunder(eff.magnitude, eff.duration);
-                        Debug.Log($"[CombatManager] Relic {relic.DisplayName}: applied {eff.status} to player for {eff.duration} turns");
-                    }
-                }
-                // Elemental Broadcast: apply 1 of equipped element mark to all enemies
-                else if (eff.effectId == "eff_apply_equipped_mark")
-                {
-                    Element equipped = player.GetAffinity();
-                    if (equipped != Element.None)
-                    {
-                        foreach (var enemy in enemies)
-                        {
-                            if (!enemy.IsAlive()) continue;
-                            enemy.AddMarks(equipped, eff.extraMarks);
-                        }
-                        Debug.Log($"[CombatManager] Relic {relic.DisplayName}: applied {eff.extraMarks} {equipped} mark(s) to all enemies");
-                    }
-                }
-            }
-        }
-        
-        // Show floating heal text for combat start heal (Field Rations)
-        int combatStartHeal = player.GetLastCombatStartHeal();
-        if (combatStartHeal > 0)
-        {
-            ShowHealToPlayer(combatStartHeal);
-        }
-    }
-    
-    /// <summary>
-    /// Apply relic effects at end of player turn that need enemy access (Elemental Drip).
-    /// Called after player.OnRelicTurnEnd() which handles player-side effects.
-    /// </summary>
-    private void ApplyTurnEndRelicEffects()
-    {
-        if (player == null) return;
-        
-        var turnEndRelics = player.GetRelicsByTrigger("onTurnEnd");
-        foreach (var relic in turnEndRelics)
-        {
-            if (relic.Effects == null) continue;
-            foreach (var eff in relic.Effects)
-            {
-                // Elemental Drip: apply mark of equipped element to random alive enemy
-                if (eff.effectId == "eff_end_turn_mark")
-                {
-                    Element equipped = player.GetAffinity();
-                    if (equipped == Element.None) continue;
-                    
-                    var alive = new List<CombatEnemy>();
-                    foreach (var e in enemies) { if (e.IsAlive()) alive.Add(e); }
-                    
-                    if (alive.Count > 0)
-                    {
-                        var target = alive[Random.Range(0, alive.Count)];
-                        target.AddMarks(equipped, eff.extraMarks);
-                        Debug.Log($"[CombatManager] Relic {relic.DisplayName}: applied {eff.extraMarks} {equipped} mark to {target.Name}");
-                    }
-                }
-            }
-        }
-    }
-    
     private void EndCombat(bool victory)
     {
         // Idempotent: if already ending, skip
@@ -2357,7 +2332,7 @@ public class CombatManager : MonoBehaviour
         if (victory)
         {
             // Process relic combat-end effects (Field Rations heal, Blood Toll damage)
-            if (player != null) player.OnRelicCombatEnd();
+            if (player != null) player.Relics.OnCombatEnd();
             
             // Calculate total rewards from all defeated enemies
             int totalXP = 0;
@@ -2561,6 +2536,17 @@ public class CombatManager : MonoBehaviour
             }
         }
         
+        // Piggy Bank: bonus gold on enemy kill
+        if (player != null && player.Relics != null)
+        {
+            int bonusGold = player.Relics.OnEnemyKilled();
+            if (bonusGold > 0)
+            {
+                player.AddGold(bonusGold);
+                GameLog.Combat(GameLog.Join("PiggyBank", GameLog.KV("gold", bonusGold)));
+            }
+        }
+        
         // Track boss defeats for FallenChampion spawn requirement
         if (enemy.IsBoss && !enemy.SpawnOnly)
         {
@@ -2723,99 +2709,6 @@ public class CombatManager : MonoBehaviour
     }
     
     #endregion
-    
-    /// <summary>
-    /// Create UI chips for all effects of a reaction. Called after ProcessReactionAfterQTE.
-    /// Chips track display info (name + tooltip) for the EnemyWorldUnit and CombatArena UI.
-    /// </summary>
-    private void CreateReactionChips(string reactionId, string reactionName, CombatEnemy target)
-    {
-        var reactionDef = DataCache.GetReactionDef(reactionId);
-        if (reactionDef == null || reactionDef.Effects == null) return;
-        
-        foreach (var effect in reactionDef.Effects)
-        {
-            if (effect == null || string.IsNullOrEmpty(effect.effectId)) continue;
-            
-            int dur = effect.duration > 0 ? effect.duration : 1;
-            
-            switch (effect.effectId)
-            {
-                case "rxn_apply_dot":
-                {
-                    string dotName = !string.IsNullOrEmpty(effect.dotName) ? effect.dotName : "DoT";
-                    string tooltip = $"Deals damage per turn ({dur} turns)";
-                    if (target != null) target.AddReactionChip(dotName, tooltip, dur);
-                    break;
-                }
-                case "rxn_player_buff":
-                {
-                    string tooltip = effect.buffType switch
-                    {
-                        "CritDamage" => $"Bonus Crit Damage +{effect.value:F0}% ({dur} turns)",
-                        "BonusAP" => $"+{effect.value:F0} max AP ({dur} turns)",
-                        "ReflectiveArmor" => $"Reflects {effect.value:F0}% damage back ({dur} turns)",
-                        "DamageReduction" => $"Takes {effect.value:F0}% less damage ({dur} turns)",
-                        "RockDamageWhileShielded" => $"+{effect.value:F0}% Rock damage while shielded",
-                        _ => reactionName
-                    };
-                    player.AddReactionChip(reactionName, tooltip, dur > 0 ? dur : 99);
-                    break;
-                }
-                case "rxn_enemy_debuff":
-                {
-                    string chipName;
-                    string tooltip;
-                    switch (effect.debuffType)
-                    {
-                        case "Freeze":
-                            chipName = "Frozen";
-                            tooltip = "Enemy is frozen and skips the next turn";
-                            break;
-                        case "Weak":
-                            chipName = reactionName;
-                            tooltip = $"Enemy deals {effect.value:F0}% less damage ({dur} turns)";
-                            break;
-                        case "Shatter":
-                            chipName = reactionName;
-                            tooltip = $"Accumulates damage taken. Pops for bonus damage at threshold ({dur} turns)";
-                            break;
-                        case "HealOnHit":
-                            chipName = reactionName;
-                            tooltip = $"Player heals {effect.value:F0}% max HP when this enemy attacks ({dur} turns)";
-                            break;
-                        case "Electrocute":
-                            chipName = reactionName;
-                            tooltip = $"Takes bonus damage when hit. Stacks up to {effect.maxStacks} ({dur} turns)";
-                            break;
-                        case "Mudslide":
-                            chipName = reactionName;
-                            tooltip = $"Slowed. At max stacks, consumes for damage + stun ({dur} turns)";
-                            break;
-                        default:
-                            chipName = reactionName;
-                            tooltip = reactionName;
-                            break;
-                    }
-                    if (target != null) target.AddReactionChip(chipName, tooltip, dur);
-                    break;
-                }
-                case "rxn_apply_shield":
-                {
-                    string tooltip = $"+{effect.value:F0} Shield";
-                    player.AddReactionChip(reactionName, tooltip, 1);
-                    break;
-                }
-                case "rxn_reduce_resist":
-                {
-                    string elems = effect.elements ?? "All";
-                    string tooltip = $"Resistances reduced by {effect.value:F0}% ({elems}) ({dur} turns)";
-                    if (target != null) target.AddReactionChip(reactionName, tooltip, dur);
-                    break;
-                }
-            }
-        }
-    }
     
     /// <summary>
     /// Check HealOnHit: if the attacking enemy has the HealOnHit reaction debuff,

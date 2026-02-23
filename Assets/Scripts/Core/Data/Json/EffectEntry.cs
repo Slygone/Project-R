@@ -74,7 +74,7 @@ public class EffectEntry
     public float damageBonus;           // bonus damage multiplier after reborn (1.0 = +100%)
 
     // eff_status_immunity (relics)
-    public string immuneStatus;         // status id to become immune to (e.g., "status_player_sunder")
+    public string immuneStatus;         // status id to become immune to (e.g., "status_sunder")
 
     // eff_ap_delta (relics — modify AP at trigger time)
     // uses 'amount' field above
@@ -146,6 +146,21 @@ public class EffectEntry
 
     // eff_reaction_extra_mark_cost (relics — reactions cost extra marks)
     // uses 'value' field above
+
+    // eff_temp_resist (relics — temporary resist bonus for N turns)
+    // uses 'value' (resist amount) and 'duration' (turns) above
+
+    // eff_hide_enemy_intentions (relics — hide enemy action previews)
+    // no extra fields needed, flag-based
+
+    // eff_ultimate_cooldown_bonus (relics — reduce ultimate cooldown by N turns)
+    // uses 'value' field above
+
+    // eff_randomize_ap_cost (relics — randomize skill AP costs periodically)
+    public int interval;                // turns between randomizations (e.g., 3)
+
+    // eff_gold_on_kill (relics — gain gold on enemy kill, breaks on gold spend)
+    public int goldAmount;              // gold gained per enemy kill (e.g., 6)
 }
 
 /// <summary>

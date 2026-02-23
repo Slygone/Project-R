@@ -78,7 +78,7 @@ public class CombatEnemy
     public int HoTAmount;                   // heal per turn (flat or % based on magnitude)
     public bool HoTActive;
     
-    // Damage buff - from Battle Shout / status_enemy_damage_up
+    // Damage buff - from Battle Shout / status_empowered
     public float DamageBuffPercent;
     public int DamageBuffTurns;
     
@@ -155,9 +155,6 @@ public class CombatEnemy
     
     // Generic reaction debuffs (HealOnHit, Electrocute, Mudslide)
     private Dictionary<string, ReactionDebuffState> reactionDebuffs = new Dictionary<string, ReactionDebuffState>();
-    
-    // Reaction status chips for UI display (separate from gameplay tracking)
-    private List<ReactionChipInfo> reactionChips = new List<ReactionChipInfo>();
     
     public class ReactionDebuffState
     {
@@ -866,24 +863,32 @@ public class CombatEnemy
     
     /// <summary>
     /// Check if marks meet reaction trigger conditions.
-    /// Returns true if 6 of same element OR 3+3 of two different elements.
+    /// monoThreshold: marks needed for single-element reaction (default 6).
+    /// dualPerElement: marks needed per element for dual reaction (default 3).
+    /// dualExtraTotal: extra marks needed total across both elements (default 0).
     /// </summary>
-    public bool CheckReactionTrigger()
+    public bool CheckReactionTrigger(int monoThreshold = 6, int dualPerElement = 3, int dualExtraTotal = 0)
     {
-        // Check for 6 of same element
+        // Check for mono reaction (e.g. 6 or 7 of same element)
         foreach (var kvp in elementalMarks)
         {
-            if (kvp.Value >= MARKS_FOR_SINGLE_REACTION)
+            if (kvp.Value >= monoThreshold)
             {
                 return true;
             }
         }
         
-        // Check for 3+3 of two different elements
-        var elementsWithThreeOrMore = elementalMarks.Where(kvp => kvp.Value >= MARKS_FOR_DUAL_REACTION).ToList();
-        if (elementsWithThreeOrMore.Count >= 2)
+        // Check for dual reaction (e.g. 3+3 or 2+2, with optional +1 extra total)
+        var qualifying = elementalMarks
+            .Where(kvp => kvp.Value >= dualPerElement)
+            .OrderByDescending(kvp => kvp.Value)
+            .ToList();
+        if (qualifying.Count >= 2)
         {
-            return true;
+            int totalAvailable = qualifying[0].Value + qualifying[1].Value;
+            int totalNeeded = dualPerElement * 2 + dualExtraTotal;
+            if (totalAvailable >= totalNeeded)
+                return true;
         }
         
         return false;
@@ -891,39 +896,48 @@ public class CombatEnemy
     
     /// <summary>
     /// Get reaction info if triggered. Returns null if no reaction.
+    /// monoThreshold: marks needed for single-element reaction (default 6).
+    /// dualPerElement: marks needed per element for dual reaction (default 3).
+    /// dualExtraTotal: extra marks needed total across both elements (default 0).
     /// </summary>
-    public ReactionTriggerInfo GetReactionTriggerInfo()
+    public ReactionTriggerInfo GetReactionTriggerInfo(int monoThreshold = 6, int dualPerElement = 3, int dualExtraTotal = 0)
     {
-        // Check for 6 of same element (single element reaction)
+        // Check for mono reaction
         foreach (var kvp in elementalMarks)
         {
-            if (kvp.Value >= MARKS_FOR_SINGLE_REACTION)
+            if (kvp.Value >= monoThreshold)
             {
                 return new ReactionTriggerInfo
                 {
                     IsSingleElement = true,
                     PrimaryElement = kvp.Key,
                     SecondaryElement = Element.None,
-                    MarksConsumed = MARKS_FOR_SINGLE_REACTION
+                    MarksConsumed = monoThreshold
                 };
             }
         }
         
-        // Check for 3+3 of two different elements (dual element reaction)
-        var elementsWithThreeOrMore = elementalMarks
-            .Where(kvp => kvp.Value >= MARKS_FOR_DUAL_REACTION)
+        // Check for dual reaction
+        var qualifying = elementalMarks
+            .Where(kvp => kvp.Value >= dualPerElement)
             .OrderByDescending(kvp => kvp.Value)
             .ToList();
             
-        if (elementsWithThreeOrMore.Count >= 2)
+        if (qualifying.Count >= 2)
         {
-            return new ReactionTriggerInfo
+            int totalAvailable = qualifying[0].Value + qualifying[1].Value;
+            int totalNeeded = dualPerElement * 2 + dualExtraTotal;
+            if (totalAvailable >= totalNeeded)
             {
-                IsSingleElement = false,
-                PrimaryElement = elementsWithThreeOrMore[0].Key,
-                SecondaryElement = elementsWithThreeOrMore[1].Key,
-                MarksConsumed = MARKS_FOR_DUAL_REACTION * 2
-            };
+                // Primary consumes dualPerElement, secondary consumes dualPerElement + dualExtraTotal
+                return new ReactionTriggerInfo
+                {
+                    IsSingleElement = false,
+                    PrimaryElement = qualifying[0].Key,
+                    SecondaryElement = qualifying[1].Key,
+                    MarksConsumed = totalNeeded
+                };
+            }
         }
         
         return null;
@@ -931,17 +945,19 @@ public class CombatEnemy
     
     /// <summary>
     /// Consume marks after reaction triggers.
+    /// dualPerElement: base marks consumed per element for dual (default 3).
+    /// dualExtraTotal: extra marks consumed from secondary element (default 0).
     /// </summary>
-    public void ConsumeMarksForReaction(ReactionTriggerInfo info)
+    public void ConsumeMarksForReaction(ReactionTriggerInfo info, int dualPerElement = 3, int dualExtraTotal = 0)
     {
         if (info == null) return;
         
         if (info.IsSingleElement)
         {
-            // Consume 6 marks of the single element
+            // Consume monoThreshold marks (stored in MarksConsumed)
             if (elementalMarks.ContainsKey(info.PrimaryElement))
             {
-                elementalMarks[info.PrimaryElement] -= MARKS_FOR_SINGLE_REACTION;
+                elementalMarks[info.PrimaryElement] -= info.MarksConsumed;
                 if (elementalMarks[info.PrimaryElement] <= 0)
                 {
                     elementalMarks.Remove(info.PrimaryElement);
@@ -950,10 +966,10 @@ public class CombatEnemy
         }
         else
         {
-            // Consume 3 marks from each element
+            // Consume dualPerElement from primary, dualPerElement + dualExtraTotal from secondary
             if (elementalMarks.ContainsKey(info.PrimaryElement))
             {
-                elementalMarks[info.PrimaryElement] -= MARKS_FOR_DUAL_REACTION;
+                elementalMarks[info.PrimaryElement] -= dualPerElement;
                 if (elementalMarks[info.PrimaryElement] <= 0)
                 {
                     elementalMarks.Remove(info.PrimaryElement);
@@ -961,7 +977,7 @@ public class CombatEnemy
             }
             if (elementalMarks.ContainsKey(info.SecondaryElement))
             {
-                elementalMarks[info.SecondaryElement] -= MARKS_FOR_DUAL_REACTION;
+                elementalMarks[info.SecondaryElement] -= (dualPerElement + dualExtraTotal);
                 if (elementalMarks[info.SecondaryElement] <= 0)
                 {
                     elementalMarks.Remove(info.SecondaryElement);
@@ -1235,39 +1251,96 @@ public class CombatEnemy
         shatterAccumulated = 0;
         namedDoTs.Clear();
         reactionDebuffs.Clear();
-        reactionChips.Clear();
     }
     
-    // ========== REACTION CHIP DISPLAY ==========
-    
-    public void AddReactionChip(string name, string tooltip, int turns)
+    // ========== UNIFIED STATUS DISPLAY ==========
+
+    /// <summary>
+    /// Returns all active statuses (debuffs + buffs) for StatusDisplayUI.
+    /// Category and Description are resolved here from DataCache so the UI is fully data-driven.
+    /// </summary>
+    public System.Collections.Generic.List<ActiveStatusInfo> GetActiveStatuses()
     {
-        // Update existing chip if same name, otherwise add new
-        for (int i = 0; i < reactionChips.Count; i++)
+        var list = new System.Collections.Generic.List<ActiveStatusInfo>();
+
+        // Debuffs
+        if (IsFrozen)
+            list.Add(MakeStatus("status_frozen", freezeTurns));
+        if (IsWeakened)
+            list.Add(MakeStatus("status_weaken", weakTurns, weakPercent));
+        if (IsStunned)
+            list.Add(MakeStatus("status_stun", statusEffects.GetEffect(StatusEffectType.Stun)?.Duration ?? 1));
+
+        // DoTs (from StatusEffectManager) — use source as display name for uniqueness
+        foreach (var eff in statusEffects.GetAllEffects())
         {
-            if (reactionChips[i].ChipName == name)
+            if (eff.Type == StatusEffectType.DoT)
             {
-                reactionChips[i].Tooltip = tooltip;
-                reactionChips[i].TurnsRemaining = Mathf.Max(reactionChips[i].TurnsRemaining, turns);
-                return;
+                string dotName = !string.IsNullOrEmpty(eff.Source) ? eff.Source : "Burning";
+                list.Add(MakeStatus("status_dot", eff.Duration, eff.Value, eff.StackCount, dotName));
             }
         }
-        reactionChips.Add(new ReactionChipInfo(name, tooltip, turns, false));
-    }
-    
-    public void TickReactionChips()
-    {
-        for (int i = reactionChips.Count - 1; i >= 0; i--)
+
+        // Named DoTs (Ignite, Magma Scorch, etc.)
+        foreach (var kvp in namedDoTs)
         {
-            reactionChips[i].TurnsRemaining--;
-            if (reactionChips[i].TurnsRemaining <= 0)
+            if (kvp.Value.TurnsRemaining > 0)
+                list.Add(MakeStatus("status_dot", kvp.Value.TurnsRemaining, kvp.Value.DamagePerTurn, kvp.Value.CurrentStacks, kvp.Value.Name));
+        }
+
+        // Reaction debuffs (Shatter, HealOnHit, Electrocute, Mudslide)
+        foreach (var kvp in reactionDebuffs)
+        {
+            if (kvp.Value.TurnsRemaining > 0)
             {
-                reactionChips.RemoveAt(i);
+                string statusId = kvp.Value.Type switch
+                {
+                    "Shatter" => "status_shatter",
+                    "HealOnHit" => "status_heal_on_hit",
+                    "Electrocute" => "status_electrocute",
+                    "Mudslide" => "status_mudslide",
+                    _ => "status_weaken"
+                };
+                list.Add(MakeStatus(statusId, kvp.Value.TurnsRemaining, kvp.Value.Value, kvp.Value.CurrentStacks));
             }
         }
+
+        // Resist down (from temp resists — negative values)
+        int tempResist = statusEffects.GetTempResist("All");
+        if (tempResist < 0)
+            list.Add(MakeStatus("status_resist_down", 0, -tempResist));
+
+        // Buffs
+        if (FrostShieldActive)
+            list.Add(MakeStatus("status_frost_shield", 1, FrostShieldResistBonus));
+        if (RetaliationActive)
+            list.Add(MakeStatus("status_retaliation", 1, RetaliationDamageMult * 100f));
+        if (MarkBlockTurns > 0)
+            list.Add(MakeStatus("status_mark_block", MarkBlockTurns));
+        if (HoTActive && HoTAmount > 0)
+            list.Add(MakeStatus("status_regenerating", 0, HoTAmount));
+        if (DamageBuffTurns > 0 && DamageBuffPercent > 0f)
+            list.Add(MakeStatus("status_empowered", DamageBuffTurns, DamageBuffPercent));
+        if (GraniteStacks > 0)
+            list.Add(MakeStatus("status_granite_bastion", 0, GraniteStacks));
+        if (Shield > 0)
+            list.Add(MakeStatus("status_riposte_stance", 0, Shield));
+
+        return list;
     }
-    
-    public List<ReactionChipInfo> GetReactionChips() => reactionChips;
+
+    /// <summary>
+    /// Helper: creates an ActiveStatusInfo with Category and Description resolved from DataCache.
+    /// </summary>
+    private ActiveStatusInfo MakeStatus(string statusId, int duration, float magnitude = 0f, int stacks = 0, string displayNameOverride = null)
+    {
+        var def = DataCache.GetStatusDef(statusId);
+        string displayName = displayNameOverride ?? (def != null ? def.Name : statusId);
+        string category = def != null ? def.Category : "debuff";
+        string description = def != null ? def.GetDescription(magnitude, duration, stacks) : displayName;
+        return new ActiveStatusInfo(statusId, duration, magnitude, stacks, displayName, null, category, description);
+    }
+
 }
 
 /// <summary>

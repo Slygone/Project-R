@@ -1,4 +1,6 @@
 ### Relic list
+ 
+!For AI DO NOT READ FROM HERE NOW!!
 
 Relic rules:
 - Relics can drop from bosses, elite enemies and be bought from shop.
@@ -56,3 +58,33 @@ Cursed Relics:
 - Reaction Exhaustion — After you trigger a reaction, gain Weaken (1 turn). (once per turn)
 - Elemental Fog — You can’t see enemy marks (UI hidden), but you gain +1 AP on turn 1.
 - Overconsumption — Reactions consume +1 extra mark total (Dual consumes 3 + 4, Mono consumes 7).
+
+
+
+Vital Totem + 10% hp Works
+Sharpen Edge + 2 damage Works
+Deadeye Counter + 10% crit chance should start counting from the moment it's aquired by the player. When aquired it should be 0/10 and every skill used it should count up to 10. When it reaches 10 it should trigger and reset to 0/10. when it is 10/10 it should be 100% crit chance and the next skill used should reset the counter to 0/10.
+First Pulse + 2 AP does not work. It should apply + 2 AP to the player at the start of combat. Combat should start 12/10 since + 2 AP is applied at the start of combat. 
+Mark Echo + 1 extra mark does not aplly + 1 mark when triggered. Once every 5 turns your next skill should apply + 1 mark to the target. 
+Ambush Seal does not work. It should apply Weaken and Vunrable to all enemies for 1 turn at the start of combat. That should be displayed as a debuff on the enemy status container. Remove the + 2 AP on the start of combat from the relic.
+Remove Marking Needle as a relic from the json and completle from the game. Its a bad relic design. No code should have it. 
+Catalyst Splinter does not work. When Aquired reactions should require 2 marks + 2 marks instead of 3 + 3. It should only be the case for dual reactions not mono reactions from a single element. 
+Remove the Reaction Rebate relic from the json and completle from the game. It should not exist. 
+Rhythm Discount does not work. It should reduce AP cost of your next 2 skills by 1 every 3 turns. The reduced skill should be reflected in the skills UI with a yellow outlier and the AP cost should be reduced by 1 in the UI. 
+Cooldown Lottery does not work. It should every 20 AP spent (Carries over combat) one random skill gets its cooldown refreshed and becomes costs 0 AP to cast. If no skill is on cooldown then its just 0 AP to cast. Cannot target Ultimate. The reduced skill should be reflected in the skills UI with a yellow outlier and the AP cost should be reduced by 0 in the UI.
+Early Guard Override does not work. It should disable Defensive QTE for the first 2 turns of combat. Gain 10% more resistances. The resistance increase should be applied to the player for 2 turns only. It should also be displayede when hovering over the players tooltip. 
+Ic Cream Core doe snot work. It should store ANY unspent AP at the end of turn and then add those to the start of the next turn to the player. example player ended turn with 5/10 AP. Next turn the player starts with 15/10 AP. Player ends turn with 15/10 AP. Next turn the player starts with 25/10 AP. This should have a cap of 50 and resets when combat ends. 
+Fracture Revival does not work. It should revive the player once per run at 30% health. This relic should be broken and cannot be used again it also reduces the players max HP by 15% for the rest of the run. 
+Elemental Broadcast does not work. It should apply 1 of your equipped elemental sigls to all enemies. For example if our skills have only watter equiped (or one type) then it should apply water to all enemies. If we have multiple types then it should apply 1 random type to all enemies. If no sigils are equipped then nothing should be applied. 
+Reactor Core does not work. It should trigger the first reaction you trigger each combat twice (second trigger at 50% effect). The second reaction triggered should also have a QTE. 
+Overcharged Ultimate should be reworked. It should increase the cooldown of the ultimate to + 2 turns of the original cooldown. For example if ultimate has 5 turn cooldown it should be 7 turn cooldown when this cursed relic is aquired. 
+Cracked Battery does not work. It should reduce AP by 2 at the start of combat and for 2 turns after that. When aquired player should start with -2 AP at the start of combat and for 2 turns after that. For example if player has 10/10 AP at the start of combat it should be 8/10 AP at the start of combat and for 2 turns after that and turn 3 it should be 10/10 AP. If player has a relic like Fast Pulse or lighting reaction Overcharge then the cursed relic should still be applied -2 AP but the bonus is still gained. 
+Siphoning Aura does not work. Every turn the player loses 1 AP at the start of their turn. (Max AP is not affected you basically start 9/10 each turn (-1 AP))
+Reaction Exhaustion does not work. After you trigger a reaction, gain Weaken (1 turn). (once per turn)
+Elemental Fog does not work. Let's rework it. When aquired it should hide the enemy intentions (attacks tooltip). Every 3rd turn it should randomize the AP cost of each skill (except ultimate) and the new skills cost should be in the skills UI.
+Reaction Exhaust does not work. After you trigger a reaction, gain Weaken (1 turn). (once per turn)
+Overconsumption does not work. Reactions consume +1 extra mark total. How it should work:
+a) Target has 3 fire marks and 3 ice marks since this relic is aquired to trigger a fire-ice reaction the target should have +1 fire or ice mark. 
+b) Target has 5 fire marks. To trigger a fire-fire reaction the target should have 7 fire marks and not the usual 6.
+This was an example of marks and fire or ice should not be the only one this rule applies when the relic is Aquired. The idea is to increase the total marks needed to trigger a reaction with ANY mark. 
+

@@ -268,7 +268,7 @@ public static class SkillEffectEngine
             case "status_blind":
                 // Blind reduces accuracy - store on enemy
                 break;
-            case "status_weak":
+            case "status_weaken":
                 enemy.ApplyWeak(eff.duration > 0 ? eff.duration : 2, eff.magnitude > 0 ? eff.magnitude : 20f);
                 break;
             default:

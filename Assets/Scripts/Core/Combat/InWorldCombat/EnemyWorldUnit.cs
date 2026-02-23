@@ -41,17 +41,8 @@ public class EnemyWorldUnit : MonoBehaviour
     private GameObject markContainer;
     private Dictionary<Element, MarkChipData> markChips = new Dictionary<Element, MarkChipData>();
     
-    // Reaction status chip display
-    private GameObject statusContainer;
-    private List<StatusChipData> statusChips = new List<StatusChipData>();
-    
-    private class StatusChipData
-    {
-        public GameObject chipObj;
-        public TextMeshProUGUI labelText;
-        public string chipName;
-        public string tooltipText;
-    }
+    // Unified status display (buffs + debuffs)
+    private StatusDisplayUI enemyStatusDisplay;
     
     private class MarkChipData
     {
@@ -121,8 +112,9 @@ public class EnemyWorldUnit : MonoBehaviour
         // Update elemental mark display
         UpdateMarkDisplay();
         
-        // Update reaction status chip display
-        UpdateStatusDisplay();
+        // Update unified status display (buffs + debuffs)
+        if (enemyStatusDisplay != null)
+            enemyStatusDisplay.UpdateStatuses(combatEnemy.GetActiveStatuses());
         
         // Make canvas face camera
         if (worldCanvas != null && Camera.main != null)
@@ -166,8 +158,11 @@ public class EnemyWorldUnit : MonoBehaviour
         // Create elemental mark display (left of enemy body)
         CreateMarkDisplay(canvasObj.transform);
         
-        // Create reaction status display (right of health bar)
-        CreateStatusDisplay(canvasObj.transform);
+        // Create unified status display (centered on enemy body)
+        enemyStatusDisplay = new StatusDisplayUI(
+            canvasObj.transform, true, new Vector2(0f, -80f),
+            (text) => CombatArena.ShowTooltip(text),
+            () => CombatArena.HideTooltip());
     }
     
     private void CreateNameplate(Transform parent)
@@ -726,131 +721,15 @@ public class EnemyWorldUnit : MonoBehaviour
         };
     }
     
-    // ========== REACTION STATUS CHIP DISPLAY ==========
+    // ========== STATUS DISPLAY CONTROL ==========
     
-    private void CreateStatusDisplay(Transform parent)
+    /// <summary>
+    /// Toggle expanded/compact mode on the enemy status display.
+    /// Called by CombatArena when X key is pressed.
+    /// </summary>
+    public void SetStatusExpanded(bool expanded)
     {
-        statusContainer = new GameObject("StatusContainer");
-        statusContainer.transform.SetParent(parent, false);
-        
-        var containerRect = statusContainer.AddComponent<RectTransform>();
-        containerRect.anchorMin = new Vector2(0.5f, 0.5f);
-        containerRect.anchorMax = new Vector2(0.5f, 0.5f);
-        containerRect.pivot = new Vector2(0f, 0.5f);
-        // Position to the right of the health bar, same row as mark chips
-        containerRect.anchoredPosition = new Vector2(healthBarWidth * 100f / 2f + 8f, -150f);
-        containerRect.sizeDelta = new Vector2(400f, 48f);
-        
-        var layout = statusContainer.AddComponent<HorizontalLayoutGroup>();
-        layout.spacing = 4;
-        layout.childAlignment = TextAnchor.MiddleLeft;
-        layout.childForceExpandWidth = false;
-        layout.childForceExpandHeight = true;
-        layout.padding = new RectOffset(0, 0, 0, 0);
-    }
-    
-    private void UpdateStatusDisplay()
-    {
-        if (combatEnemy == null || statusContainer == null) return;
-        
-        var activeChips = combatEnemy.GetReactionChips();
-        
-        // Remove UI chips that are no longer in the active list
-        for (int i = statusChips.Count - 1; i >= 0; i--)
-        {
-            bool found = false;
-            foreach (var chip in activeChips)
-            {
-                if (chip.ChipName == statusChips[i].chipName) { found = true; break; }
-            }
-            if (!found)
-            {
-                Destroy(statusChips[i].chipObj);
-                statusChips.RemoveAt(i);
-            }
-        }
-        
-        // Add or update chips
-        foreach (var chipInfo in activeChips)
-        {
-            bool exists = false;
-            foreach (var existing in statusChips)
-            {
-                if (existing.chipName == chipInfo.ChipName)
-                {
-                    existing.tooltipText = chipInfo.Tooltip;
-                    exists = true;
-                    break;
-                }
-            }
-            if (!exists)
-            {
-                var uiChip = CreateStatusChip(chipInfo.ChipName, chipInfo.Tooltip);
-                statusChips.Add(uiChip);
-            }
-        }
-    }
-    
-    private StatusChipData CreateStatusChip(string chipName, string tooltip)
-    {
-        var data = new StatusChipData();
-        data.chipName = chipName;
-        data.tooltipText = tooltip;
-        
-        data.chipObj = new GameObject($"Status_{chipName}");
-        data.chipObj.transform.SetParent(statusContainer.transform, false);
-        
-        // Purple-tinted background for reaction status chips
-        var bg = data.chipObj.AddComponent<Image>();
-        bg.color = new Color(0.25f, 0.15f, 0.35f, 0.9f);
-        bg.raycastTarget = true;
-        
-        // Border
-        var outline = data.chipObj.AddComponent<Outline>();
-        outline.effectColor = new Color(0.7f, 0.4f, 0.9f, 0.8f);
-        outline.effectDistance = new Vector2(1, 1);
-        
-        // Size via LayoutElement — same as mark chips
-        var layoutElem = data.chipObj.AddComponent<LayoutElement>();
-        layoutElem.preferredHeight = 44;
-        layoutElem.minWidth = 40;
-        
-        var fitter = data.chipObj.AddComponent<ContentSizeFitter>();
-        fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
-        fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
-        
-        var hLayout = data.chipObj.AddComponent<HorizontalLayoutGroup>();
-        hLayout.padding = new RectOffset(12, 12, 2, 2);
-        hLayout.childAlignment = TextAnchor.MiddleCenter;
-        hLayout.childForceExpandWidth = false;
-        hLayout.childForceExpandHeight = true;
-        
-        // Label text: reaction/status name
-        var textObj = new GameObject("Label");
-        textObj.transform.SetParent(data.chipObj.transform, false);
-        
-        data.labelText = textObj.AddComponent<TextMeshProUGUI>();
-        data.labelText.text = chipName;
-        data.labelText.fontSize = 22f;
-        data.labelText.color = new Color(0.9f, 0.7f, 1f);
-        data.labelText.fontStyle = FontStyles.Bold;
-        data.labelText.alignment = TextAlignmentOptions.Center;
-        data.labelText.textWrappingMode = TextWrappingModes.NoWrap;
-        data.labelText.raycastTarget = false;
-        
-        // EventTrigger for tooltip on hover
-        var trigger = data.chipObj.AddComponent<EventTrigger>();
-        
-        var enterEntry = new EventTrigger.Entry();
-        enterEntry.eventID = EventTriggerType.PointerEnter;
-        enterEntry.callback.AddListener((_) => { CombatArena.ShowTooltip(data.tooltipText); });
-        trigger.triggers.Add(enterEntry);
-        
-        var exitEntry = new EventTrigger.Entry();
-        exitEntry.eventID = EventTriggerType.PointerExit;
-        exitEntry.callback.AddListener((_) => { CombatArena.HideTooltip(); });
-        trigger.triggers.Add(exitEntry);
-        
-        return data;
+        if (enemyStatusDisplay != null)
+            enemyStatusDisplay.SetExpanded(expanded);
     }
 }

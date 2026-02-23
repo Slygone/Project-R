@@ -657,7 +657,7 @@
       "description": "Reduces the player's damage by 50% for 2 turns",
       "cooldown": 3,
       "effects": [
-        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_weaken", "duration": 2, "magnitude": 50 }
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_weaken", "duration": 2, "magnitude": 50 }
       ]
     },
     {
@@ -747,7 +747,7 @@
       "description": "Heals all enemies for 5% of their max health per turn",
       "cooldown": 2,
       "effects": [
-        { "effectId": "eff_apply_status", "target": "AllAllies", "status": "status_enemy_hot", "duration": 3, "magnitude": 5 }
+        { "effectId": "eff_apply_status", "target": "AllAllies", "status": "status_regenerating", "duration": 3, "magnitude": 5 }
       ]
     },
     {
@@ -765,7 +765,7 @@
       "description": "Increases all enemies damage by 20% for 2 turns",
       "cooldown": 3,
       "effects": [
-        { "effectId": "eff_apply_status", "target": "AllAllies", "status": "status_enemy_damage_up", "duration": 2, "magnitude": 20 }
+        { "effectId": "eff_apply_status", "target": "AllAllies", "status": "status_empowered", "duration": 2, "magnitude": 20 }
       ]
     },
     {
@@ -793,7 +793,7 @@
       "cooldown": 0,
       "effects": [
         { "effectId": "eff_deal_damage", "target": "Player", "multiplier": 1.0 },
-        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_vulnerable", "duration": 3, "magnitude": 10, "maxStacks": 30 }
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_vulnerable", "duration": 3, "magnitude": 10, "maxStacks": 30 }
       ]
     },
     {
@@ -876,7 +876,7 @@
       "description": "Weakens the player, reducing damage dealt by 50% for 2 turns",
       "cooldown": 2,
       "effects": [
-        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_weaken", "duration": 2, "magnitude": 50 }
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_weaken", "duration": 2, "magnitude": 50 }
       ]
     },
     {
@@ -885,7 +885,7 @@
       "description": "Sunders the player, reducing shield gain by 50% for 2 turns",
       "cooldown": 2,
       "effects": [
-        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_sunder", "duration": 2, "magnitude": 50 }
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_sunder", "duration": 2, "magnitude": 50 }
       ]
     },
     {
@@ -958,9 +958,9 @@
       "description": "Stuns the player for 1 turn, weakens and sunders for 2 turns",
       "cooldown": 4,
       "effects": [
-        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_stun", "duration": 1 },
-        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_weaken", "duration": 2, "magnitude": 30 },
-        { "effectId": "eff_apply_status", "target": "Player", "status": "status_player_sunder", "duration": 2, "magnitude": 30 }
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_stun", "duration": 1 },
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_weaken", "duration": 2, "magnitude": 30 },
+        { "effectId": "eff_apply_status", "target": "Player", "status": "status_sunder", "duration": 2, "magnitude": 30 }
       ]
     },
     {

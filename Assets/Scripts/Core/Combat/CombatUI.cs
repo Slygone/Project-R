@@ -270,7 +270,7 @@ public class CombatUI : MonoBehaviour
                 var st = sigilRewardButton.GetComponentInChildren<TextMeshProUGUI>();
                 if (st != null)
                 {
-                    st.text = $"<color=#{ColorUtility.ToHtmlStringRGB(ElementColors.Get(pendingSigil))}>\u25C8</color>{pendingSigil} Sigil<size=16>(Click to enchant)</size>";
+                    st.text = $"<color=#{ColorUtility.ToHtmlStringRGB(ElementColors.Get(pendingSigil))}>*</color> {pendingSigil} Sigil <size=16>(Click to enchant)</size>";
                     st.color = ElementColors.Get(pendingSigil);
                 }
                 sigilRewardButton.GetComponent<Button>().interactable = true;
@@ -288,8 +288,8 @@ public class CombatUI : MonoBehaviour
             {
                 // Rarity-based selection: bosses drop Legendary, elites 50/50, regular = Common
                 string dropRarity = isBoss ? "Legendary" : (isElite && Random.value < 0.5f ? "Legendary" : "Common");
-                pendingRelic = GetRandomRelicByRarity(dropRarity);
-                if (pendingRelic == null) pendingRelic = GetRandomRelicByRarity("Common");
+                pendingRelic = GetRandomRelicByRarity(dropRarity, p);
+                if (pendingRelic == null) pendingRelic = GetRandomRelicByRarity("Common", p);
                 if (pendingRelic != null)
                 {
                     var ri = relicRewardButton.GetComponent<Image>();
@@ -499,14 +499,22 @@ public class CombatUI : MonoBehaviour
         if (combatManager != null) combatManager.OnLootCollected();
     }
     
-    private static RelicData GetRandomRelicByRarity(string rarity)
+    private static RelicData GetRandomRelicByRarity(string rarity, Player playerRef = null)
     {
         if (DataCache.Relics == null || DataCache.Relics.Count == 0) return null;
+        
+        // Build set of owned relic IDs to exclude duplicates
+        var ownedIds = new System.Collections.Generic.HashSet<string>();
+        if (playerRef != null)
+        {
+            foreach (var owned in playerRef.GetRelics())
+                ownedIds.Add(owned.Id);
+        }
         
         var pool = new System.Collections.Generic.List<RelicData>();
         foreach (var r in DataCache.Relics)
         {
-            if (r.Rarity == rarity) pool.Add(r);
+            if (r.Rarity == rarity && !ownedIds.Contains(r.Id)) pool.Add(r);
         }
         
         if (pool.Count == 0) return null;

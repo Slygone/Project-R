@@ -375,10 +375,18 @@ public class ShopUI : MonoBehaviour
         }
 
         // Only show purchasable relics (Common rarity with price > 0) in shop
+        // Exclude relics the player already owns (no duplicates)
+        var ownedIds = new HashSet<string>();
+        if (player != null)
+        {
+            foreach (var owned in player.GetRelics())
+                ownedIds.Add(owned.Id);
+        }
+
         var available = new List<RelicData>();
         foreach (var r in allRelics)
         {
-            if (r.Price > 0 && r.Rarity == "Common")
+            if (r.Price > 0 && r.Rarity == "Common" && !ownedIds.Contains(r.Id))
                 available.Add(r);
         }
         

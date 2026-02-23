@@ -104,42 +104,8 @@ public class CombatArena : MonoBehaviour
     private TextMeshProUGUI tooltipText;
     private bool tooltipVisible;
     
-    // Player debuff display (above health bar)
-    private GameObject debuffContainer;
-    private List<DebuffChipData> debuffChips = new List<DebuffChipData>();
-    
-    // Player reaction buff display (above debuff container)
-    private GameObject buffContainer;
-    private List<BuffChipData> buffChips = new List<BuffChipData>();
-    
-    private class BuffChipData
-    {
-        public GameObject chipObj;
-        public TextMeshProUGUI nameText;
-        public string chipName;
-        public string tooltipDescription;
-    }
-    
-    private class DebuffChipData
-    {
-        public GameObject chipObj;
-        public TextMeshProUGUI nameText;
-        public string debuffId;
-        public string tooltipDescription;
-    }
-    
-    private struct DebuffInfo
-    {
-        public string id;
-        public string name;
-        public string description;
-        public DebuffInfo(string id, string name, string description)
-        {
-            this.id = id;
-            this.name = name;
-            this.description = description;
-        }
-    }
+    // Unified status display (buffs + debuffs) for the player
+    private StatusDisplayUI playerStatusDisplay;
     
     public bool InCombat => inCombat;
     public List<EnemyWorldUnit> SpawnedEnemies => spawnedEnemies;
@@ -149,11 +115,13 @@ public class CombatArena : MonoBehaviour
         public GameObject buttonObj;
         public Button button;
         public Image bgImage;
+        public Image borderImage;
         public TextMeshProUGUI nameText;
+        public TextMeshProUGUI apText;
         public TextMeshProUGUI cooldownText;
         public int skillNumber;
         public string baseElement; // Original element from character
-        public int apCost;
+        public int baseAPCost; // Original AP cost from character data
         public bool isUltimate;
     }
 
@@ -208,27 +176,27 @@ public class CombatArena : MonoBehaviour
         // Update health and energy displays
         UpdateHealthEnergyDisplays();
         
-        // Update player debuff display
-        UpdateDebuffDisplay();
+        // Update player status display (unified buffs + debuffs)
+        if (playerStatusDisplay != null && currentPlayer != null)
+            playerStatusDisplay.UpdateStatuses(currentPlayer.GetActiveStatuses());
         
-        // Update player reaction buff display
-        UpdateBuffDisplay();
-        
-        // Follow mouse with tooltip (positioned to the left of cursor)
-        if (tooltipVisible && tooltipPanel != null)
+        // X key toggles expanded status view for all entities
+        if (Input.GetKeyDown(KeyCode.X))
         {
-            var rt = tooltipPanel.GetComponent<RectTransform>();
-            Vector2 mousePos = Input.mousePosition;
-            // Position to the left and above cursor
-            float x = mousePos.x - 16f;
-            float y = mousePos.y + 16f;
-            // Clamp to screen bounds
-            float tooltipWidth = rt.sizeDelta.x;
-            float tooltipHeight = rt.sizeDelta.y > 0 ? rt.sizeDelta.y : 100f;
-            if (x - tooltipWidth < 0) x = tooltipWidth;
-            if (y + tooltipHeight > Screen.height) y = Screen.height - tooltipHeight;
-            rt.position = new Vector3(x, y, 0f);
+            StatusDisplayUI.GlobalExpanded = !StatusDisplayUI.GlobalExpanded;
+            if (playerStatusDisplay != null)
+                playerStatusDisplay.SetExpanded(StatusDisplayUI.GlobalExpanded);
+            foreach (var unit in spawnedEnemies)
+            {
+                if (unit != null) unit.SetStatusExpanded(StatusDisplayUI.GlobalExpanded);
+            }
+            // Hide tooltip when collapsing (SetExpanded already calls hideTooltip,
+            // but also clear it here for enemy world-space chips that use static tooltip)
+            if (!StatusDisplayUI.GlobalExpanded)
+                HideTooltipInternal();
         }
+        
+        // Tooltip is positioned once in ShowTooltipInternal — no mouse follow
     }
     
     /// <summary>
@@ -260,11 +228,11 @@ public class CombatArena : MonoBehaviour
             cameraManager.EnterCombat(arenaCenter);
         }
         
-        // Initialize AP from character data
+        // Initialize AP from character data (read actual AP — may differ from max due to relics)
         if (currentPlayer != null && currentPlayer.HasCharacter())
         {
             maxAP = currentPlayer.GetCharacter().MaxActionPoints;
-            currentAP = maxAP;
+            currentAP = currentPlayer.GetCurrentAP();
         }
         
         // Hide world nodes
@@ -583,11 +551,11 @@ public class CombatArena : MonoBehaviour
         // Create Health container (bottom left - red circle)
         CreateHealthContainer();
         
-        // Create debuff display (above health bar)
-        CreateDebuffContainer();
-        
-        // Create buff display (above debuff container)
-        CreateBuffContainer();
+        // Create unified status display (buffs + debuffs) above health bar
+        // Health container is at (20, 20) with height 36, so position chips above it
+        playerStatusDisplay = new StatusDisplayUI(
+            combatCanvas.transform, false, new Vector2(20, 64),
+            ShowTooltipInternal, HideTooltipInternal);
         
         // Create Energy container (bottom right - dark circle)
         CreateEnergyContainer();
@@ -867,11 +835,13 @@ public class CombatArena : MonoBehaviour
             buttonObj = buttonObj,
             button = button,
             bgImage = bgImage,
+            borderImage = borderImage,
             nameText = nameText,
+            apText = apText,
             cooldownText = cooldownText,
             skillNumber = skillNumber,
             baseElement = element,
-            apCost = apCost,
+            baseAPCost = apCost,
             isUltimate = isUltimate
         };
         skillButtonsData.Add(data);
@@ -912,7 +882,30 @@ public class CombatArena : MonoBehaviour
             int cooldown = currentPlayer.GetSkillCooldown(data.skillNumber - 1);
             bool isOnCooldown = cooldown > 0;
             
-            bool canAfford = currentAP >= data.apCost;
+            // Get effective AP cost (accounts for Rhythm Discount, Cooldown Lottery, Elemental Fog)
+            int effectiveCost = data.baseAPCost;
+            if (!data.isUltimate && currentPlayer.Relics != null)
+            {
+                effectiveCost = currentPlayer.Relics.GetEffectiveAPCost(data.skillNumber - 1, data.baseAPCost);
+            }
+            
+            // Update AP cost text dynamically
+            if (data.apText != null && !data.isUltimate)
+            {
+                data.apText.text = $"{effectiveCost} AP";
+                // Yellow text if discounted
+                bool highlighted = currentPlayer.Relics != null && currentPlayer.Relics.IsSkillHighlighted(data.skillNumber - 1);
+                data.apText.color = highlighted ? new Color(1f, 0.85f, 0.2f) : new Color(0.8f, 0.7f, 0.2f);
+            }
+            
+            // Yellow border for highlighted skills
+            if (data.borderImage != null && !data.isUltimate)
+            {
+                bool highlighted = currentPlayer.Relics != null && currentPlayer.Relics.IsSkillHighlighted(data.skillNumber - 1);
+                data.borderImage.color = highlighted ? new Color(0.9f, 0.75f, 0.1f) : new Color(0.4f, 0.4f, 0.4f);
+            }
+            
+            bool canAfford = currentAP >= effectiveCost;
             bool canUse = canAfford && !isOnCooldown;
             
             // Ultimate requires max energy
@@ -970,17 +963,11 @@ public class CombatArena : MonoBehaviour
     
     private void UpdateAPDisplay()
     {
-        // Sync maxAP from Player in case BonusAP buff changed it mid-turn
+        // Always sync from Player — authoritative source for AP (relics may modify mid-turn)
         if (currentPlayer != null)
         {
-            int playerMax = currentPlayer.GetMaxAP();
-            if (playerMax != maxAP)
-            {
-                int diff = playerMax - maxAP;
-                maxAP = playerMax;
-                // If max increased mid-turn (BonusAP buff), also increase current AP
-                if (diff > 0) currentAP += diff;
-            }
+            maxAP = currentPlayer.GetMaxAP();
+            currentAP = currentPlayer.GetCurrentAP();
         }
         
         if (apDisplayText != null)
@@ -1015,8 +1002,15 @@ public class CombatArena : MonoBehaviour
         
         if (skillData == null) return;
         
+        // Get effective AP cost (accounts for relic modifiers)
+        int effectiveCost = skillData.baseAPCost;
+        if (!skillData.isUltimate && currentPlayer.Relics != null)
+        {
+            effectiveCost = currentPlayer.Relics.GetEffectiveAPCost(skillData.skillNumber - 1, skillData.baseAPCost);
+        }
+        
         // Check if we can afford the skill
-        if (currentAP < skillData.apCost) return;
+        if (currentAP < effectiveCost) return;
         
         // For ultimate, also check energy
         if (skillData.isUltimate && !currentPlayer.CanUseUltimate()) return;
@@ -1037,7 +1031,7 @@ public class CombatArena : MonoBehaviour
                 CombatEnemy target = selectedUnit.CombatEnemy;
                 if (target != null && combatManager != null)
                 {
-                    currentAP -= skillData.apCost;
+                    currentAP -= effectiveCost;
                     combatManager.OnPlayerSkillTarget(skillNumber, target);
                 }
             }
@@ -1065,9 +1059,9 @@ public class CombatArena : MonoBehaviour
     {
         if (currentPlayer != null && currentPlayer.HasCharacter())
         {
-            // Sync maxAP from Player (may have changed due to BonusAP reaction buff)
+            // Sync from Player (currentAP may differ from max due to relics like First Pulse, Cracked Battery)
             maxAP = currentPlayer.GetMaxAP();
-            currentAP = maxAP;
+            currentAP = currentPlayer.GetCurrentAP();
             UpdateAPDisplay();
             UpdateSkillButtonStates();
         }
@@ -1087,6 +1081,14 @@ public class CombatArena : MonoBehaviour
         {
             combatCanvas.gameObject.SetActive(true);
             PopulateSkillButtons();
+            
+            // Recreate player status display (HideCombatUI destroys it each combat)
+            if (playerStatusDisplay == null)
+            {
+                playerStatusDisplay = new StatusDisplayUI(
+                    combatCanvas.transform, false, new Vector2(20, 64),
+                    ShowTooltipInternal, HideTooltipInternal);
+            }
         }
     }
     
@@ -1106,19 +1108,13 @@ public class CombatArena : MonoBehaviour
         // Hide tooltip
         HideTooltipInternal();
         
-        // Clear debuff chips
-        foreach (var chip in debuffChips)
+        // Clear status display
+        if (playerStatusDisplay != null)
         {
-            if (chip.chipObj != null) Destroy(chip.chipObj);
+            playerStatusDisplay.Destroy();
+            playerStatusDisplay = null;
         }
-        debuffChips.Clear();
-        
-        // Clear buff chips
-        foreach (var chip in buffChips)
-        {
-            if (chip.chipObj != null) Destroy(chip.chipObj);
-        }
-        buffChips.Clear();
+        StatusDisplayUI.GlobalExpanded = false;
     }
     
     /// <summary>
@@ -1274,274 +1270,6 @@ public class CombatArena : MonoBehaviour
         energyText.outlineColor = Color.black;
     }
     
-    private void CreateDebuffContainer()
-    {
-        // Grid container above the health bar for debuff chips
-        debuffContainer = new GameObject("DebuffContainer");
-        debuffContainer.transform.SetParent(combatCanvas.transform, false);
-        
-        var containerRect = debuffContainer.AddComponent<RectTransform>();
-        containerRect.anchorMin = new Vector2(0f, 0f);
-        containerRect.anchorMax = new Vector2(0f, 0f);
-        containerRect.pivot = new Vector2(0f, 0f);
-        containerRect.anchoredPosition = new Vector2(20, 62);
-        containerRect.sizeDelta = new Vector2(500, 0);
-        
-        var grid = debuffContainer.AddComponent<GridLayoutGroup>();
-        grid.cellSize = new Vector2(100, 24);
-        grid.spacing = new Vector2(4, 4);
-        grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
-        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
-        grid.childAlignment = TextAnchor.UpperLeft;
-        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = 5;
-        
-        var csf = debuffContainer.AddComponent<ContentSizeFitter>();
-        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-    }
-    
-    private void CreateBuffContainer()
-    {
-        // Grid container above the debuff container for reaction + relic buff chips
-        buffContainer = new GameObject("BuffContainer");
-        buffContainer.transform.SetParent(combatCanvas.transform, false);
-        
-        var containerRect = buffContainer.AddComponent<RectTransform>();
-        containerRect.anchorMin = new Vector2(0f, 0f);
-        containerRect.anchorMax = new Vector2(0f, 0f);
-        containerRect.pivot = new Vector2(0f, 0f);
-        containerRect.anchoredPosition = new Vector2(20, 96);
-        containerRect.sizeDelta = new Vector2(500, 0);
-        
-        var grid = buffContainer.AddComponent<GridLayoutGroup>();
-        grid.cellSize = new Vector2(100, 24);
-        grid.spacing = new Vector2(4, 4);
-        grid.startCorner = GridLayoutGroup.Corner.UpperLeft;
-        grid.startAxis = GridLayoutGroup.Axis.Horizontal;
-        grid.childAlignment = TextAnchor.UpperLeft;
-        grid.constraint = GridLayoutGroup.Constraint.FixedColumnCount;
-        grid.constraintCount = 5;
-        
-        var csf = buffContainer.AddComponent<ContentSizeFitter>();
-        csf.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
-    }
-    
-    private void UpdateBuffDisplay()
-    {
-        if (currentPlayer == null || buffContainer == null) return;
-        
-        // Combine reaction chips + relic buff chips
-        var activeChips = new List<ReactionChipInfo>(currentPlayer.GetReactionChips());
-        activeChips.AddRange(currentPlayer.GetRelicBuffChips());
-        
-        // Remove UI chips no longer active
-        for (int i = buffChips.Count - 1; i >= 0; i--)
-        {
-            bool found = false;
-            foreach (var chip in activeChips)
-            {
-                if (chip.ChipName == buffChips[i].chipName) { found = true; break; }
-            }
-            if (!found)
-            {
-                Destroy(buffChips[i].chipObj);
-                buffChips.RemoveAt(i);
-            }
-        }
-        
-        // Add or update chips
-        foreach (var chipInfo in activeChips)
-        {
-            bool exists = false;
-            foreach (var existing in buffChips)
-            {
-                if (existing.chipName == chipInfo.ChipName)
-                {
-                    existing.tooltipDescription = chipInfo.Tooltip;
-                    exists = true;
-                    break;
-                }
-            }
-            if (!exists)
-            {
-                var uiChip = CreateBuffChip(chipInfo.ChipName, chipInfo.Tooltip);
-                buffChips.Add(uiChip);
-            }
-        }
-    }
-    
-    private BuffChipData CreateBuffChip(string chipName, string tooltip)
-    {
-        var chip = new BuffChipData();
-        chip.chipName = chipName;
-        chip.tooltipDescription = tooltip;
-        
-        chip.chipObj = new GameObject($"Buff_{chipName}");
-        chip.chipObj.transform.SetParent(buffContainer.transform, false);
-        
-        // Green-tinted background for buff chips
-        var bg = chip.chipObj.AddComponent<Image>();
-        bg.color = new Color(0.1f, 0.3f, 0.15f, 0.9f);
-        bg.raycastTarget = true;
-        
-        // Green border
-        var outline = chip.chipObj.AddComponent<Outline>();
-        outline.effectColor = new Color(0.3f, 0.8f, 0.4f, 0.8f);
-        outline.effectDistance = new Vector2(1, 1);
-        
-        // Name text (fills the grid cell)
-        var textObj = new GameObject("BuffName");
-        textObj.transform.SetParent(chip.chipObj.transform, false);
-        
-        var textRect = textObj.AddComponent<RectTransform>();
-        textRect.anchorMin = Vector2.zero;
-        textRect.anchorMax = Vector2.one;
-        textRect.offsetMin = new Vector2(4f, 0f);
-        textRect.offsetMax = new Vector2(-4f, 0f);
-        
-        chip.nameText = textObj.AddComponent<TextMeshProUGUI>();
-        chip.nameText.text = chipName;
-        chip.nameText.fontSize = 12;
-        chip.nameText.color = new Color(0.6f, 1f, 0.7f);
-        chip.nameText.alignment = TextAlignmentOptions.Center;
-        chip.nameText.textWrappingMode = TextWrappingModes.NoWrap;
-        chip.nameText.overflowMode = TextOverflowModes.Ellipsis;
-        chip.nameText.raycastTarget = false;
-        
-        // EventTrigger for tooltip hover
-        var trigger = chip.chipObj.AddComponent<UnityEngine.EventSystems.EventTrigger>();
-        
-        var enterEntry = new UnityEngine.EventSystems.EventTrigger.Entry();
-        enterEntry.eventID = UnityEngine.EventSystems.EventTriggerType.PointerEnter;
-        enterEntry.callback.AddListener((data) => { ShowTooltipInternal(chip.tooltipDescription); });
-        trigger.triggers.Add(enterEntry);
-        
-        var exitEntry = new UnityEngine.EventSystems.EventTrigger.Entry();
-        exitEntry.eventID = UnityEngine.EventSystems.EventTriggerType.PointerExit;
-        exitEntry.callback.AddListener((data) => { HideTooltipInternal(); });
-        trigger.triggers.Add(exitEntry);
-        
-        return chip;
-    }
-    
-    private void UpdateDebuffDisplay()
-    {
-        if (currentPlayer == null || debuffContainer == null) return;
-        
-        // Build list of currently active debuffs
-        var activeDebuffs = new List<DebuffInfo>();
-        
-        if (currentPlayer.IsWeakened)
-            activeDebuffs.Add(new DebuffInfo("weaken", "Weaken",
-                $"Damage dealt reduced by {currentPlayer.WeakenPercent:F0}% ({currentPlayer.WeakenTurns} turns)"));
-        
-        if (currentPlayer.IsSundered)
-            activeDebuffs.Add(new DebuffInfo("sunder", "Sunder",
-                $"Shield gain reduced by {currentPlayer.SunderPercent:F0}% ({currentPlayer.SunderTurns} turns)"));
-        
-        if (currentPlayer.IsVulnerable)
-            activeDebuffs.Add(new DebuffInfo("vulnerable", "Vulnerable",
-                $"Damage taken increased by {currentPlayer.VulnerablePercent:F0}% ({currentPlayer.VulnerableTurns} turns)"));
-        
-        if (currentPlayer.IsPlayerStunned)
-            activeDebuffs.Add(new DebuffInfo("stun", "Stunned",
-                $"Cannot act ({currentPlayer.StunTurns} turns)"));
-        
-        if (currentPlayer.HasPlayerDoT)
-            activeDebuffs.Add(new DebuffInfo("dot", "Burning",
-                $"Taking {currentPlayer.PlayerDoTDamage} damage per turn ({currentPlayer.PlayerDoTTurns} turns)"));
-        
-        // Remove chips for debuffs that are no longer active
-        for (int i = debuffChips.Count - 1; i >= 0; i--)
-        {
-            bool stillActive = false;
-            foreach (var d in activeDebuffs)
-            {
-                if (d.id == debuffChips[i].debuffId) { stillActive = true; break; }
-            }
-            if (!stillActive)
-            {
-                Destroy(debuffChips[i].chipObj);
-                debuffChips.RemoveAt(i);
-            }
-        }
-        
-        // Add chips for new debuffs, update descriptions for existing ones
-        foreach (var debuff in activeDebuffs)
-        {
-            bool exists = false;
-            foreach (var chip in debuffChips)
-            {
-                if (chip.debuffId == debuff.id)
-                {
-                    // Update description (turns may have changed)
-                    chip.tooltipDescription = debuff.description;
-                    exists = true;
-                    break;
-                }
-            }
-            if (exists) continue;
-            
-            // Create new chip
-            var chipData = CreateDebuffChip(debuff.id, debuff.name, debuff.description);
-            debuffChips.Add(chipData);
-        }
-    }
-    
-    private DebuffChipData CreateDebuffChip(string debuffId, string name, string description)
-    {
-        var chip = new DebuffChipData();
-        chip.debuffId = debuffId;
-        chip.tooltipDescription = description;
-        
-        chip.chipObj = new GameObject($"Debuff_{debuffId}");
-        chip.chipObj.transform.SetParent(debuffContainer.transform, false);
-        
-        // Background
-        var bg = chip.chipObj.AddComponent<Image>();
-        bg.color = new Color(0.5f, 0.15f, 0.15f, 0.9f);
-        bg.raycastTarget = true;
-        
-        // Border
-        var outline = chip.chipObj.AddComponent<Outline>();
-        outline.effectColor = new Color(0.8f, 0.2f, 0.2f, 0.8f);
-        outline.effectDistance = new Vector2(1, 1);
-        
-        // Name text (fills the grid cell)
-        var textObj = new GameObject("DebuffName");
-        textObj.transform.SetParent(chip.chipObj.transform, false);
-        
-        var textRect = textObj.AddComponent<RectTransform>();
-        textRect.anchorMin = Vector2.zero;
-        textRect.anchorMax = Vector2.one;
-        textRect.offsetMin = new Vector2(4f, 0f);
-        textRect.offsetMax = new Vector2(-4f, 0f);
-        
-        chip.nameText = textObj.AddComponent<TextMeshProUGUI>();
-        chip.nameText.text = name;
-        chip.nameText.fontSize = 12;
-        chip.nameText.color = new Color(1f, 0.7f, 0.7f);
-        chip.nameText.alignment = TextAlignmentOptions.Center;
-        chip.nameText.textWrappingMode = TextWrappingModes.NoWrap;
-        chip.nameText.overflowMode = TextOverflowModes.Ellipsis;
-        chip.nameText.raycastTarget = false;
-        
-        // EventTrigger for tooltip hover
-        var trigger = chip.chipObj.AddComponent<UnityEngine.EventSystems.EventTrigger>();
-        
-        var enterEntry = new UnityEngine.EventSystems.EventTrigger.Entry();
-        enterEntry.eventID = UnityEngine.EventSystems.EventTriggerType.PointerEnter;
-        enterEntry.callback.AddListener((data) => { ShowTooltipInternal(chip.tooltipDescription); });
-        trigger.triggers.Add(enterEntry);
-        
-        var exitEntry = new UnityEngine.EventSystems.EventTrigger.Entry();
-        exitEntry.eventID = UnityEngine.EventSystems.EventTriggerType.PointerExit;
-        exitEntry.callback.AddListener((data) => { HideTooltipInternal(); });
-        trigger.triggers.Add(exitEntry);
-        
-        return chip;
-    }
-    
     private void UpdateHealthEnergyDisplays()
     {
         if (currentPlayer == null) return;
@@ -1596,6 +1324,12 @@ public class CombatArena : MonoBehaviour
         var panelRect = tooltipPanel.AddComponent<RectTransform>();
         panelRect.pivot = new Vector2(1f, 0f); // Top-right pivot so it expands left+up from cursor
         panelRect.sizeDelta = new Vector2(320, 0); // Width fixed, height auto from layout
+        
+        // Force tooltip to render in front of everything (above details panels at 500)
+        var tooltipCanvas = tooltipPanel.AddComponent<Canvas>();
+        tooltipCanvas.overrideSorting = true;
+        tooltipCanvas.sortingOrder = 1000;
+        tooltipPanel.AddComponent<GraphicRaycaster>();
         
         // Dark background
         var panelImage = tooltipPanel.AddComponent<Image>();
@@ -1660,6 +1394,17 @@ public class CombatArena : MonoBehaviour
         tooltipText.text = text;
         tooltipPanel.SetActive(true);
         tooltipVisible = true;
+        
+        // Position tooltip at current mouse position (stays fixed, no follow)
+        var rt = tooltipPanel.GetComponent<RectTransform>();
+        Vector2 mousePos = Input.mousePosition;
+        float x = mousePos.x - 16f;
+        float y = mousePos.y + 16f;
+        float tooltipWidth = rt.sizeDelta.x;
+        float tooltipHeight = rt.sizeDelta.y > 0 ? rt.sizeDelta.y : 100f;
+        if (x - tooltipWidth < 0) x = tooltipWidth;
+        if (y + tooltipHeight > Screen.height) y = Screen.height - tooltipHeight;
+        rt.position = new Vector3(x, y, 0f);
     }
     
     private void HideTooltipInternal()

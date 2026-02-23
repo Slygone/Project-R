@@ -25,55 +25,13 @@ public class Player : MonoBehaviour
     private int lowestThresholdLevel = -1; // -1 means not initialized yet
     public int WoundCount => lowestThresholdLevel >= 0 ? (maxHealth / THRESHOLD_SIZE) - lowestThresholdLevel : 0;
     public int ThresholdSize => THRESHOLD_SIZE;
-    private List<RelicData> relics = new List<RelicData>();
     private List<PotionData> potionInventory = new List<PotionData>();
     private const int MAX_POTIONS = 4;
     
-    // Relic trigger tracking
-    private int relicSkillUseCounter = 0;
-    private int relicTurnCounter = 0;
-    private int relicApSpentCounter = 0;
-    private int bankedAP = 0;
-    private bool hasAPBanking = false;
-    private List<string> statusImmunities = new List<string>();
-    private float energyCostMultiplier = 1f;
-    private int extraMarksThisTurn = 0;
-    private int apReductionThisTurn = 0;
-    private int apReductionSkillsRemaining = 0;
-    private bool phoenixFeatherUsed = false;
-    private int crackedBatteryTurnsLeft = 0;
-    private int sipheringApDelta = 0;
-    private bool hasFirstMarkBonus = false;
-    private bool firstMarkAppliedThisTurn = false;
-    private bool hasPerfectQteAp = false;
-    private bool perfectQteApUsedThisTurn = false;
-    private int perfectQteApAmount = 0;
-    private bool hasReactionCostReduction = false;
-    private bool reactionCostReductionUsed = false;
-    private bool hasReactionApRefund = false;
-    private bool reactionApRefundUsedThisTurn = false;
-    private int reactionApRefundAmount = 0;
-    private bool hasMarkTransfer = false;
-    private int markTransferCount = 0;
-    private bool hasPerfectReactionSaveMark = false;
-    private int perfectReactionSaveMarkCount = 0;
-    private bool hasReactionDouble = false;
-    private bool reactionDoubleUsed = false;
-    private float reactionDoubleMultiplier = 0.5f;
-    private bool hasDualReactionShield = false;
-    private bool dualReactionShieldUsed = false;
-    private int dualReactionShieldPercent = 0;
-    private bool hasReactionWeaken = false;
-    private bool reactionWeakenUsedThisTurn = false;
-    private int reactionWeakenDuration = 0;
-    private bool hideEnemyMarks = false;
-    private int reactionExtraMarkCost = 0;
-    private bool deadeyeCritReady = false;
-    private HashSet<string> relicJustTriggered = new HashSet<string>();
-    private int disableDefensiveQTETurns = 0;
-    private bool disableReactionQTE = false;
-    private bool disableSigils = false;
-    private int lastCombatStartHeal = 0;
+    // Centralized relic manager — owns all relic state and logic
+    private RelicManager relicManager;
+    public RelicManager Relics => relicManager;
+    
     private ElementalDamage elementalDamage = new ElementalDamage();
     private Element affinity = Element.None;
     private CharacterData selectedCharacter = null;
@@ -113,6 +71,9 @@ public class Player : MonoBehaviour
         {
             DataCache.LoadAll();
         }
+        
+        // Initialize centralized relic manager
+        relicManager = new RelicManager(this);
         
         // Initialize with minimal defaults - real stats come from character selection
         maxHealth = 100;
@@ -176,8 +137,8 @@ public class Player : MonoBehaviour
     }
     public int GetElementalBonus(Element element) => elementalDamage.Get(element);
     public ElementalDamage GetElementalDamage() => elementalDamage;
-    public Element GetAffinity() => disableSigils ? Element.None : affinity;
-    public bool HasAffinity() => !disableSigils && affinity != Element.None;
+    public Element GetAffinity() => (relicManager != null && relicManager.AreSigilsDisabled()) ? Element.None : affinity;
+    public bool HasAffinity() => !(relicManager != null && relicManager.AreSigilsDisabled()) && affinity != Element.None;
     public CharacterData GetCharacter() => selectedCharacter;
     public bool HasCharacter() => selectedCharacter != null;
     public int GetGold() => gold;
@@ -585,7 +546,7 @@ public class Player : MonoBehaviour
     public Element GetSkillElement(int skillNumber)
     {
         // Sigil Renounce: all skills are physical when sigils disabled
-        if (disableSigils) return Element.None;
+        if (relicManager != null && relicManager.AreSigilsDisabled()) return Element.None;
         
         int index = skillNumber - 1;
         if (index >= 0 && index < 5)
@@ -665,6 +626,13 @@ public class Player : MonoBehaviour
         
         // Set cooldown directly from JSON skill definition
         int cooldown = skillDef != null ? skillDef.cooldown : 0;
+        
+        // Overcharged Ultimate relic: add extra cooldown turns to ultimate (skill index 4)
+        if (skillIndex == 4 && relicManager != null)
+        {
+            cooldown += relicManager.GetUltimateCooldownBonus();
+        }
+        
         skillCooldowns[skillIndex] = cooldown;
         
         
@@ -919,6 +887,12 @@ public class Player : MonoBehaviour
 
     public void AddGold(int amount)
     {
+        // Piggy Bank: breaks when player spends gold (negative delta)
+        if (amount < 0 && relicManager != null)
+        {
+            relicManager.OnGoldSpent();
+        }
+
         gold += amount;
         GameLog.System(GameLog.Join(
             "Gold",
@@ -939,769 +913,69 @@ public class Player : MonoBehaviour
         if (energy > maxEnergy) energy = maxEnergy;
     }
 
-    public void AddRelic(RelicData relic)
-    {
-        relics.Add(relic);
-        
-        string trigger = relic.Trigger ?? "onAcquire";
-        
-        // Only apply effects immediately for onAcquire and permanent triggers
-        if (trigger == "onAcquire" || trigger == "permanent")
-        {
-            ApplyRelicEffectsImmediate(relic);
-        }
-        
-        // Track passive flags
-        if (relic.Effects != null)
-        {
-            foreach (var eff in relic.Effects)
-            {
-                if (eff.effectId == "eff_status_immunity" && !string.IsNullOrEmpty(eff.immuneStatus))
-                {
-                    if (!statusImmunities.Contains(eff.immuneStatus))
-                        statusImmunities.Add(eff.immuneStatus);
-                }
-                else if (eff.effectId == "eff_energy_cost_multiplier")
-                {
-                    if (eff.multiplier > 0) energyCostMultiplier *= eff.multiplier;
-                }
-                else if (eff.effectId == "eff_ap_banking")
-                {
-                    hasAPBanking = true;
-                }
-                else if (eff.effectId == "eff_first_mark_bonus")
-                {
-                    hasFirstMarkBonus = true;
-                }
-                else if (eff.effectId == "eff_perfect_qte_ap")
-                {
-                    hasPerfectQteAp = true;
-                    perfectQteApAmount = eff.amount;
-                }
-                else if (eff.effectId == "eff_reaction_cost_reduction")
-                {
-                    hasReactionCostReduction = true;
-                }
-                else if (eff.effectId == "eff_reaction_ap_refund")
-                {
-                    hasReactionApRefund = true;
-                    reactionApRefundAmount = eff.amount;
-                }
-                else if (eff.effectId == "eff_mark_transfer")
-                {
-                    hasMarkTransfer = true;
-                    markTransferCount = eff.value;
-                }
-                else if (eff.effectId == "eff_perfect_reaction_save_mark")
-                {
-                    hasPerfectReactionSaveMark = true;
-                    perfectReactionSaveMarkCount = eff.value;
-                }
-                else if (eff.effectId == "eff_reaction_double")
-                {
-                    hasReactionDouble = true;
-                    reactionDoubleMultiplier = eff.multiplier;
-                }
-                else if (eff.effectId == "eff_dual_reaction_shield")
-                {
-                    hasDualReactionShield = true;
-                    dualReactionShieldPercent = eff.percentOfMaxHealth;
-                }
-                else if (eff.effectId == "eff_reaction_weaken")
-                {
-                    hasReactionWeaken = true;
-                    reactionWeakenDuration = eff.duration;
-                }
-                else if (eff.effectId == "eff_hide_marks")
-                {
-                    hideEnemyMarks = true;
-                }
-                else if (eff.effectId == "eff_reaction_extra_mark_cost")
-                {
-                    reactionExtraMarkCost += eff.value;
-                }
-                else if (eff.effectId == "eff_disable_system")
-                {
-                    string dt = (eff.disableTarget ?? "").ToLower();
-                    if (dt == "reactionqte") disableReactionQTE = true;
-                    else if (dt == "sigils")
-                    {
-                        disableSigils = true;
-                        ClearSkillEnchantments();
-                        affinity = Element.None;
-                        Debug.Log("[Player] Sigil Renounce: cleared all skill enchantments and affinity");
-                    }
-                }
-            }
-        }
-        
-        GameLog.System(GameLog.Join(
-            "RelicGain",
-            GameLog.KV("relic", relic != null ? relic.DisplayName : "null"),
-            GameLog.KV("trigger", trigger)
-        ), GameLogVerbosity.Verbose);
-    }
+    // ════════════════════════════════════════════════════════════
+    //  RELIC DELEGATION — all logic lives in RelicManager
+    // ════════════════════════════════════════════════════════════
 
-    private void ApplyRelicEffectsImmediate(RelicData relic)
+    public void AddRelic(RelicData relic) => relicManager.AddRelic(relic);
+    public void RemoveRelic(RelicData relic) => relicManager.RemoveRelic(relic);
+    public List<RelicData> GetRelics() => relicManager.GetRelics();
+    public List<RelicData> GetRelicsByTrigger(string trigger) => relicManager.GetRelicsByTrigger(trigger);
+    
+    // Query methods delegated to RelicManager
+    public bool IsImmuneToStatus(string statusId) => relicManager.IsImmuneToStatus(statusId);
+    public float GetEnergyCostMultiplier() => relicManager.GetEnergyCostMultiplier();
+    public int GetExtraMarksThisTurn() => relicManager.GetExtraMarksThisTurn();
+    public bool IsDefensiveQTEDisabled(int currentTurn) => relicManager.IsDefensiveQTEDisabled(currentTurn);
+    public bool IsReactionQTEDisabled() => relicManager.IsReactionQTEDisabled();
+    public bool AreSigilsDisabled() => relicManager.AreSigilsDisabled();
+    public bool HasPerfectQteAp() => relicManager.HasPerfectQteAp();
+    public bool HasMarkTransfer() => relicManager.HasMarkTransfer();
+    public int GetMarkTransferCount() => relicManager.GetMarkTransferCount();
+    public bool HasPerfectReactionSaveMark() => relicManager.HasPerfectReactionSaveMark();
+    public int GetPerfectReactionSaveMarkCount() => relicManager.GetPerfectReactionSaveMarkCount();
+    public bool HasReactionDouble() => relicManager.HasReactionDouble();
+    public float GetReactionDoubleMultiplier() => relicManager.GetReactionDoubleMultiplier();
+    public bool HasDualReactionShield() => relicManager.HasDualReactionShield();
+    public int GetReactionExtraMarkCost() => relicManager.GetReactionExtraMarkCost();
+    public int GetLastCombatStartHeal() => relicManager.GetLastCombatStartHeal();
+    public bool IsDeadeyeCritReady() => relicManager.IsDeadeyeCritReady();
+    public bool ConsumeDeadeyeCritIfReady() => relicManager.ConsumeDeadeyeCrit();
+    public bool TryConsumePerfectQteAp() => relicManager.TryConsumePerfectQteAp();
+    public void ConsumeCatalystSplinter() => relicManager.ConsumeCatalystSplinter();
+    public float GetMissingHPBonusDamagePercent() => relicManager.GetMissingHPBonusDamagePercent();
+    public bool HasPhoenixFeather() => relicManager.HasRevive();
+    public bool TryPhoenixRevive() => relicManager.TryRevive();
+    
+    // UI state delegation
+    public List<RelicManager.RelicStateInfo> GetRelicStates() => relicManager.GetRelicStates();
+    public void ClearRelicJustTriggered() => relicManager.ClearRelicJustTriggered();
+    public List<ReactionChipInfo> GetRelicBuffChips() => relicManager.GetRelicBuffChips();
+    
+    // ════════════════════════════════════════════════════════════
+    //  HELPER METHODS for RelicManager
+    // ════════════════════════════════════════════════════════════
+    
+    public void ModifyCurrentAP(int delta)
     {
-        if (relic.Effects == null || relic.Effects.Count == 0) return;
-        
-        // Set of effectIds that are handled as passive flags, not immediate
-        var flagEffects = new System.Collections.Generic.HashSet<string> {
-            "eff_status_immunity", "eff_energy_cost_multiplier", "eff_ap_banking",
-            "eff_first_mark_bonus", "eff_perfect_qte_ap", "eff_reaction_cost_reduction",
-            "eff_reaction_ap_refund", "eff_mark_transfer", "eff_perfect_reaction_save_mark",
-            "eff_reaction_double", "eff_dual_reaction_shield", "eff_reaction_weaken",
-            "eff_hide_marks", "eff_reaction_extra_mark_cost", "eff_disable_system",
-            "eff_temp_crit_bonus"
-        };
-        
-        var standardEffects = new List<EffectEntry>();
-        
-        foreach (var eff in relic.Effects)
-        {
-            // Skip flag-tracked effects
-            if (flagEffects.Contains(eff.effectId)) continue;
-            
-            // Handle stat bonuses that SkillEffectEngine doesn't know about
-            if (eff.effectId == "eff_stat_bonus")
-            {
-                string stat = (eff.stat ?? "").ToLower();
-                if (stat == "maxhealthpercent")
-                {
-                    int bonus = Mathf.RoundToInt(maxHealth * (eff.value / 100f));
-                    maxHealth += bonus;
-                    if (eff.value > 0) health += bonus;
-                }
-                else if (stat == "damagemax")
-                {
-                    baseDamage += eff.value;
-                }
-                else if (stat == "physicalresist")
-                {
-                    physicalResist += eff.value;
-                }
-                else if (stat == "elementalresist")
-                {
-                    elementalResist += eff.value;
-                }
-                else
-                {
-                    // critChance, critDamage, damage handled by SkillEffectEngine
-                    standardEffects.Add(eff);
-                }
-                continue;
-            }
-            
-            // All other effects go to SkillEffectEngine
-            standardEffects.Add(eff);
-        }
-        
-        if (standardEffects.Count > 0)
-        {
-            SkillEffectEngine.ExecuteRest(standardEffects, this);
-        }
-        
-        GameLog.System(GameLog.Join(
-            "RelicApply",
-            GameLog.KV("relic", relic.DisplayName),
-            GameLog.KV("effectCount", relic.Effects.Count)
-        ), GameLogVerbosity.Verbose);
-    }
-
-    public void RemoveRelic(RelicData relic)
-    {
-        relics.Remove(relic);
-        
-        string trigger = relic.Trigger ?? "onAcquire";
-        
-        // Reverse immediate stat effects for onAcquire/permanent
-        if (trigger == "onAcquire" || trigger == "permanent")
-        {
-            ReverseRelicEffectsImmediate(relic);
-        }
-        
-        // Reverse passive flags
-        if (relic.Effects != null)
-        {
-            foreach (var eff in relic.Effects)
-            {
-                if (eff.effectId == "eff_status_immunity" && !string.IsNullOrEmpty(eff.immuneStatus))
-                    statusImmunities.Remove(eff.immuneStatus);
-                else if (eff.effectId == "eff_energy_cost_multiplier" && eff.multiplier > 0)
-                    energyCostMultiplier /= eff.multiplier;
-                else if (eff.effectId == "eff_ap_banking") hasAPBanking = false;
-                else if (eff.effectId == "eff_first_mark_bonus") hasFirstMarkBonus = false;
-                else if (eff.effectId == "eff_perfect_qte_ap") { hasPerfectQteAp = false; perfectQteApAmount = 0; }
-                else if (eff.effectId == "eff_reaction_cost_reduction") hasReactionCostReduction = false;
-                else if (eff.effectId == "eff_reaction_ap_refund") { hasReactionApRefund = false; reactionApRefundAmount = 0; }
-                else if (eff.effectId == "eff_mark_transfer") { hasMarkTransfer = false; markTransferCount = 0; }
-                else if (eff.effectId == "eff_perfect_reaction_save_mark") { hasPerfectReactionSaveMark = false; perfectReactionSaveMarkCount = 0; }
-                else if (eff.effectId == "eff_reaction_double") { hasReactionDouble = false; reactionDoubleMultiplier = 0.5f; }
-                else if (eff.effectId == "eff_dual_reaction_shield") { hasDualReactionShield = false; dualReactionShieldPercent = 0; }
-                else if (eff.effectId == "eff_reaction_weaken") { hasReactionWeaken = false; reactionWeakenDuration = 0; }
-                else if (eff.effectId == "eff_temp_crit_bonus") deadeyeCritReady = false;
-                else if (eff.effectId == "eff_hide_marks") hideEnemyMarks = false;
-                else if (eff.effectId == "eff_reaction_extra_mark_cost") reactionExtraMarkCost -= eff.value;
-                else if (eff.effectId == "eff_disable_system")
-                {
-                    string dt = (eff.disableTarget ?? "").ToLower();
-                    if (dt == "reactionqte") disableReactionQTE = false;
-                    else if (dt == "sigils") disableSigils = false;
-                }
-            }
-        }
-        
-        GameLog.System(GameLog.Join("RelicRemove", GameLog.KV("relic", relic.DisplayName)), GameLogVerbosity.Verbose);
+        currentAP += delta;
+        if (currentAP < 0) currentAP = 0;
     }
     
-    private void ReverseRelicEffectsImmediate(RelicData relic)
+    public void SetHealth(int hp)
     {
-        if (relic.Effects == null) return;
-        foreach (var eff in relic.Effects)
-        {
-            if (eff.effectId != "eff_stat_bonus") continue;
-            string stat = (eff.stat ?? "").ToLower();
-            if (stat == "maxhealthpercent")
-            {
-                int bonus = Mathf.RoundToInt(maxHealth * (eff.value / (100f + eff.value)));
-                maxHealth -= bonus;
-                if (health > maxHealth) health = maxHealth;
-            }
-            else if (stat == "damagemax") baseDamage -= eff.value;
-            else if (stat == "physicalresist") physicalResist -= eff.value;
-            else if (stat == "elementalresist") elementalResist -= eff.value;
-            else if (stat == "damage") baseDamage -= eff.value;
-            else if (stat == "critchance") critChance -= eff.value;
-            else if (stat == "critdamage") critDamage -= eff.value / 100f;
-        }
+        health = Mathf.Clamp(hp, 0, maxHealth);
     }
     
-    public List<RelicData> GetRelics() => relics;
-    
-    // ── Relic Trigger Methods (called by CombatManager/CombatArena) ──
-    
-    public List<RelicData> GetRelicsByTrigger(string trigger)
+    public void ReduceMaxHealth(int amount)
     {
-        var result = new List<RelicData>();
-        foreach (var r in relics)
-        {
-            if (r.Trigger == trigger) result.Add(r);
-        }
-        return result;
+        maxHealth -= amount;
+        if (maxHealth < 1) maxHealth = 1;
+        if (health > maxHealth) health = maxHealth;
     }
     
-    public void OnCombatStart()
-    {
-        relicTurnCounter = 0;
-        extraMarksThisTurn = 0;
-        apReductionThisTurn = 0;
-        apReductionSkillsRemaining = 0;
-        crackedBatteryTurnsLeft = 0;
-        firstMarkAppliedThisTurn = false;
-        perfectQteApUsedThisTurn = false;
-        reactionCostReductionUsed = false;
-        reactionApRefundUsedThisTurn = false;
-        reactionDoubleUsed = false;
-        dualReactionShieldUsed = false;
-        reactionWeakenUsedThisTurn = false;
-        disableDefensiveQTETurns = 0;
-        lastCombatStartHeal = 0;
-        
-        // Process combatStart relics
-        foreach (var relic in relics)
-        {
-            if (relic.Trigger != "combatStart" || relic.Effects == null) continue;
-            
-            foreach (var eff in relic.Effects)
-            {
-                if (eff.effectId == "eff_ap_delta")
-                {
-                    // Cracked Battery: -2 AP for N turns
-                    if (eff.duration > 0)
-                    {
-                        crackedBatteryTurnsLeft = eff.duration;
-                        sipheringApDelta = eff.amount;
-                    }
-                    else
-                    {
-                        currentAP += eff.amount;
-                    }
-                    Debug.Log($"[Player] Relic {relic.DisplayName}: AP delta {eff.amount}");
-                }
-                else if (eff.effectId == "eff_post_combat_heal")
-                {
-                    int healAmount = Mathf.RoundToInt(maxHealth * eff.percentOfMaxHealth / 100f);
-                    if (healAmount > 0)
-                    {
-                        Heal(healAmount);
-                        lastCombatStartHeal = healAmount;
-                        Debug.Log($"[Player] Relic {relic.DisplayName}: healed {healAmount} HP at combat start");
-                    }
-                }
-                else if (eff.effectId == "eff_apply_status")
-                {
-                    // Status application handled by CombatManager which has access to enemies
-                    // Flag it for CombatManager to pick up
-                }
-                else if (eff.effectId == "eff_combat_shield")
-                {
-                    int shieldAmount = Mathf.RoundToInt(maxHealth * eff.percentOfMaxHealth / 100f);
-                    AddShield(shieldAmount);
-                    Debug.Log($"[Player] Relic {relic.DisplayName}: +{shieldAmount} shield");
-                }
-                else if (eff.effectId == "eff_disable_system")
-                {
-                    string dt = (eff.disableTarget ?? "").ToLower();
-                    if (dt == "defensiveqte") disableDefensiveQTETurns = eff.disableDuration;
-                    // reactionQTE and sigils are permanent flags set on acquire, not per-combat
-                    Debug.Log($"[Player] Relic {relic.DisplayName}: disable {eff.disableTarget} for {eff.disableDuration} turns");
-                }
-                else if (eff.effectId == "eff_apply_equipped_mark")
-                {
-                    // Handled by CombatManager which has access to enemies
-                    Debug.Log($"[Player] Relic {relic.DisplayName}: apply equipped element marks");
-                }
-                else if (eff.effectId == "eff_hide_marks")
-                {
-                    Debug.Log($"[Player] Relic {relic.DisplayName}: hide enemy marks");
-                }
-                else if (eff.effectId == "eff_stat_bonus")
-                {
-                    // Resistance bonuses applied via ApplyRelicEffectsImmediate on acquire, not here
-                }
-            }
-        }
-    }
-    
-    public void OnRelicTurnStart()
-    {
-        relicTurnCounter++;
-        extraMarksThisTurn = 0;
-        apReductionThisTurn = 0;
-        apReductionSkillsRemaining = 0;
-        firstMarkAppliedThisTurn = false;
-        perfectQteApUsedThisTurn = false;
-        reactionApRefundUsedThisTurn = false;
-        reactionWeakenUsedThisTurn = false;
-        
-        // Cracked Battery: AP penalty for N turns
-        if (crackedBatteryTurnsLeft > 0)
-        {
-            currentAP += sipheringApDelta;
-            if (currentAP < 0) currentAP = 0;
-            crackedBatteryTurnsLeft--;
-            Debug.Log($"[Player] Cracked Battery: {sipheringApDelta} AP, {crackedBatteryTurnsLeft} turns left");
-        }
-        
-        // Process onTurnStart relics
-        foreach (var relic in relics)
-        {
-            if (relic.Trigger != "onTurnStart") continue;
-            if (relic.TriggerInterval > 0 && relicTurnCounter % relic.TriggerInterval != 0) continue;
-            
-            if (relic.Effects == null) continue;
-            foreach (var eff in relic.Effects)
-            {
-                if (eff.effectId == "eff_extra_marks")
-                {
-                    extraMarksThisTurn += eff.extraMarks;
-                    relicJustTriggered.Add(relic.Id);
-                    Debug.Log($"[Player] Relic {relic.DisplayName}: +{eff.extraMarks} extra marks this turn");
-                }
-                else if (eff.effectId == "eff_ap_cost_reduction")
-                {
-                    apReductionThisTurn += eff.apReduction;
-                    apReductionSkillsRemaining = eff.skillCount > 0 ? eff.skillCount : 999;
-                    relicJustTriggered.Add(relic.Id);
-                    Debug.Log($"[Player] Relic {relic.DisplayName}: -{eff.apReduction} AP cost for {eff.skillCount} skills");
-                }
-                else if (eff.effectId == "eff_ap_delta")
-                {
-                    // Siphoning Aura: -1 AP each turn
-                    currentAP += eff.amount;
-                    if (currentAP < 0) currentAP = 0;
-                    Debug.Log($"[Player] Relic {relic.DisplayName}: AP delta {eff.amount}");
-                }
-            }
-        }
-        
-        // AP banking: add banked AP on top of refreshed AP
-        if (hasAPBanking && bankedAP > 0)
-        {
-            currentAP += bankedAP;
-            Debug.Log($"[Player] AP Banking: added {bankedAP} banked AP, total now {currentAP}");
-            bankedAP = 0;
-        }
-    }
-    
-    public void OnRelicTurnEnd()
-    {
-        // AP banking: save unspent AP
-        if (hasAPBanking && currentAP > 0)
-        {
-            bankedAP = currentAP;
-            Debug.Log($"[Player] AP Banking: saved {bankedAP} AP for next turn");
-        }
-        
-        // Process onTurnEnd relics (Elemental Drip handled by CombatManager)
-        foreach (var relic in relics)
-        {
-            if (relic.Trigger != "onTurnEnd" || relic.Effects == null) continue;
-            foreach (var eff in relic.Effects)
-            {
-                if (eff.effectId == "eff_deal_damage" && eff.target == "Self")
-                {
-                    int dmg = eff.value > 0 ? eff.value : 1;
-                    TakeDamage(dmg);
-                    Debug.Log($"[Player] Relic {relic.DisplayName}: took {dmg} self-damage");
-                }
-            }
-        }
-    }
-    
-    public void OnRelicCombatEnd()
-    {
-        // Process onCombatEnd relics (Blood Toll self-damage)
-        foreach (var relic in relics)
-        {
-            if (relic.Trigger != "onCombatEnd" || relic.Effects == null) continue;
-            foreach (var eff in relic.Effects)
-            {
-                if (eff.effectId == "eff_post_combat_heal")
-                {
-                    int healAmount = Mathf.RoundToInt(maxHealth * eff.percentOfMaxHealth / 100f);
-                    if (healAmount > 0)
-                    {
-                        Heal(healAmount);
-                        Debug.Log($"[Player] Relic {relic.DisplayName}: healed {healAmount} HP");
-                    }
-                }
-                else if (eff.effectId == "eff_deal_damage" && eff.target == "Self")
-                {
-                    int dmg = eff.value > 0 ? eff.value : 1;
-                    TakeDamage(dmg);
-                    Debug.Log($"[Player] Relic {relic.DisplayName}: took {dmg} self-damage");
-                }
-            }
-        }
-    }
-    
-    public void OnRelicSkillUsed()
-    {
-        relicSkillUseCounter++;
-        
-        // Consume AP reduction skill count
-        if (apReductionSkillsRemaining > 0)
-        {
-            apReductionSkillsRemaining--;
-            if (apReductionSkillsRemaining <= 0)
-            {
-                apReductionThisTurn = 0;
-            }
-        }
-        
-        foreach (var relic in relics)
-        {
-            if (relic.Trigger != "onSkillUse") continue;
-            if (relic.TriggerInterval <= 0) continue;
-            if (relicSkillUseCounter % relic.TriggerInterval != 0) continue;
-            
-            if (relic.Effects == null) continue;
-            foreach (var eff in relic.Effects)
-            {
-                if (eff.effectId == "eff_temp_crit_bonus")
-                {
-                    deadeyeCritReady = true;
-                    relicJustTriggered.Add(relic.Id);
-                    Debug.Log($"[Player] Relic {relic.DisplayName}: guaranteed crit ready for next skill");
-                }
-            }
-        }
-    }
-    
-    public void OnRelicAPSpent(int apSpent)
-    {
-        relicApSpentCounter += apSpent;
-        
-        // Check Cooldown Lottery
-        foreach (var relic in relics)
-        {
-            if (relic.Effects == null) continue;
-            foreach (var eff in relic.Effects)
-            {
-                if (eff.effectId == "eff_refresh_random_skill" && eff.apSpentThreshold > 0)
-                {
-                    if (relicApSpentCounter >= eff.apSpentThreshold)
-                    {
-                        relicApSpentCounter -= eff.apSpentThreshold;
-                        RefreshRandomSkillCooldown();
-                        relicJustTriggered.Add(relic.Id);
-                        Debug.Log($"[Player] Relic {relic.DisplayName}: triggered at {eff.apSpentThreshold} AP spent");
-                    }
-                }
-            }
-        }
-    }
-    
-    private void RefreshRandomSkillCooldown()
-    {
-        // Find skills on cooldown (not ultimate = index 4)
-        var onCooldown = new List<int>();
-        for (int i = 0; i < 4; i++)
-        {
-            if (skillCooldowns[i] > 0) onCooldown.Add(i);
-        }
-        
-        if (onCooldown.Count > 0)
-        {
-            int idx = onCooldown[UnityEngine.Random.Range(0, onCooldown.Count)];
-            skillCooldowns[idx] = 0;
-            Debug.Log($"[Player] Cooldown Lottery: refreshed skill {idx + 1}");
-        }
-        // If no skill on cooldown, the next skill cast will still benefit from 0 AP cost
-        // (handled by CombatManager checking a flag)
-    }
-    
-    public bool HasPhoenixFeather()
-    {
-        if (phoenixFeatherUsed) return false;
-        foreach (var r in relics)
-        {
-            if (r.Trigger == "onDeath" && !phoenixFeatherUsed) return true;
-        }
-        return false;
-    }
-    
-    public bool TryPhoenixRevive()
-    {
-        if (phoenixFeatherUsed) return false;
-        
-        foreach (var relic in relics)
-        {
-            if (relic.Trigger != "onDeath") continue;
-            
-            phoenixFeatherUsed = true;
-            
-            if (relic.Effects != null)
-            {
-                foreach (var eff in relic.Effects)
-                {
-                    if (eff.effectId == "eff_reborn")
-                    {
-                        int reviveHP = Mathf.Max(1, Mathf.RoundToInt(maxHealth * (eff.healthPercent / 100f)));
-                        health = reviveHP;
-                    }
-                    else if (eff.effectId == "eff_stat_bonus" && eff.stat == "maxHealthPercent" && eff.value < 0)
-                    {
-                        int reduction = Mathf.RoundToInt(maxHealth * (Mathf.Abs(eff.value) / 100f));
-                        maxHealth -= reduction;
-                        if (health > maxHealth) health = maxHealth;
-                    }
-                }
-            }
-            
-            Debug.Log($"[Player] Phoenix Feather used! Revived at {health}/{maxHealth}");
-            return true;
-        }
-        return false;
-    }
-    
-    // ── Relic Query Methods ──
-    public bool IsImmuneToStatus(string statusId) => statusImmunities.Contains(statusId);
-    public float GetEnergyCostMultiplier() => energyCostMultiplier;
-    public int GetExtraMarksThisTurn() => extraMarksThisTurn;
-    public int GetAPReductionThisTurn() => apReductionThisTurn;
-    public int GetAPReductionSkillsRemaining() => apReductionSkillsRemaining;
-    public bool HasAPBanking() => hasAPBanking;
-    public int GetLastCombatStartHeal() { int h = lastCombatStartHeal; lastCombatStartHeal = 0; return h; }
-    public bool IsDefensiveQTEDisabled(int currentTurn) => disableDefensiveQTETurns > 0 && currentTurn <= disableDefensiveQTETurns;
-    public bool IsReactionQTEDisabled() => disableReactionQTE;
-    public bool AreSigilsDisabled() => disableSigils;
-    public bool HasFirstMarkBonus() => hasFirstMarkBonus;
-    public bool HasPerfectQteAp() => hasPerfectQteAp;
-    public bool HasReactionCostReduction() => hasReactionCostReduction && !reactionCostReductionUsed;
-    public bool HasReactionApRefund() => hasReactionApRefund && !reactionApRefundUsedThisTurn;
-    public int GetReactionApRefundAmount() => reactionApRefundAmount;
-    public bool HasMarkTransfer() => hasMarkTransfer;
-    public int GetMarkTransferCount() => markTransferCount;
-    public bool HasPerfectReactionSaveMark() => hasPerfectReactionSaveMark;
-    public int GetPerfectReactionSaveMarkCount() => perfectReactionSaveMarkCount;
-    public bool HasReactionDouble() => hasReactionDouble && !reactionDoubleUsed;
-    public float GetReactionDoubleMultiplier() => reactionDoubleMultiplier;
-    public bool HasDualReactionShield() => hasDualReactionShield && !dualReactionShieldUsed;
-    public int GetDualReactionShieldPercent() => dualReactionShieldPercent;
-    public bool HasReactionWeaken() => hasReactionWeaken && !reactionWeakenUsedThisTurn;
-    public int GetReactionWeakenDuration() => reactionWeakenDuration;
-    public bool ShouldHideEnemyMarks() => hideEnemyMarks;
-    public int GetReactionExtraMarkCost() => reactionExtraMarkCost;
-    
-    // Called when AP reduction skill discount is consumed
-    public void ConsumeAPReductionSkill()
-    {
-        if (apReductionSkillsRemaining > 0) apReductionSkillsRemaining--;
-    }
-    
-    // Called when first mark bonus is used this turn
-    public bool TryConsumeFirstMarkBonus()
-    {
-        if (!hasFirstMarkBonus || firstMarkAppliedThisTurn) return false;
-        firstMarkAppliedThisTurn = true;
-        return true;
-    }
-    
-    // Called when perfect QTE AP bonus is triggered
-    public bool TryConsumePerfectQteAp()
-    {
-        if (!hasPerfectQteAp || perfectQteApUsedThisTurn) return false;
-        perfectQteApUsedThisTurn = true;
-        return true;
-    }
-    
-    // Called when reaction cost reduction is used
-    public void ConsumeReactionCostReduction() { reactionCostReductionUsed = true; }
-    
-    // Called when reaction AP refund is used
-    public void ConsumeReactionApRefund() { reactionApRefundUsedThisTurn = true; }
-    
-    // Called when reaction double is used
-    public void ConsumeReactionDouble() { reactionDoubleUsed = true; }
-    
-    // Called when dual reaction shield is used
-    public void ConsumeDualReactionShield() { dualReactionShieldUsed = true; }
-    
-    // Called when reaction weaken is triggered this turn
-    public void ConsumeReactionWeaken() { reactionWeakenUsedThisTurn = true; }
-    
-    // Deadeye Counter: consume guaranteed crit if ready (called BEFORE OnRelicSkillUsed)
-    public bool ConsumeDeadeyeCritIfReady()
-    {
-        if (!deadeyeCritReady) return false;
-        deadeyeCritReady = false;
-        Debug.Log("[Player] Deadeye Counter: guaranteed crit consumed");
-        return true;
-    }
-    public bool IsDeadeyeCritReady() => deadeyeCritReady;
-    
-    // ── Relic State for UI ──
-    
-    public struct RelicStateInfo
-    {
-        public string RelicId;
-        public int CurrentCount;  // progress toward next trigger
-        public int MaxCount;      // threshold
-        public bool IsReady;      // buff active / available
-        public bool JustTriggered; // flash/shake (one frame)
-    }
-    
-    public List<RelicStateInfo> GetRelicStates()
-    {
-        var states = new List<RelicStateInfo>();
-        foreach (var relic in relics)
-        {
-            var s = new RelicStateInfo { RelicId = relic.Id };
-            bool hasCounter = false;
-            
-            // Counter-based relics
-            if (relic.Trigger == "onSkillUse" && relic.TriggerInterval > 0)
-            {
-                s.MaxCount = relic.TriggerInterval;
-                s.CurrentCount = relicSkillUseCounter % relic.TriggerInterval;
-                hasCounter = true;
-                // Check ready state by effect
-                if (relic.Effects != null)
-                    foreach (var eff in relic.Effects)
-                        if (eff.effectId == "eff_temp_crit_bonus") s.IsReady = deadeyeCritReady;
-            }
-            else if (relic.Trigger == "onTurnStart" && relic.TriggerInterval > 0)
-            {
-                s.MaxCount = relic.TriggerInterval;
-                s.CurrentCount = relicTurnCounter > 0 ? relicTurnCounter % relic.TriggerInterval : 0;
-                hasCounter = true;
-                if (relic.Effects != null)
-                    foreach (var eff in relic.Effects)
-                    {
-                        if (eff.effectId == "eff_extra_marks") s.IsReady = extraMarksThisTurn > 0;
-                        else if (eff.effectId == "eff_ap_cost_reduction") s.IsReady = apReductionThisTurn > 0 && apReductionSkillsRemaining > 0;
-                    }
-            }
-            else if (relic.Effects != null)
-            {
-                foreach (var eff in relic.Effects)
-                {
-                    if (eff.effectId == "eff_refresh_random_skill" && eff.apSpentThreshold > 0)
-                    {
-                        s.MaxCount = eff.apSpentThreshold;
-                        s.CurrentCount = relicApSpentCounter;
-                        hasCounter = true;
-                    }
-                    else if (eff.effectId == "eff_reaction_double") s.IsReady = hasReactionDouble && !reactionDoubleUsed;
-                    else if (eff.effectId == "eff_dual_reaction_shield") s.IsReady = hasDualReactionShield && !dualReactionShieldUsed;
-                    else if (eff.effectId == "eff_reaction_cost_reduction") s.IsReady = hasReactionCostReduction && !reactionCostReductionUsed;
-                    else if (eff.effectId == "eff_reaction_ap_refund") s.IsReady = hasReactionApRefund && !reactionApRefundUsedThisTurn;
-                    else if (eff.effectId == "eff_perfect_qte_ap") s.IsReady = hasPerfectQteAp && !perfectQteApUsedThisTurn;
-                    else if (eff.effectId == "eff_first_mark_bonus") s.IsReady = hasFirstMarkBonus && !firstMarkAppliedThisTurn;
-                }
-            }
-            
-            s.JustTriggered = relicJustTriggered.Contains(relic.Id);
-            
-            if (hasCounter || s.IsReady || s.JustTriggered)
-                states.Add(s);
-        }
-        return states;
-    }
-    
-    public void ClearRelicJustTriggered() { relicJustTriggered.Clear(); }
-    
-    // Return relic buffs to show in player status bar during combat
-    public List<ReactionChipInfo> GetRelicBuffChips()
-    {
-        var chips = new List<ReactionChipInfo>();
-        foreach (var relic in relics)
-        {
-            if (relic.Effects == null) continue;
-            foreach (var eff in relic.Effects)
-            {
-                if (eff.effectId == "eff_temp_crit_bonus" && deadeyeCritReady)
-                    chips.Add(new ReactionChipInfo("Deadeye Ready", "Next skill is a guaranteed critical hit.", 99, true));
-                else if (eff.effectId == "eff_extra_marks" && extraMarksThisTurn > 0 && relic.Trigger == "onTurnStart")
-                    chips.Add(new ReactionChipInfo("Mark Echo", $"+{extraMarksThisTurn} extra mark(s) this turn.", 1, true));
-                else if (eff.effectId == "eff_ap_cost_reduction" && apReductionThisTurn > 0 && apReductionSkillsRemaining > 0)
-                    chips.Add(new ReactionChipInfo("Rhythm Discount", $"-{apReductionThisTurn} AP cost for {apReductionSkillsRemaining} skill(s).", 1, true));
-                else if (eff.effectId == "eff_reaction_double" && hasReactionDouble && !reactionDoubleUsed)
-                    chips.Add(new ReactionChipInfo("Reactor Core", "Next reaction triggers twice.", 99, true));
-                else if (eff.effectId == "eff_dual_reaction_shield" && hasDualReactionShield && !dualReactionShieldUsed)
-                    chips.Add(new ReactionChipInfo("Dual Specialist", $"Dual Reaction grants {dualReactionShieldPercent}% HP shield.", 99, true));
-                else if (eff.effectId == "eff_reaction_cost_reduction" && hasReactionCostReduction && !reactionCostReductionUsed)
-                    chips.Add(new ReactionChipInfo("Catalyst Splinter", "Next dual reaction costs less marks.", 99, true));
-                else if (eff.effectId == "eff_reaction_ap_refund" && hasReactionApRefund && !reactionApRefundUsedThisTurn)
-                    chips.Add(new ReactionChipInfo("Reaction Rebate", $"First reaction refunds {reactionApRefundAmount} AP.", 1, true));
-                else if (eff.effectId == "eff_perfect_qte_ap" && hasPerfectQteAp && !perfectQteApUsedThisTurn)
-                    chips.Add(new ReactionChipInfo("Focus Lens", $"Perfect QTE grants +{perfectQteApAmount} AP.", 1, true));
-                else if (eff.effectId == "eff_first_mark_bonus" && hasFirstMarkBonus && !firstMarkAppliedThisTurn)
-                    chips.Add(new ReactionChipInfo("Marking Needle", "First mark this turn applies +1 extra.", 1, true));
-            }
-        }
-        return chips;
-    }
-    
-    public float GetMissingHPBonusDamagePercent()
-    {
-        float maxBonus = 0f;
-        foreach (var relic in relics)
-        {
-            if (relic.Trigger != "passive" || relic.Effects == null) continue;
-            foreach (var eff in relic.Effects)
-            {
-                if (eff.effectId == "eff_missing_hp_damage" && eff.maxBonusPercent > maxBonus)
-                    maxBonus = eff.maxBonusPercent;
-            }
-        }
-        if (maxBonus <= 0) return 0f;
-        float missingPercent = 1f - ((float)health / maxHealth);
-        return Mathf.Min(missingPercent * 100f, maxBonus);
-    }
+    public void AddPhysicalResist(int amount) { physicalResist += amount; }
+    public void AddElementalResist(int amount) { elementalResist += amount; }
 
     public bool IsAlive() => health > 0;
 
@@ -1835,7 +1109,7 @@ public class Player : MonoBehaviour
         ), GameLogVerbosity.Verbose);
         GameLog.System(GameLog.Join(
             "WorldResetKeep",
-            GameLog.KV("relics", relics.Count),
+            GameLog.KV("relics", relicManager.GetRelics().Count),
             GameLog.KV("charDamage", GetCharacterDamage())
         ), GameLogVerbosity.Verbose);
     }
@@ -1859,57 +1133,14 @@ public class Player : MonoBehaviour
         elementalResist = 10;
         
         // Clear all run-specific collections
-        relics.Clear();
         potionInventory.Clear();
         
         // Reset temporary bonuses
         tempCritChanceBonus = 0;
         tempCritDamageBonus = 0;
         
-        // Reset relic trigger tracking
-        relicSkillUseCounter = 0;
-        relicTurnCounter = 0;
-        relicApSpentCounter = 0;
-        bankedAP = 0;
-        hasAPBanking = false;
-        statusImmunities.Clear();
-        energyCostMultiplier = 1f;
-        extraMarksThisTurn = 0;
-        apReductionThisTurn = 0;
-        apReductionSkillsRemaining = 0;
-        phoenixFeatherUsed = false;
-        crackedBatteryTurnsLeft = 0;
-        sipheringApDelta = 0;
-        hasFirstMarkBonus = false;
-        firstMarkAppliedThisTurn = false;
-        hasPerfectQteAp = false;
-        perfectQteApUsedThisTurn = false;
-        perfectQteApAmount = 0;
-        hasReactionCostReduction = false;
-        reactionCostReductionUsed = false;
-        hasReactionApRefund = false;
-        reactionApRefundUsedThisTurn = false;
-        reactionApRefundAmount = 0;
-        hasMarkTransfer = false;
-        markTransferCount = 0;
-        hasPerfectReactionSaveMark = false;
-        perfectReactionSaveMarkCount = 0;
-        hasReactionDouble = false;
-        reactionDoubleUsed = false;
-        reactionDoubleMultiplier = 0.5f;
-        hasDualReactionShield = false;
-        dualReactionShieldUsed = false;
-        dualReactionShieldPercent = 0;
-        hasReactionWeaken = false;
-        reactionWeakenUsedThisTurn = false;
-        reactionWeakenDuration = 0;
-        hideEnemyMarks = false;
-        reactionExtraMarkCost = 0;
-        deadeyeCritReady = false;
-        relicJustTriggered.Clear();
-        disableDefensiveQTETurns = 0;
-        disableReactionQTE = false;
-        disableSigils = false;
+        // Reset all relic state via centralized manager
+        relicManager.ResetForNewRun();
         
         // Reset skill enchantments (sigils don't carry over)
         for (int i = 0; i < 5; i++)
@@ -2284,7 +1515,6 @@ public class Player : MonoBehaviour
         reactionDamageReduction = 0f;
         reactionDamageReductionTurns = 0;
         reactionRockDmgWhileShielded = 0f;
-        reactionChips.Clear();
     }
     
     // Query reaction buff states
@@ -2298,35 +1528,65 @@ public class Player : MonoBehaviour
     public bool HasDamageReduction => reactionDamageReductionTurns > 0 && reactionDamageReduction > 0f;
     public float GetRockDamageWhileShieldedBonus() => GetShield() > 0 ? reactionRockDmgWhileShielded / 100f : 0f;
     
-    // ========== REACTION CHIP DISPLAY ==========
-    
-    private List<ReactionChipInfo> reactionChips = new List<ReactionChipInfo>();
-    
-    public void AddReactionChip(string name, string tooltip, int turns)
+    // ========== UNIFIED STATUS DISPLAY ==========
+
+    /// <summary>
+    /// Returns all active statuses (debuffs + reaction buffs + relic buffs) for StatusDisplayUI.
+    /// Category and Description are resolved here from DataCache so the UI is fully data-driven.
+    /// </summary>
+    public List<ActiveStatusInfo> GetActiveStatuses()
     {
-        for (int i = 0; i < reactionChips.Count; i++)
+        var list = new List<ActiveStatusInfo>();
+
+        // Player debuffs
+        if (IsWeakened)
+            list.Add(MakeStatus("status_weaken", weakenTurns, weakenPercent));
+        if (IsSundered)
+            list.Add(MakeStatus("status_sunder", sunderTurns, sunderPercent));
+        if (IsVulnerable)
+            list.Add(MakeStatus("status_vulnerable", vulnerableTurns, vulnerablePercent));
+        if (IsPlayerStunned)
+            list.Add(MakeStatus("status_stun", stunTurns));
+        if (HasPlayerDoT)
+            list.Add(MakeStatus("status_dot", playerDoTTurns, playerDoTDamage));
+
+        // Reaction buffs
+        if (reactionCritDamageTurns > 0)
+            list.Add(MakeStatus("status_crit_damage_up", reactionCritDamageTurns, reactionCritDamageBonus));
+        if (reactionBonusAPTurns > 0 && reactionBonusAP > 0)
+            list.Add(MakeStatus("status_bonus_ap", reactionBonusAPTurns, reactionBonusAP));
+        if (reactionReflectTurns > 0 && reactionReflectPercent > 0f)
+            list.Add(MakeStatus("status_reflective_armor", reactionReflectTurns, reactionReflectPercent));
+        if (reactionDamageReductionTurns > 0 && reactionDamageReduction > 0f)
+            list.Add(MakeStatus("status_damage_reduction", reactionDamageReductionTurns, reactionDamageReduction));
+        if (reactionRockDmgWhileShielded > 0f && GetShield() > 0)
+            list.Add(MakeStatus("status_rock_dmg_shielded", 0, reactionRockDmgWhileShielded));
+
+        // Relic buff chips (from RelicManager) — category and description provided directly
+        if (relicManager != null)
         {
-            if (reactionChips[i].ChipName == name)
+            var relicBuffs = relicManager.GetRelicBuffChips();
+            foreach (var chip in relicBuffs)
             {
-                reactionChips[i].Tooltip = tooltip;
-                reactionChips[i].TurnsRemaining = Mathf.Max(reactionChips[i].TurnsRemaining, turns);
-                return;
+                list.Add(new ActiveStatusInfo(
+                    "relic_" + chip.ChipName, chip.TurnsRemaining, 0f, 0,
+                    chip.ChipName, null, "buff", chip.Tooltip));
             }
         }
-        reactionChips.Add(new ReactionChipInfo(name, tooltip, turns, true));
+
+        return list;
     }
-    
-    public void TickReactionChips()
+
+    /// <summary>
+    /// Helper: creates an ActiveStatusInfo with Category and Description resolved from DataCache.
+    /// </summary>
+    private ActiveStatusInfo MakeStatus(string statusId, int duration, float magnitude = 0f, int stacks = 0)
     {
-        for (int i = reactionChips.Count - 1; i >= 0; i--)
-        {
-            reactionChips[i].TurnsRemaining--;
-            if (reactionChips[i].TurnsRemaining <= 0)
-            {
-                reactionChips.RemoveAt(i);
-            }
-        }
+        var def = DataCache.GetStatusDef(statusId);
+        string displayName = def != null ? def.Name : statusId;
+        string category = def != null ? def.Category : "debuff";
+        string description = def != null ? def.GetDescription(magnitude, duration, stacks) : statusId;
+        return new ActiveStatusInfo(statusId, duration, magnitude, stacks, displayName, null, category, description);
     }
-    
-    public List<ReactionChipInfo> GetReactionChips() => reactionChips;
+
 }

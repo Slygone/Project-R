@@ -10,7 +10,7 @@ public static class GameDataLoader
     private static Dictionary<string, CharacterDefinition> _characterById;
     private static Dictionary<string, SkillDefinition> _skillById;
     private static Dictionary<string, EffectDefinition> _effectById;
-    private static Dictionary<string, StatusDefinition> _statusById;
+    private static Dictionary<string, StatusDefinitionLegacy> _statusById;
     
     public static bool IsLoaded { get; private set; }
     
@@ -68,7 +68,7 @@ public static class GameDataLoader
         
         _effectsFile = JsonUtility.FromJson<EffectsFile>(json.text);
         _effectById = new Dictionary<string, EffectDefinition>();
-        _statusById = new Dictionary<string, StatusDefinition>();
+        _statusById = new Dictionary<string, StatusDefinitionLegacy>();
         
         foreach (var effect in _effectsFile.effects)
         {
@@ -135,12 +135,12 @@ public static class GameDataLoader
         return null;
     }
     
-    public static List<StatusDefinition> GetAllStatuses()
+    public static List<StatusDefinitionLegacy> GetAllStatuses()
     {
-        return _effectsFile?.statuses ?? new List<StatusDefinition>();
+        return _effectsFile?.statuses ?? new List<StatusDefinitionLegacy>();
     }
     
-    public static StatusDefinition GetStatus(string id)
+    public static StatusDefinitionLegacy GetStatus(string id)
     {
         if (_statusById != null && _statusById.TryGetValue(id, out var status))
         {

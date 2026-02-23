@@ -37,7 +37,7 @@ public class ScalingData
 }
 
 [Serializable]
-public class StatusDefinition
+public class StatusDefinitionLegacy
 {
     public string id;
     public string displayName;
@@ -59,5 +59,5 @@ public class StatusDefaults
 public class EffectsFile
 {
     public List<EffectDefinition> effects;
-    public List<StatusDefinition> statuses;
+    public List<StatusDefinitionLegacy> statuses;
 }

@@ -83,7 +83,7 @@
       "trigger": "onAcquire",
       "price": 5,
       "effects": [
-        { "effectId": "eff_status_immunity", "target": "Self", "immuneStatus": "status_player_sunder" }
+        { "effectId": "eff_status_immunity", "target": "Self", "immuneStatus": "status_sunder" }
       ]
     },
     {
@@ -95,7 +95,7 @@
       "trigger": "onAcquire",
       "price": 5,
       "effects": [
-        { "effectId": "eff_status_immunity", "target": "Self", "immuneStatus": "status_player_weaken" }
+        { "effectId": "eff_status_immunity", "target": "Self", "immuneStatus": "status_weaken" }
       ]
     },
     {
@@ -103,13 +103,12 @@
       "displayName": "Ambush Seal",
       "relicID": 9,
       "rarity": "Common",
-      "description": "On start of combat apply Weaken and Vulnerable to all enemies for 1 turn. You start combat with 2 AP.",
+      "description": "On start of combat apply Weaken and Vulnerable to all enemies for 1 turn.",
       "trigger": "combatStart",
       "price": 5,
       "effects": [
-        { "effectId": "eff_apply_status", "target": "AllEnemies", "status": "status_weak", "duration": 1, "magnitude": 25 },
-        { "effectId": "eff_apply_status", "target": "AllEnemies", "status": "status_player_vulnerable", "duration": 1, "magnitude": 25 },
-        { "effectId": "eff_ap_delta", "target": "Self", "amount": -8 }
+        { "effectId": "eff_apply_status", "target": "AllEnemies", "status": "status_weaken", "duration": 1, "magnitude": 25 },
+        { "effectId": "eff_apply_status", "target": "AllEnemies", "status": "status_vulnerable", "duration": 1, "magnitude": 25 }
       ]
     },
     {
@@ -122,18 +121,6 @@
       "price": 5,
       "effects": [
         { "effectId": "eff_post_combat_heal", "target": "Self", "percentOfMaxHealth": 3 }
-      ]
-    },
-    {
-      "id": "relic_marking_needle",
-      "displayName": "Marking Needle",
-      "relicID": 11,
-      "rarity": "Common",
-      "description": "The first time each turn you apply a mark, apply +1 extra mark (same element) to that target.",
-      "trigger": "passive",
-      "price": 5,
-      "effects": [
-        { "effectId": "eff_first_mark_bonus", "target": "Self", "extraMarks": 1 }
       ]
     },
     {
@@ -197,18 +184,6 @@
       ]
     },
     {
-      "id": "relic_reaction_rebate",
-      "displayName": "Reaction Rebate",
-      "relicID": 17,
-      "rarity": "Common",
-      "description": "The first reaction you trigger each turn refunds 1 AP.",
-      "trigger": "passive",
-      "price": 5,
-      "effects": [
-        { "effectId": "eff_reaction_ap_refund", "target": "Self", "amount": 1 }
-      ]
-    },
-    {
       "id": "relic_elemental_drip",
       "displayName": "Elemental Drip",
       "relicID": 18,
@@ -244,7 +219,18 @@
         { "effectId": "eff_perfect_reaction_save_mark", "target": "Self", "value": 1 }
       ]
     },
-
+    {
+      "id": "relic_piggy_bank",
+      "displayName": "Piggy Bank",
+      "relicID": 40,
+      "rarity": "Common",
+      "description": "Each time you kill an enemy gain +6 gold. Breaks when you spend gold.",
+      "trigger": "passive",
+      "price": 5,
+      "effects": [
+        { "effectId": "eff_gold_on_kill", "target": "Self", "goldAmount": 6 }
+      ]
+    },
     {
       "id": "relic_rhythm_discount",
       "displayName": "Rhythm Discount",
@@ -275,13 +261,12 @@
       "displayName": "Early Guard Override",
       "relicID": 23,
       "rarity": "Legendary",
-      "description": "Disable Defensive QTE for the first 2 turns of combat. Gain 10% more resistances.",
+      "description": "Disable Defensive QTE for the first 2 turns of combat. Gain 10% more resistances for 2 turns.",
       "trigger": "combatStart",
       "price": 0,
       "effects": [
         { "effectId": "eff_disable_system", "target": "Self", "disableTarget": "defensiveQTE", "disableDuration": 2 },
-        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "physicalResist", "value": 10 },
-        { "effectId": "eff_stat_bonus", "target": "Self", "stat": "elementalResist", "value": 10 }
+        { "effectId": "eff_temp_resist", "target": "Self", "value": 10, "duration": 2 }
       ]
     },
     {
@@ -361,7 +346,6 @@
         { "effectId": "eff_dual_reaction_shield", "target": "Self", "percentOfMaxHealth": 5 }
       ]
     },
-
     {
       "id": "relic_crippling_weakness",
       "displayName": "Crippling Weakness",
@@ -371,7 +355,7 @@
       "trigger": "combatStart",
       "price": 0,
       "effects": [
-        { "effectId": "eff_apply_status", "target": "Self", "status": "status_player_weaken", "duration": 2, "magnitude": 25 }
+        { "effectId": "eff_apply_status", "target": "Self", "status": "status_weaken", "duration": 2, "magnitude": 25 }
       ]
     },
     {
@@ -383,7 +367,7 @@
       "trigger": "combatStart",
       "price": 0,
       "effects": [
-        { "effectId": "eff_apply_status", "target": "Self", "status": "status_player_sunder", "duration": 2, "magnitude": 25 }
+        { "effectId": "eff_apply_status", "target": "Self", "status": "status_sunder", "duration": 2, "magnitude": 25 }
       ]
     },
     {
@@ -403,11 +387,11 @@
       "displayName": "Overcharged Ultimate",
       "relicID": 33,
       "rarity": "Cursed",
-      "description": "Increases the energy requirement of your ultimate by 100%.",
+      "description": "Increases the cooldown of your ultimate by +2 turns.",
       "trigger": "onAcquire",
       "price": 0,
       "effects": [
-        { "effectId": "eff_energy_cost_multiplier", "target": "Self", "multiplier": 2.0 }
+        { "effectId": "eff_ultimate_cooldown_bonus", "target": "Self", "value": 2 }
       ]
     },
     {
@@ -463,12 +447,12 @@
       "displayName": "Elemental Fog",
       "relicID": 38,
       "rarity": "Cursed",
-      "description": "You can't see enemy marks (UI hidden), but you gain +1 AP on turn 1.",
-      "trigger": "combatStart",
+      "description": "Hide enemy attack intentions. Every 3rd turn, randomize AP cost (0-3) of each skill except ultimate.",
+      "trigger": "onAcquire",
       "price": 0,
       "effects": [
-        { "effectId": "eff_hide_marks", "target": "Self", "disableTarget": "enemyMarks", "disableDuration": 0 },
-        { "effectId": "eff_ap_delta", "target": "Self", "amount": 1 }
+        { "effectId": "eff_hide_enemy_intentions", "target": "Self" },
+        { "effectId": "eff_randomize_ap_cost", "target": "Self", "interval": 3 }
       ]
     },
     {
